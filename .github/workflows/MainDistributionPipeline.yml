@@ -3,8 +3,8 @@
 #
 name: Main Extension Distribution Pipeline
 on:
-  push:
-  pull_request:
+  # push:
+  # pull_request:
   workflow_dispatch:
 
 concurrency:
@@ -18,5 +18,5 @@ jobs:
     with:
       duckdb_version: v1.3.1
       ci_tools_version: v1.3.1
-      extension_name: capi_quack
+      extension_name: odbc_scanner
       extra_toolchains: python3

@@ -26,12 +26,19 @@ endif()
 ###
 # Build
 ###
-project(${EXTENSION_NAME} LANGUAGES C)
+project(${EXTENSION_NAME} LANGUAGES C CXX)
+
+find_package(ODBC REQUIRED)
+message(STATUS "ODBC library found at: " ${ODBC_LIBRARIES})
+get_filename_component(ODBC_LIB_DIR ${ODBC_LIBRARIES} DIRECTORY)
+find_library(ODBCINST_LIB NAMES odbcinst libodbcinst REQUIRED HINTS ${ODBC_LIB_DIR})
+
+set(CMAKE_CXX_STANDARD "11" CACHE STRING "C++ standard to enforce")
 
 # Create Extension library
 set(EXTENSION_SOURCES
-        src/add_numbers.c
-        src/capi_quack.c
+        src/capi_odbc_scanner.c
+        src/odbc_query.cpp
 )
 
 if (DUCKDB_WASM_EXTENSION)
@@ -47,8 +54,18 @@ set(VISIBILITY_INLINES_HIDDEN ON)
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
 
-# Include own headers
-target_include_directories(${EXTENSION_NAME} PRIVATE src/include)
+target_include_directories(${EXTENSION_NAME} PRIVATE
+    duckdb_capi
+    ${ODBC_INCLUDE_DIRS}
+    src/include
+)
 
-# Include DuckDB C API headers
-target_include_directories(${EXTENSION_NAME} PRIVATE duckdb_capi)
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_compile_options(${EXTENSION_NAME} PRIVATE "-O0")
+endif ()
+
+target_link_libraries(${EXTENSION_NAME} PRIVATE
+  ${ODBC_LIBRARIES}
+)
+
+add_subdirectory(test)

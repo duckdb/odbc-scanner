@@ -1,0 +1,19 @@
+# name: test/sql/odbc_scanner.test
+# description: test odbc_scanner extension
+# group: [odbc_scanner]
+
+# Before we load the extension, this will fail
+statement error
+SELECT * FROM odbc_query('SELECT unnest([41, 42, 43])')
+----
+Catalog Error: Table Function with name odbc_query does not exist!
+
+# Require statement will ensure the extension is loaded from now on
+require odbc_scanner
+
+query I
+SELECT * FROM odbc_query('Driver=TODO', 'SELECT unnest([41, 42, 43])')
+----
+41
+42
+43

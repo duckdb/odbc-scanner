@@ -1,11 +1,12 @@
-# DuckDB C/C++ extension template
-This is an **experimental** template for C/C++ based extensions that link with the **C Extension API** of DuckDB. Note that this
-is different from https://github.com/duckdb/extension-template, which links against the C++ API of DuckDB.
+# DuckDB ODBC Scanner
 
-Features:
-- No DuckDB build required
-- CI/CD chain preconfigured
-- (Coming soon) Works with community extensions
+ODBC Scanner extension that links with the **C Extension API** of DuckDB.
+
+## Usage example
+
+```
+SELECT * FROM odbc_query('Driver={...}', 'SELECT 42')
+```
 
 ## Cloning
 Clone the repo with submodules
@@ -23,6 +24,7 @@ tooling to make life a little easier and to be able to share CI/CD infrastructur
 - [Make](https://www.gnu.org/software/make)
 - CMake
 - Git
+- unixODBC
 - (Optional) Ninja + ccache
 
 Installing these dependencies will vary per platform:
