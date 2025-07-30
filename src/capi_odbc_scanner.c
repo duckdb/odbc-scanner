@@ -5,6 +5,8 @@ DUCKDB_EXTENSION_ENTRYPOINT(duckdb_connection connection, duckdb_extension_info 
 	(void)info;
 	(void)access;
 
+	odbc_connect_register(connection);
+	odbc_close_register(connection);
 	odbc_query_register(connection);
 
 	return true;

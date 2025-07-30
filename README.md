@@ -5,7 +5,13 @@ ODBC Scanner extension that links with the **C Extension API** of DuckDB.
 ## Usage example
 
 ```
-SELECT * FROM odbc_query('Driver={...}', 'SELECT 42')
+LOAD odbc_scanner;
+
+SET VARIABLE postgres_conn = odbc_connect('DSN=postgres1;');
+
+SELECT * FROM odbc_query(getvariable('postgres_conn'), 'SELECT pg_backend_pid()');
+
+SELECT odbc_close(getvariable('postgres_conn'));
 ```
 
 ## Cloning

@@ -22,10 +22,18 @@ TEST_CASE("Scanner basic test", "[basic]") {
 	std::string load_query = "LOAD '" + std::string(ODBC_SCANNER_EXTENSION_FILE_PATH_STR) + "'";
 	REQUIRE(duckdb_query(connection, load_query.c_str(), &result) == DuckDBSuccess);
 
-	REQUIRE(duckdb_query(connection, "SELECT * FROM odbc_query('Driver=TODO', 'SELECT 42')", &result) == DuckDBSuccess);
+	REQUIRE(duckdb_query(connection, "SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};threads=1;')",
+	                     &result) == DuckDBSuccess);
 
-	int64_t val = duckdb_value_int64(&result, 0, 0);
-	REQUIRE(val == 42);
+	REQUIRE(duckdb_query(connection, "SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42')", &result) ==
+	        DuckDBSuccess);
+	REQUIRE(duckdb_value_int64(&result, 0, 0) == 42);
+
+	REQUIRE(duckdb_query(connection, "SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 43')", &result) ==
+	        DuckDBSuccess);
+	REQUIRE(duckdb_value_int64(&result, 0, 0) == 43);
+
+	REQUIRE(duckdb_query(connection, "SELECT odbc_close(getvariable('conn'))", &result) == DuckDBSuccess);
 
 	duckdb_disconnect(&connection);
 	duckdb_close(&database);
