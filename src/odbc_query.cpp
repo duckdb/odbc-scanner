@@ -1,5 +1,7 @@
 #include "capi_odbc_scanner.h"
+#include "common.hpp"
 #include "odbc_connection.hpp"
+#include "scanner_exception.hpp"
 
 #include <memory>
 #include <sql.h>
@@ -9,25 +11,7 @@
 
 DUCKDB_EXTENSION_EXTERN
 
-// todo: error handling
-
-struct QueryContext {
-	OdbcConnection &conn;
-
-	// todo: enum
-	bool finished = false;
-
-	QueryContext(OdbcConnection &conn_in) : conn(conn_in) {
-	}
-
-	QueryContext &operator=(const QueryContext &) = delete;
-	QueryContext &operator=(QueryContext &&other);
-
-	static void Destroy(void *ctx_in) noexcept {
-		auto ctx = reinterpret_cast<QueryContext *>(ctx_in);
-		delete ctx;
-	}
-};
+namespace odbcscanner {
 
 struct BindData {
 	OdbcConnection &conn;
@@ -52,7 +36,25 @@ struct BindData {
 	}
 };
 
-void odbc_query_bind(duckdb_bind_info info) noexcept {
+struct LocalInitData {
+	OdbcConnection &conn;
+
+	// todo: enum
+	bool finished = false;
+
+	LocalInitData(OdbcConnection &conn_in) : conn(conn_in) {
+	}
+
+	LocalInitData &operator=(const LocalInitData &) = delete;
+	LocalInitData &operator=(LocalInitData &&other);
+
+	static void Destroy(void *ctx_in) noexcept {
+		auto ctx = reinterpret_cast<LocalInitData *>(ctx_in);
+		delete ctx;
+	}
+};
+
+static void Bind(duckdb_bind_info info) {
 	duckdb_value conn_ptr_val = duckdb_bind_get_parameter(info, 0);
 	int64_t conn_ptr_num = duckdb_get_int64(conn_ptr_val);
 	OdbcConnection *conn_ptr = reinterpret_cast<OdbcConnection *>(conn_ptr_num);
@@ -104,19 +106,15 @@ void odbc_query_bind(duckdb_bind_info info) noexcept {
 	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
 }
 
-void odbc_query_init(duckdb_init_info info) noexcept {
-	(void)info;
-}
-
-void odbc_query_local_init(duckdb_init_info info) noexcept {
+static void LocalInit(duckdb_init_info info) {
 	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_init_get_bind_data(info));
-	auto ctx_ptr = std::unique_ptr<QueryContext>(new QueryContext(bdata.conn));
-	duckdb_init_set_init_data(info, ctx_ptr.release(), QueryContext::Destroy);
+	auto ctx_ptr = std::unique_ptr<LocalInitData>(new LocalInitData(bdata.conn));
+	duckdb_init_set_init_data(info, ctx_ptr.release(), LocalInitData::Destroy);
 }
 
-void odbc_query_function(duckdb_function_info info, duckdb_data_chunk output) noexcept {
+static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_function_get_bind_data(info));
-	QueryContext &ctx = *reinterpret_cast<QueryContext *>(duckdb_function_get_local_init_data(info));
+	LocalInitData &ctx = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
 
 	if (ctx.finished) {
 		duckdb_data_chunk_set_size(output, 0);
@@ -171,7 +169,37 @@ void odbc_query_function(duckdb_function_info info, duckdb_data_chunk output) no
 	duckdb_data_chunk_set_size(output, row_idx);
 }
 
-void odbc_query_register(duckdb_connection conn) /* noexcept */ {
+} // namespace odbcscanner
+
+void odbc_query_bind(duckdb_bind_info info) noexcept {
+	try {
+		odbcscanner::Bind(info);
+	} catch (std::exception &e) {
+		duckdb_bind_set_error(info, e.what());
+	}
+}
+
+void odbc_query_init(duckdb_init_info info) noexcept {
+	(void)info;
+}
+
+void odbc_query_local_init(duckdb_init_info info) noexcept {
+	try {
+		odbcscanner::LocalInit(info);
+	} catch (std::exception &e) {
+		duckdb_init_set_error(info, e.what());
+	}
+}
+
+void odbc_query_function(duckdb_function_info info, duckdb_data_chunk output) noexcept {
+	try {
+		odbcscanner::Query(info, output);
+	} catch (std::exception &e) {
+		duckdb_function_set_error(info, e.what());
+	}
+}
+
+duckdb_state odbc_query_register(duckdb_connection conn) /* noexcept */ {
 	duckdb_table_function fun = duckdb_create_table_function();
 	duckdb_table_function_set_name(fun, "odbc_query");
 
@@ -190,6 +218,8 @@ void odbc_query_register(duckdb_connection conn) /* noexcept */ {
 	duckdb_table_function_set_function(fun, odbc_query_function);
 
 	// register and cleanup
-	duckdb_register_table_function(conn, fun);
+	duckdb_state state = duckdb_register_table_function(conn, fun);
 	duckdb_destroy_table_function(&fun);
+
+	return state;
 }

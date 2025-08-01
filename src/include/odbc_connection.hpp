@@ -1,7 +1,11 @@
+#pragma once
+
 #include <cstdint>
 #include <sql.h>
 #include <sqlext.h>
 #include <string>
+
+namespace odbcscanner {
 
 struct OdbcConnection {
 	SQLHANDLE env = nullptr;
@@ -25,3 +29,5 @@ struct OdbcConnection {
 		SQLFreeHandle(SQL_HANDLE_ENV, env);
 	}
 };
+
+} // namespace odbcscanner

@@ -1,5 +1,8 @@
 #include "capi_odbc_scanner.h"
+#include "common.hpp"
+#include "make_unique.hpp"
 #include "odbc_connection.hpp"
+#include "scanner_exception.hpp"
 
 #include <memory>
 #include <sql.h>
@@ -8,31 +11,31 @@
 
 DUCKDB_EXTENSION_EXTERN
 
-// todo: error handling
+namespace odbcscanner {
 
-void odbc_connect_function(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) noexcept {
+static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
 	(void)info;
 
-	idx_t input_size = duckdb_data_chunk_get_size(input);
-	if (input_size != 1) {
-		// todo: throw
-		return;
-	}
+	CheckChunkRowsCount(input);
+	std::string url = ExtractStringFromChunk(input, 0);
 
-	duckdb_vector url_vec = duckdb_data_chunk_get_vector(input, 0);
-	duckdb_string_t *url_data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(url_vec));
-	duckdb_string_t url_str_t = url_data[0];
-	const char *url_cstr = duckdb_string_t_data(&url_str_t);
-	uint32_t url_len = duckdb_string_t_length(url_str_t);
-	std::string url(url_cstr, url_len);
-
-	auto oc_ptr = std::unique_ptr<OdbcConnection>(new OdbcConnection(url));
+	auto oc_ptr = std_make_unique<OdbcConnection>(url);
 
 	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
 	result_data[0] = reinterpret_cast<int64_t>(oc_ptr.release());
 }
 
-void odbc_connect_register(duckdb_connection conn) /* noexcept */ {
+} // namespace odbcscanner
+
+void odbc_connect_function(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) noexcept {
+	try {
+		odbcscanner::Connect(info, input, output);
+	} catch (std::exception &e) {
+		duckdb_scalar_function_set_error(info, e.what());
+	}
+}
+
+duckdb_state odbc_connect_register(duckdb_connection conn) /* noexcept */ {
 	duckdb_scalar_function fun = duckdb_create_scalar_function();
 	duckdb_scalar_function_set_name(fun, "odbc_connect");
 
@@ -48,6 +51,8 @@ void odbc_connect_register(duckdb_connection conn) /* noexcept */ {
 	duckdb_scalar_function_set_function(fun, odbc_connect_function);
 
 	// register and cleanup
-	duckdb_register_scalar_function(conn, fun);
+	duckdb_state state = duckdb_register_scalar_function(conn, fun);
 	duckdb_destroy_scalar_function(&fun);
+
+	return state;
 }
