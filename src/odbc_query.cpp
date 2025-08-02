@@ -1,7 +1,10 @@
 #include "capi_odbc_scanner.h"
+#include "capi_pointers.hpp"
 #include "common.hpp"
+#include "fetch.hpp"
 #include "odbc_connection.hpp"
 #include "scanner_exception.hpp"
+#include "types.hpp"
 
 #include <memory>
 #include <sql.h>
@@ -10,6 +13,11 @@
 #include <vector>
 
 DUCKDB_EXTENSION_EXTERN
+
+static void odbc_query_bind(duckdb_bind_info info) noexcept;
+static void odbc_query_init(duckdb_init_info info) noexcept;
+static void odbc_query_local_init(duckdb_init_info info) noexcept;
+static void odbc_query_function(duckdb_function_info info, duckdb_data_chunk output) noexcept;
 
 namespace odbcscanner {
 
@@ -25,7 +33,7 @@ struct BindData {
 	BindData &operator=(const BindData &) = delete;
 	BindData &operator=(BindData &&other) = delete;
 
-	~BindData() {
+	~BindData() noexcept {
 		SQLFreeStmt(hstmt, SQL_CLOSE);
 		SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
 	}
@@ -55,51 +63,76 @@ struct LocalInitData {
 };
 
 static void Bind(duckdb_bind_info info) {
-	duckdb_value conn_ptr_val = duckdb_bind_get_parameter(info, 0);
-	int64_t conn_ptr_num = duckdb_get_int64(conn_ptr_val);
-	OdbcConnection *conn_ptr = reinterpret_cast<OdbcConnection *>(conn_ptr_num);
-	OdbcConnection &conn = *conn_ptr;
-	duckdb_destroy_value(&conn_ptr_val);
+	auto conn_ptr_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
+	if (duckdb_is_null_value(conn_ptr_val.get())) {
+		throw ScannerException("'odbc_query': specified ODBC connection is NULL");
+	}
+	int64_t conn_ptr_num = duckdb_get_int64(conn_ptr_val.get());
+	OdbcConnection &conn = *reinterpret_cast<OdbcConnection *>(conn_ptr_num);
 
-	duckdb_value query_val = duckdb_bind_get_parameter(info, 1);
-	char *query_ptr = duckdb_get_varchar(query_val);
+	auto query_val = ValuePtr(duckdb_bind_get_parameter(info, 1), ValueDeleter);
+	if (duckdb_is_null_value(query_val.get())) {
+		throw ScannerException("'odbc_query': specified SQL query is NULL");
+	}
+	char *query_ptr = duckdb_get_varchar(query_val.get());
 	std::string query(query_ptr);
-	duckdb_destroy_value(&query_val);
 
 	HSTMT hstmt = SQL_NULL_HSTMT;
-	SQLAllocHandle(SQL_HANDLE_STMT, conn.dbc, &hstmt);
-	SQLPrepare(hstmt, reinterpret_cast<SQLCHAR *>(const_cast<char *>(query.c_str())), SQL_NTS);
+	{
+		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_STMT, conn.dbc, &hstmt);
+		if (!SQL_SUCCEEDED(ret)) {
+			throw ScannerException("'SQLAllocHandle' failed for STMT handle, return: " + std::to_string(ret));
+		}
+	}
+	{
+		SQLRETURN ret = SQLPrepare(hstmt, reinterpret_cast<SQLCHAR *>(const_cast<char *>(query.c_str())), SQL_NTS);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
+			throw ScannerException("'SQLPrepare' failed, query: '" + query + "', return: " + std::to_string(ret) +
+			                       ", diagnostics: '" + diag + "'");
+		}
+	}
 
 	SQLSMALLINT cols_count = 0;
-	SQLNumResultCols(hstmt, &cols_count);
+	{
+		SQLRETURN ret = SQLNumResultCols(hstmt, &cols_count);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
+			throw ScannerException("'SQLNumResultCols' failed, query: '" + query + "', return: " + std::to_string(ret) +
+			                       ", diagnostics: '" + diag + "'");
+		}
+	}
 
-	for (SQLSMALLINT i = 0; i < cols_count; i++) {
+	for (SQLSMALLINT col_idx = 1; col_idx <= cols_count; col_idx++) {
 		SQLLEN ctype = -1;
-		SQLColAttribute(hstmt, i + 1, SQL_DESC_CONCISE_TYPE, nullptr, 0, nullptr, &ctype);
-
-		duckdb_logical_type lt = nullptr;
-		switch (ctype) {
-		case SQL_INTEGER: {
-			lt = duckdb_create_logical_type(DUCKDB_TYPE_BIGINT);
-			break;
-		}
-		case SQL_VARCHAR: {
-			lt = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
-			break;
-		}
-		default:
-			// todo
-			return;
+		{
+			SQLRETURN ret = SQLColAttribute(hstmt, col_idx, SQL_DESC_CONCISE_TYPE, nullptr, 0, nullptr, &ctype);
+			if (!SQL_SUCCEEDED(ret)) {
+				std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
+				throw ScannerException("'SQLColAttribute' for type failed, column index: " + std::to_string(col_idx) +
+				                       ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
+				                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+			}
 		}
 
 		std::vector<SQLCHAR> buf;
 		SQLSMALLINT len = 0;
 		buf.resize(1024);
-		SQLColAttribute(hstmt, i + 1, SQL_DESC_NAME, buf.data(), static_cast<SQLSMALLINT>(buf.size()), &len, nullptr);
+		{
+			SQLRETURN ret = SQLColAttribute(hstmt, col_idx, SQL_DESC_NAME, buf.data(),
+			                                static_cast<SQLSMALLINT>(buf.size()), &len, nullptr);
+			if (!SQL_SUCCEEDED(ret)) {
+				std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
+				throw ScannerException("'SQLColAttribute' for name failed, column index: " + std::to_string(col_idx) +
+				                       ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
+				                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+			}
+		}
 		std::string name(reinterpret_cast<char *>(buf.data()), len);
 
-		duckdb_bind_add_result_column(info, name.c_str(), lt);
-		duckdb_destroy_logical_type(&lt);
+		duckdb_type dtype = OdbcCTypeToDuckType(ctype);
+		auto ltype = LogicalTypePtr(duckdb_create_logical_type(dtype), LogicalTypeDeleter);
+		duckdb_bind_add_result_column(info, name.c_str(), ltype.get());
 	}
 
 	auto bdata_ptr = std::unique_ptr<BindData>(new BindData(conn, std::move(query), hstmt));
@@ -114,64 +147,101 @@ static void LocalInit(duckdb_init_info info) {
 
 static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_function_get_bind_data(info));
-	LocalInitData &ctx = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
+	LocalInitData &ldata = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
 
-	if (ctx.finished) {
+	if (ldata.finished) {
 		duckdb_data_chunk_set_size(output, 0);
 		return;
 	}
 
-	SQLExecute(bdata.hstmt);
+	{
+		SQLRETURN ret = SQLExecute(bdata.hstmt);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = ReadDiagnostics(bdata.hstmt, SQL_HANDLE_STMT);
+			throw ScannerException("'SQLExecute' failed, query: '" + bdata.query + "', return: " + std::to_string(ret) +
+			                       ", diagnostics: '" + diag + "'");
+		}
+	}
 
 	SQLSMALLINT cols_count = 0;
-	SQLNumResultCols(bdata.hstmt, &cols_count);
+	{
+		SQLRETURN ret = SQLNumResultCols(bdata.hstmt, &cols_count);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = ReadDiagnostics(bdata.hstmt, SQL_HANDLE_STMT);
+			throw ScannerException("'SQLNumResultCols' failed, query: '" + bdata.query +
+			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
+	}
 
 	idx_t row_idx = 0;
 	for (; row_idx < duckdb_vector_size(); row_idx++) {
 
-		SQLRETURN status = SQLFetch(bdata.hstmt);
-		if (status != SQL_SUCCESS) {
-			ctx.finished = true;
-			break;
+		{
+			SQLRETURN ret = SQLFetch(bdata.hstmt);
+			if (!SQL_SUCCEEDED(ret)) {
+				ldata.finished = true;
+				if (ret != SQL_NO_DATA) {
+					std::string diag = ReadDiagnostics(bdata.hstmt, SQL_HANDLE_STMT);
+					throw ScannerException("'SQLFetch' failed, query: '" + bdata.query +
+					                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+				}
+				break;
+			}
 		}
 
-		for (idx_t col_idx = 0; col_idx < static_cast<idx_t>(cols_count); col_idx++) {
-			duckdb_vector vec = duckdb_data_chunk_get_vector(output, col_idx);
+		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(cols_count); col_idxz++) {
+			SQLSMALLINT col_idx = static_cast<SQLSMALLINT>(col_idxz + 1);
+
+			duckdb_vector vec = duckdb_data_chunk_get_vector(output, col_idxz);
+			if (vec == nullptr) {
+				throw ScannerException("Vector is NULL, query: '" + bdata.query + "', columns count: " +
+				                       std::to_string(cols_count) + ", column index: " + std::to_string(col_idxz));
+			}
+
 			SQLLEN ctype = -1;
-			SQLColAttribute(bdata.hstmt, static_cast<SQLSMALLINT>(col_idx + 1), SQL_DESC_CONCISE_TYPE, nullptr, 0,
-			                nullptr, &ctype);
-			switch (ctype) {
-			case SQL_INTEGER: {
-				int64_t *vec_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
-				int32_t fetched = 0;
-				SQLGetData(bdata.hstmt, static_cast<SQLSMALLINT>(col_idx + 1), SQL_C_SLONG, &fetched, sizeof(fetched),
-				           nullptr);
-				vec_data[row_idx] = fetched;
-				break;
+			{
+				SQLRETURN ret =
+				    SQLColAttribute(bdata.hstmt, col_idx, SQL_DESC_CONCISE_TYPE, nullptr, 0, nullptr, &ctype);
+				if (!SQL_SUCCEEDED(ret)) {
+					std::string diag = ReadDiagnostics(bdata.hstmt, SQL_HANDLE_STMT);
+					throw ScannerException(
+					    "'SQLColAttribute' for type failed, column index: " + std::to_string(col_idx) +
+					    ", columns count: " + std::to_string(cols_count) + ", query: '" + bdata.query +
+					    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+				}
 			}
-			case SQL_VARCHAR: {
-				// todo: parts
-				std::vector<SQLCHAR> buf;
-				buf.resize(1024);
-				SQLLEN len = 0;
-				SQLGetData(bdata.hstmt, col_idx + 1, SQL_C_CHAR, buf.data(), static_cast<SQLSMALLINT>(buf.size()),
-				           &len);
-				std::string str(reinterpret_cast<char *>(buf.data()), len);
-				duckdb_vector_assign_string_element_len(vec, row_idx, str.c_str(), str.length());
-				break;
-			}
-			default:
-				// todo
-				break;
-			}
+
+			FetchIntoVector(ctype, bdata.query, bdata.hstmt, col_idx, vec, row_idx);
 		}
 	}
 	duckdb_data_chunk_set_size(output, row_idx);
 }
 
+static duckdb_state Register(duckdb_connection conn) {
+	auto fun = TableFunctionPtr(duckdb_create_table_function(), TableFunctionDeleter);
+	duckdb_table_function_set_name(fun.get(), "odbc_query");
+
+	// parameters
+	auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
+	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
+	duckdb_table_function_add_parameter(fun.get(), bigint_type.get());
+	duckdb_table_function_add_parameter(fun.get(), varchar_type.get());
+
+	// callbacks
+	duckdb_table_function_set_bind(fun.get(), odbc_query_bind);
+	duckdb_table_function_set_init(fun.get(), odbc_query_init);
+	duckdb_table_function_set_local_init(fun.get(), odbc_query_local_init);
+	duckdb_table_function_set_function(fun.get(), odbc_query_function);
+
+	// register and cleanup
+	duckdb_state state = duckdb_register_table_function(conn, fun.get());
+
+	return state;
+}
+
 } // namespace odbcscanner
 
-void odbc_query_bind(duckdb_bind_info info) noexcept {
+static void odbc_query_bind(duckdb_bind_info info) noexcept {
 	try {
 		odbcscanner::Bind(info);
 	} catch (std::exception &e) {
@@ -179,11 +249,11 @@ void odbc_query_bind(duckdb_bind_info info) noexcept {
 	}
 }
 
-void odbc_query_init(duckdb_init_info info) noexcept {
+static void odbc_query_init(duckdb_init_info info) noexcept {
 	(void)info;
 }
 
-void odbc_query_local_init(duckdb_init_info info) noexcept {
+static void odbc_query_local_init(duckdb_init_info info) noexcept {
 	try {
 		odbcscanner::LocalInit(info);
 	} catch (std::exception &e) {
@@ -191,7 +261,7 @@ void odbc_query_local_init(duckdb_init_info info) noexcept {
 	}
 }
 
-void odbc_query_function(duckdb_function_info info, duckdb_data_chunk output) noexcept {
+static void odbc_query_function(duckdb_function_info info, duckdb_data_chunk output) noexcept {
 	try {
 		odbcscanner::Query(info, output);
 	} catch (std::exception &e) {
@@ -200,26 +270,10 @@ void odbc_query_function(duckdb_function_info info, duckdb_data_chunk output) no
 }
 
 duckdb_state odbc_query_register(duckdb_connection conn) /* noexcept */ {
-	duckdb_table_function fun = duckdb_create_table_function();
-	duckdb_table_function_set_name(fun, "odbc_query");
-
-	// parameters
-	duckdb_logical_type bigint_type = duckdb_create_logical_type(DUCKDB_TYPE_BIGINT);
-	duckdb_logical_type varchar_type = duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR);
-	duckdb_table_function_add_parameter(fun, bigint_type);
-	duckdb_table_function_add_parameter(fun, varchar_type);
-	duckdb_destroy_logical_type(&varchar_type);
-	duckdb_destroy_logical_type(&bigint_type);
-
-	// callbacks
-	duckdb_table_function_set_bind(fun, odbc_query_bind);
-	duckdb_table_function_set_init(fun, odbc_query_init);
-	duckdb_table_function_set_local_init(fun, odbc_query_local_init);
-	duckdb_table_function_set_function(fun, odbc_query_function);
-
-	// register and cleanup
-	duckdb_state state = duckdb_register_table_function(conn, fun);
-	duckdb_destroy_table_function(&fun);
-
-	return state;
+	try {
+		return odbcscanner::Register(conn);
+	} catch (std::exception &e) {
+		(void)e;
+		return DuckDBError;
+	}
 }

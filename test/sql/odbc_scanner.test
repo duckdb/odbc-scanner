@@ -5,19 +5,61 @@
 #statement ok
 #PRAGMA threads=1
 
-# Before we load the extension, this will fail
 statement error
 SELECT * FROM odbc_query()
 ----
 Catalog Error: Table Function with name odbc_query does not exist!
 
-# Require statement will ensure the extension is loaded from now on
 require odbc_scanner
 
-# Open ODBC connection
+statement error
+SET VARIABLE conn = odbc_connect()
+----
+Binder Error: No function matches the given name and argument types 'odbc_connect()'. You might need to add explicit type casts.
+	Candidate functions:
+	odbc_connect(VARCHAR) -> BIGINT
+
+query I
+SELECT odbc_connect(NULL)
+----
+NULL
+
+statement error
+SET VARIABLE conn = odbc_connect('fail')
+----
+Invalid Input Error: 'SQLDriverConnect' failed, url: 'fail', return: -1, diagnostics: 'IM002(0): [unixODBC][Driver Manager]Data source name not found and no default driver specified'
+
+statement error
+SET VARIABLE conn = odbc_connect('Driver=fail')
+----
+Invalid Input Error: 'SQLDriverConnect' failed, url: 'Driver=fail', return: -1, diagnostics: '01000(0): [unixODBC][Driver Manager]Can't open lib 'fail' : file not found'
+
+statement ok
+SET VARIABLE conn = NULL
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42')
+----
+Binder Error: 'odbc_query': specified ODBC connection is NULL
 
 statement ok
 SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+
+statement error
+SELECT * FROM odbc_query(NULL, 'SELECT 42')
+----
+Binder Error: 'odbc_query': specified ODBC connection is NULL
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), NULL)
+----
+Binder Error: 'odbc_query': specified SQL query is NULL
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'FAIL')
+----
+Binder Error: 'SQLPrepare' failed, query: 'FAIL', return: -1, diagnostics: '42000(0): ODBC_DuckDB->PrepareStmt
+Parser Error: syntax error at or near "FAIL"
 
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT unnest([41, 42, 43])')
@@ -26,11 +68,15 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT unnest([41, 42, 43])')
 42
 43
 
-# todo: columns
 query II
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''foo'', 42')
 ----
 foo	42
+
+query I
+SELECT odbc_close(NULL)
+----
+NULL
 
 statement ok
 SELECT odbc_close(getvariable('conn'))

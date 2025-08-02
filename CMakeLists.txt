@@ -39,9 +39,12 @@ set(CMAKE_CXX_STANDARD "11" CACHE STRING "C++ standard to enforce")
 set(EXTENSION_SOURCES
     src/capi_odbc_scanner.c
     src/common.cpp
+    src/fetch.cpp
     src/odbc_close.cpp
     src/odbc_connect.cpp
+    src/odbc_connection.cpp
     src/odbc_query.cpp
+    src/types.cpp
 )
 
 if (DUCKDB_WASM_EXTENSION)
