@@ -43,8 +43,10 @@ set(EXTENSION_SOURCES
     src/odbc_close.cpp
     src/odbc_connect.cpp
     src/odbc_connection.cpp
+    src/odbc_params.cpp
     src/odbc_query.cpp
     src/types.cpp
+    src/params.cpp
 )
 
 if (DUCKDB_WASM_EXTENSION)

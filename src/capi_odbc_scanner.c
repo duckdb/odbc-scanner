@@ -26,5 +26,12 @@ DUCKDB_EXTENSION_ENTRYPOINT(duckdb_connection connection, duckdb_extension_info 
 		}
 	}
 
+	{
+		duckdb_state state = odbc_params_register(connection);
+		if (state != DuckDBSuccess) {
+			return false;
+		}
+	}
+
 	return true;
 }

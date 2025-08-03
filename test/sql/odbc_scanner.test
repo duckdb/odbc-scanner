@@ -38,7 +38,7 @@ statement ok
 SET VARIABLE conn = NULL
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42', NULL)
 ----
 Binder Error: 'odbc_query': specified ODBC connection is NULL
 
@@ -46,32 +46,37 @@ statement ok
 SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
 
 statement error
-SELECT * FROM odbc_query(NULL, 'SELECT 42')
+SELECT * FROM odbc_query(NULL, 'SELECT 42', NULL)
 ----
 Binder Error: 'odbc_query': specified ODBC connection is NULL
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), NULL)
+SELECT * FROM odbc_query(getvariable('conn'), NULL, NULL)
 ----
 Binder Error: 'odbc_query': specified SQL query is NULL
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'FAIL')
+SELECT * FROM odbc_query(getvariable('conn'), 'FAIL', NULL)
 ----
 Binder Error: 'SQLPrepare' failed, query: 'FAIL', return: -1, diagnostics: '42000(0): ODBC_DuckDB->PrepareStmt
 Parser Error: syntax error at or near "FAIL"
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT unnest([41, 42, 43])')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT unnest([41, 42, 43])', NULL)
 ----
 41
 42
 43
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''foo'', 42')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''foo'', 42', NULL)
 ----
 foo	42
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER + ?::INTEGER', odbc_params(41, 42))
+----
+83
 
 query I
 SELECT odbc_close(NULL)
