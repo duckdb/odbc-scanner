@@ -14,8 +14,6 @@ static void odbc_params_function(duckdb_function_info info, duckdb_data_chunk in
 
 namespace odbcscanner {
 
-// todo: null handling
-
 static void Params(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
 	(void)info;
 
@@ -44,6 +42,10 @@ static duckdb_state Register(duckdb_connection conn) {
 
 	// callbacks
 	duckdb_scalar_function_set_function(fun.get(), odbc_params_function);
+
+	// options
+	duckdb_scalar_function_set_volatile(fun.get());
+	duckdb_scalar_function_set_special_handling(fun.get());
 
 	// register and cleanup
 	duckdb_state state = duckdb_register_scalar_function(conn, fun.get());

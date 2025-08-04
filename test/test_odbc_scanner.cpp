@@ -27,18 +27,24 @@ TEST_CASE("Scanner basic test", "[basic]") {
 	REQUIRE(duckdb_query(connection, "SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};threads=1;')",
 	                     &result) == DuckDBSuccess);
 
-	REQUIRE(duckdb_query(connection, "SELECT odbc_params(41, 42)", &result) == DuckDBSuccess);
+	REQUIRE(duckdb_query(connection, "SELECT odbc_params(NULL::INTEGER, 42)", &result) == DuckDBSuccess);
+
+	REQUIRE(duckdb_query(connection,
+	                     "SELECT * FROM odbc_query(getvariable('conn'), 'SELECT coalesce(?::INTEGER, ?::INTEGER)', "
+	                     "params=odbc_params(NULL, 42))",
+	                     &result) == DuckDBSuccess);
+	REQUIRE(duckdb_value_int64(&result, 0, 0) == 42);
 
 	REQUIRE(duckdb_query(connection,
 	                     "SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER, ?::INTEGER, ?::INTEGER', "
-	                     "odbc_params(41, 42, 43))",
+	                     "params=odbc_params(41, 42, 43))",
 	                     &result) == DuckDBSuccess);
 	REQUIRE(duckdb_value_int64(&result, 0, 0) == 41);
 	REQUIRE(duckdb_value_int64(&result, 1, 0) == 42);
 	REQUIRE(duckdb_value_int64(&result, 2, 0) == 43);
 
-	REQUIRE(duckdb_query(connection, "SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''foo''', NULL)",
-	                     &result) == DuckDBSuccess);
+	REQUIRE(duckdb_query(connection, "SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''foo''')", &result) ==
+	        DuckDBSuccess);
 	REQUIRE(std::strcmp(duckdb_value_varchar(&result, 0, 0), "foo") == 0);
 
 	REQUIRE(duckdb_query(connection, "SELECT odbc_close(getvariable('conn'))", &result) == DuckDBSuccess);

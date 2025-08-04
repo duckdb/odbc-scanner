@@ -24,7 +24,18 @@ static void SetInteger(const std::string &query, HSTMT hstmt, duckdb_value value
 	                                 reinterpret_cast<SQLPOINTER>(num_ptr), num_len, &num_len);
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLBindParameter' INTEGER failed, value: " + std::to_string(num) + ", query: '" +
+		throw ScannerException("'SQLBindParameter' INTEGER failed, value: " + std::to_string(num) +
+		                       ", index: " + std::to_string(param_idx) + ", query: '" + query +
+		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+	}
+}
+
+static void SetNull(const std::string &query, HSTMT hstmt, SQLSMALLINT param_idx) {
+	SQLLEN ind = SQL_NULL_DATA;
+	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, 0, 0, NULL, 0, &ind);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
+		throw ScannerException("'SQLBindParameter' NULL failed, index: " + std::to_string(param_idx) + ", query: '" +
 		                       query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
 }
@@ -39,6 +50,10 @@ void SetOdbcParam(const std::string &query, HSTMT hstmt, duckdb_value value, SQL
 		SetInteger(query, hstmt, value, param_idx, holder);
 		return;
 	}
+	case DUCKDB_TYPE_SQLNULL: {
+		SetNull(query, hstmt, param_idx);
+		return;
+	}
 	default: {
 		throw ScannerException("Unsupported parameter type: " + std::to_string(type_id));
 	}
@@ -51,6 +66,11 @@ ValuePtr ExtractInputParam(duckdb_data_chunk input, idx_t col_idx) {
 	auto vec = duckdb_data_chunk_get_vector(input, col_idx);
 	if (vec == nullptr) {
 		throw ScannerException(err_prefix + "vector is NULL");
+	}
+
+	uint64_t *validity = duckdb_vector_get_validity(vec);
+	if (validity != nullptr && !duckdb_validity_row_is_valid(validity, 0)) {
+		return ValuePtr(duckdb_create_null_value(), ValueDeleter);
 	}
 
 	auto logical_type = duckdb_vector_get_column_type(vec);
