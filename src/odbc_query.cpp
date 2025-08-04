@@ -83,9 +83,9 @@ static void Bind(duckdb_bind_info info) {
 	char *query_ptr = duckdb_get_varchar(query_val.get());
 	std::string query(query_ptr);
 
-	auto params_ptr_val = ValuePtr(duckdb_bind_get_parameter(info, 2), ValueDeleter);
+	auto params_ptr_val = ValuePtr(duckdb_bind_get_named_parameter(info, "params"), ValueDeleter);
 	std::vector<ValuePtr> params;
-	if (!duckdb_is_null_value(params_ptr_val.get())) {
+	if (params_ptr_val.get() != nullptr && !duckdb_is_null_value(params_ptr_val.get())) {
 		int64_t params_ptr_num = duckdb_get_int64(params_ptr_val.get());
 		std::vector<ValuePtr> *passed_params_ptr = reinterpret_cast<std::vector<ValuePtr> *>(params_ptr_num);
 		std::vector<ValuePtr> &passed_params = *passed_params_ptr;
@@ -122,7 +122,7 @@ static void Bind(duckdb_bind_info info) {
 		if (static_cast<size_t>(count) != params.size()) {
 			throw ScannerException(
 			    "Incorrect number of query parameters specified, expected: " + std::to_string(count) +
-			    ", actual: " + std::to_string(params.size()) + "query: '" + query + "'");
+			    ", actual: " + std::to_string(params.size()) + ", query: '" + query + "'");
 		}
 	}
 
@@ -265,7 +265,7 @@ static duckdb_state Register(duckdb_connection conn) {
 	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
 	duckdb_table_function_add_parameter(fun.get(), bigint_type.get());
 	duckdb_table_function_add_parameter(fun.get(), varchar_type.get());
-	duckdb_table_function_add_parameter(fun.get(), bigint_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "params", bigint_type.get());
 
 	// callbacks
 	duckdb_table_function_set_bind(fun.get(), odbc_query_bind);

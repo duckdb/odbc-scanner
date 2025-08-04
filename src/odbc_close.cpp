@@ -40,6 +40,9 @@ static duckdb_state Register(duckdb_connection conn) {
 	// callbacks
 	duckdb_scalar_function_set_function(fun.get(), odbc_close_function);
 
+	// options
+	duckdb_scalar_function_set_volatile(fun.get());
+
 	// register and cleanup
 	duckdb_state state = duckdb_register_scalar_function(conn, fun.get());
 
