@@ -84,6 +84,26 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT coalesce(?::INTEGER, ?::IN
 42
 
 query I
+CALL odbc_query(getvariable('conn'), 'CREATE TABLE tab1 (col1 INTEGER, col2 VARCHAR)')
+----
+-1
+
+query I
+CALL odbc_query(getvariable('conn'), 'INSERT INTO tab1 VALUES(42, ''foo'')')
+----
+1
+
+query I
+CALL odbc_query(getvariable('conn'), 'UPDATE tab1 SET col2 = ''baz'' WHERE col1 = 42')
+----
+1
+
+query I
+CALL odbc_query(getvariable('conn'), 'DROP TABLE tab1')
+----
+-1
+
+query I
 SELECT odbc_close(NULL)
 ----
 NULL

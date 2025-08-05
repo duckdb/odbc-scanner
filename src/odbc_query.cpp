@@ -126,7 +126,7 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 
-	SQLSMALLINT cols_count = 0;
+	SQLSMALLINT cols_count = -1;
 	{
 		SQLRETURN ret = SQLNumResultCols(hstmt, &cols_count);
 		if (!SQL_SUCCEEDED(ret)) {
@@ -166,6 +166,11 @@ static void Bind(duckdb_bind_info info) {
 		duckdb_type dtype = OdbcCTypeToDuckType(ctype);
 		auto ltype = LogicalTypePtr(duckdb_create_logical_type(dtype), LogicalTypeDeleter);
 		duckdb_bind_add_result_column(info, name.c_str(), ltype.get());
+	}
+
+	if (cols_count == 0) {
+		auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
+		duckdb_bind_add_result_column(info, "rowcount", bigint_type.get());
 	}
 
 	auto bdata_ptr = std::unique_ptr<BindData>(new BindData(conn, std::move(query), std::move(params), hstmt));
@@ -212,13 +217,38 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 		}
 	}
 
+	// DDL or DML query
+
+	if (cols_count == 0) {
+		SQLLEN count = -1;
+		SQLRETURN ret = SQLRowCount(bdata.hstmt, &count);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = ReadDiagnostics(bdata.hstmt, SQL_HANDLE_STMT);
+			throw ScannerException("'SQLRowCount' failed, DDL/DML query: '" + bdata.query +
+			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
+
+		duckdb_vector vec = duckdb_data_chunk_get_vector(output, 0);
+		if (vec == nullptr) {
+			throw ScannerException("Vector is NULL, DDL/DML query: '" + bdata.query +
+			                       "', columns count: " + std::to_string(cols_count));
+		}
+
+		int64_t *vec_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
+		vec_data[0] = static_cast<int64_t>(count);
+		duckdb_data_chunk_set_size(output, 1);
+		ldata.finished = true;
+		return;
+	}
+
+	// normal query
+
 	idx_t row_idx = 0;
 	for (; row_idx < duckdb_vector_size(); row_idx++) {
 
 		{
 			SQLRETURN ret = SQLFetch(bdata.hstmt);
 			if (!SQL_SUCCEEDED(ret)) {
-				ldata.finished = true;
 				if (ret != SQL_NO_DATA) {
 					std::string diag = ReadDiagnostics(bdata.hstmt, SQL_HANDLE_STMT);
 					throw ScannerException("'SQLFetch' failed, query: '" + bdata.query +
@@ -254,6 +284,7 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 		}
 	}
 	duckdb_data_chunk_set_size(output, row_idx);
+	ldata.finished = true;
 }
 
 static duckdb_state Register(duckdb_connection conn) {
