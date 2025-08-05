@@ -6,6 +6,7 @@
 #include "params.hpp"
 #include "scanner_exception.hpp"
 #include "types.hpp"
+#include "widechar.hpp"
 
 #include <memory>
 #include <sql.h>
@@ -103,7 +104,8 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 	{
-		SQLRETURN ret = SQLPrepare(hstmt, reinterpret_cast<SQLCHAR *>(const_cast<char *>(query.c_str())), SQL_NTS);
+		auto wquery = utf8_to_utf16_lenient(query.data(), query.length());
+		SQLRETURN ret = SQLPrepareW(hstmt, wquery.data(), wquery.length<SQLINTEGER>());
 		if (!SQL_SUCCEEDED(ret)) {
 			std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
 			throw ScannerException("'SQLPrepare' failed, query: '" + query + "', return: " + std::to_string(ret) +

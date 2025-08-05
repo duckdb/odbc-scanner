@@ -2,6 +2,7 @@
 
 #include "common.hpp"
 #include "scanner_exception.hpp"
+#include "widechar.hpp"
 
 #include <cstdint>
 
@@ -33,9 +34,9 @@ OdbcConnection::OdbcConnection(const std::string &url) {
 	}
 
 	{
-		SQLRETURN ret =
-		    SQLDriverConnect(dbc, nullptr, reinterpret_cast<SQLCHAR *>(const_cast<char *>(url.c_str())),
-		                     static_cast<SQLSMALLINT>(url.length()), nullptr, 0, nullptr, SQL_DRIVER_COMPLETE_REQUIRED);
+		auto wurl = utf8_to_utf16_lenient(url.data(), url.length());
+		SQLRETURN ret = SQLDriverConnectW(dbc, nullptr, wurl.data(), wurl.length<SQLSMALLINT>(), nullptr, 0, nullptr,
+		                                  SQL_DRIVER_COMPLETE_REQUIRED);
 		if (!SQL_SUCCEEDED(ret)) {
 			std::string diag = ReadDiagnostics(dbc, SQL_HANDLE_DBC);
 			throw ScannerException("'SQLDriverConnect' failed, url: '" + url + "', return: " + std::to_string(ret) +

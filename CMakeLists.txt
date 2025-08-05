@@ -45,8 +45,9 @@ set(EXTENSION_SOURCES
     src/odbc_connection.cpp
     src/odbc_params.cpp
     src/odbc_query.cpp
-    src/types.cpp
     src/params.cpp
+    src/types.cpp
+    src/widechar.cpp
 )
 
 if (DUCKDB_WASM_EXTENSION)
@@ -63,6 +64,7 @@ set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
 
 target_include_directories(${EXTENSION_NAME} PRIVATE
+    third_party/utf8cpp
     duckdb_capi
     ${ODBC_INCLUDE_DIRS}
     src/include

@@ -1,6 +1,7 @@
 #include "common.hpp"
 #include "scanner_exception.hpp"
 #include "types.hpp"
+#include "widechar.hpp"
 
 #include <vector>
 
@@ -24,18 +25,18 @@ static void FetchInteger(const std::string &query, HSTMT hstmt, SQLSMALLINT col_
 
 static void FetchVarchar(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
 	// todo: parts
-	std::vector<SQLCHAR> buf;
+	std::vector<SQLWCHAR> buf;
 	buf.resize(1024);
 	SQLLEN len = 0;
-	SQLRETURN ret = SQLGetData(hstmt, col_idx, SQL_C_CHAR, buf.data(), static_cast<SQLSMALLINT>(buf.size()), &len);
+	SQLRETURN ret = SQLGetData(hstmt, col_idx, SQL_C_WCHAR, buf.data(), static_cast<SQLSMALLINT>(buf.size() * 2), &len);
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLGetData' for INTEGER failed, column index: " + std::to_string(col_idx) +
+		throw ScannerException("'SQLGetData' for VARCHAR failed, column index: " + std::to_string(col_idx) +
 		                       ", query: '" + query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
 		                       "'");
 	}
 
-	std::string str(reinterpret_cast<char *>(buf.data()), len);
+	std::string str = utf16_to_utf8_lenient(buf.data(), len / 2);
 	duckdb_vector_assign_string_element_len(vec, row_idx, str.c_str(), str.length());
 }
 

@@ -74,6 +74,11 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''foo'', 42')
 foo	42
 
 query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''🌌''')
+----
+🌌
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER + ?::INTEGER', params=odbc_params(41, 42))
 ----
 83

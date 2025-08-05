@@ -13,6 +13,9 @@ struct OdbcConnection {
 	OdbcConnection(const std::string &url);
 	~OdbcConnection() noexcept;
 
+	OdbcConnection(OdbcConnection &other) = delete;
+	OdbcConnection(OdbcConnection &&other) = delete;
+
 	OdbcConnection &operator=(const OdbcConnection &) = delete;
 	OdbcConnection &operator=(OdbcConnection &&other) = delete;
 };
