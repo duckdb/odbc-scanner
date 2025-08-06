@@ -11,6 +11,8 @@ namespace odbcscanner {
 duckdb_type OdbcCTypeToDuckType(SQLLEN odbc_ctype) {
 	switch (odbc_ctype) {
 	case SQL_INTEGER:
+		return DUCKDB_TYPE_INTEGER;
+	case SQL_BIGINT:
 		return DUCKDB_TYPE_BIGINT;
 	case SQL_VARCHAR:
 		return DUCKDB_TYPE_VARCHAR;

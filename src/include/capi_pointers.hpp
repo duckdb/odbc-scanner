@@ -32,4 +32,10 @@ inline void ValueDeleter(duckdb_value val) {
 	duckdb_destroy_value(&val);
 }
 
+using VarcharPtr = std::unique_ptr<char, void (*)(char *)>;
+
+inline void VarcharDeleter(char *val) {
+	duckdb_free(val);
+}
+
 } // namespace odbcscanner

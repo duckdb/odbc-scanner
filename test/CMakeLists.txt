@@ -1,6 +1,8 @@
 
 add_executable(test_${EXTENSION_NAME}
-  test_odbc_scanner.cpp
+  test_basic.cpp
+  test_common.cpp
+  test_params.cpp
 )
 
 target_include_directories(test_${EXTENSION_NAME} PRIVATE

@@ -19,6 +19,20 @@ static void FetchInteger(const std::string &query, HSTMT hstmt, SQLSMALLINT col_
 		                       "'");
 	}
 
+	int32_t *vec_data = reinterpret_cast<int32_t *>(duckdb_vector_get_data(vec));
+	vec_data[row_idx] = fetched;
+}
+
+static void FetchBigInt(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+	int64_t fetched = 0;
+	SQLRETURN ret = SQLGetData(hstmt, col_idx, SQL_C_SBIGINT, &fetched, sizeof(fetched), nullptr);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
+		throw ScannerException("'SQLGetData' for BIGINT failed, column index: " + std::to_string(col_idx) +
+		                       ", query: '" + query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
+		                       "'");
+	}
+
 	int64_t *vec_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
 	vec_data[row_idx] = fetched;
 }
@@ -28,7 +42,8 @@ static void FetchVarchar(const std::string &query, HSTMT hstmt, SQLSMALLINT col_
 	std::vector<SQLWCHAR> buf;
 	buf.resize(1024);
 	SQLLEN len = 0;
-	SQLRETURN ret = SQLGetData(hstmt, col_idx, SQL_C_WCHAR, buf.data(), static_cast<SQLSMALLINT>(buf.size() * 2), &len);
+	SQLRETURN ret = SQLGetData(hstmt, col_idx, SQL_C_WCHAR, buf.data(),
+	                           static_cast<SQLSMALLINT>(buf.size() * sizeof(SQLWCHAR)), &len);
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for VARCHAR failed, column index: " + std::to_string(col_idx) +
@@ -45,6 +60,10 @@ void FetchIntoVector(SQLSMALLINT odbc_ctype, const std::string &query, HSTMT hst
 	switch (odbc_ctype) {
 	case SQL_INTEGER: {
 		FetchInteger(query, hstmt, col_idx, vec, row_idx);
+		break;
+	}
+	case SQL_BIGINT: {
+		FetchBigInt(query, hstmt, col_idx, vec, row_idx);
 		break;
 	}
 	case SQL_VARCHAR: {

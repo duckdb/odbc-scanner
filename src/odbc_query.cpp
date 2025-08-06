@@ -81,8 +81,8 @@ static void Bind(duckdb_bind_info info) {
 	if (duckdb_is_null_value(query_val.get())) {
 		throw ScannerException("'odbc_query': specified SQL query is NULL");
 	}
-	char *query_ptr = duckdb_get_varchar(query_val.get());
-	std::string query(query_ptr);
+	auto query_ptr = VarcharPtr(duckdb_get_varchar(query_val.get()), VarcharDeleter);
+	std::string query(query_ptr.get());
 
 	auto params_ptr_val = ValuePtr(duckdb_bind_get_named_parameter(info, "params"), ValueDeleter);
 	std::vector<ValuePtr> params;
