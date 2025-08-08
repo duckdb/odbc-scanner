@@ -26,11 +26,10 @@ namespace odbcscanner {
 struct BindData {
 	OdbcConnection &conn;
 	std::string query;
-	std::vector<ValuePtr> params;
-	std::vector<void *> params_holder;
+	std::vector<ScannerParam> params;
 	HSTMT hstmt = SQL_NULL_HSTMT;
 
-	BindData(OdbcConnection &conn_in, std::string query_in, std::vector<ValuePtr> params_in, HSTMT hstmt_in)
+	BindData(OdbcConnection &conn_in, std::string query_in, std::vector<ScannerParam> params_in, HSTMT hstmt_in)
 	    : conn(conn_in), query(std::move(query_in)), params(std::move(params_in)), hstmt(hstmt_in) {
 	}
 
@@ -40,9 +39,6 @@ struct BindData {
 	~BindData() noexcept {
 		SQLFreeStmt(hstmt, SQL_CLOSE);
 		SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
-		for (void *param : params_holder) {
-			std::free(param);
-		}
 	}
 
 	static void Destroy(void *bdata_in) noexcept {
@@ -85,13 +81,13 @@ static void Bind(duckdb_bind_info info) {
 	std::string query(query_ptr.get());
 
 	auto params_ptr_val = ValuePtr(duckdb_bind_get_named_parameter(info, "params"), ValueDeleter);
-	std::vector<ValuePtr> params;
+	std::vector<ScannerParam> params;
 	if (params_ptr_val.get() != nullptr && !duckdb_is_null_value(params_ptr_val.get())) {
 		int64_t params_ptr_num = duckdb_get_int64(params_ptr_val.get());
-		std::vector<ValuePtr> *passed_params_ptr = reinterpret_cast<std::vector<ValuePtr> *>(params_ptr_num);
-		std::vector<ValuePtr> &passed_params = *passed_params_ptr;
-		for (ValuePtr &vp : passed_params) {
-			params.push_back(std::move(vp));
+		std::vector<ScannerParam> *passed_params_ptr = reinterpret_cast<std::vector<ScannerParam> *>(params_ptr_num);
+		std::vector<ScannerParam> &passed_params = *passed_params_ptr;
+		for (ScannerParam &sp : passed_params) {
+			params.push_back(std::move(sp));
 		}
 		delete passed_params_ptr;
 	}
@@ -195,9 +191,9 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 	}
 
 	for (size_t i = 0; i < bdata.params.size(); i++) {
-		ValuePtr &val = bdata.params.at(i);
+		ScannerParam &param = bdata.params.at(i);
 		SQLSMALLINT idx = static_cast<SQLSMALLINT>(i + 1);
-		SetOdbcParam(bdata.query, bdata.hstmt, val.get(), idx, bdata.params_holder);
+		SetOdbcParam(bdata.query, bdata.hstmt, param, idx);
 	}
 
 	{
