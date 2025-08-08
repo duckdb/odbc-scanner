@@ -11,6 +11,9 @@ namespace odbcscanner {
 struct SqlWString {
 	std::vector<SQLWCHAR> vec;
 
+	SqlWString() {
+	}
+
 	SqlWString(std::vector<SQLWCHAR> vec_in) : vec(std::move(vec_in)) {
 	}
 
@@ -18,7 +21,7 @@ struct SqlWString {
 	SqlWString(SqlWString &&other) = default;
 
 	SqlWString &operator=(const SqlWString &) = delete;
-	SqlWString &operator=(SqlWString &&other) = delete;
+	SqlWString &operator=(SqlWString &&other) = default;
 
 	template <typename INT_TYPE>
 	INT_TYPE length() {

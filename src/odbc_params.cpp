@@ -20,10 +20,10 @@ static void Params(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
 	CheckChunkRowsCount(input);
 
 	idx_t col_count = duckdb_data_chunk_get_column_count(input);
-	auto valvec_ptr = std_make_unique<std::vector<ValuePtr>>();
+	auto valvec_ptr = std_make_unique<std::vector<ScannerParam>>();
 	for (idx_t i = 0; i < col_count; i++) {
-		ValuePtr val = ExtractInputParam(input, i);
-		valvec_ptr->emplace_back(std::move(val));
+		ScannerParam param = ExtractInputParam(input, i);
+		valvec_ptr->emplace_back(std::move(param));
 	}
 
 	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
