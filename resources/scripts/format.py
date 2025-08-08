@@ -13,8 +13,9 @@ if args.check:
 hpp_files = set(glob('src/include/*.hpp'))
 c_files = set(glob('src/*.c'))
 cpp_files = set(glob('src/*.cpp'))
+cpp_subdir_files = set(glob('src/**/*.cpp'))
 test_cpp_files = set(glob('test/*.cpp'))
 
-for name in [*hpp_files] + [*c_files] + [*cpp_files] + [*test_cpp_files]:
+for name in [*hpp_files] + [*c_files] + [*cpp_files] + [*cpp_subdir_files] + [*test_cpp_files]:
     print('Formatting', name)
     check_call(template + [name])

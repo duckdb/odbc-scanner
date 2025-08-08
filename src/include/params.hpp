@@ -36,8 +36,8 @@ struct ScannerParam {
 	ScannerParam &operator=(ScannerParam &&other) = default;
 };
 
-void SetOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
-
 ScannerParam ExtractInputParam(duckdb_data_chunk input, idx_t col_idx);
+
+void SetOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
 
 } // namespace odbcscanner

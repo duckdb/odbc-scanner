@@ -79,6 +79,16 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''🌌''')
 🌌
 
 query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT NULL::INTEGER')
+----
+NULL
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT NULL::VARCHAR')
+----
+NULL
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER + ?::INTEGER', params=odbc_params(41, 42))
 ----
 83
