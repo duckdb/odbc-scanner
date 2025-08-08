@@ -60,8 +60,13 @@ endif()
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(CMAKE_C_VISIBILITY_PRESET hidden)
 set(VISIBILITY_INLINES_HIDDEN ON)
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
+if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -s")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -s")
+elseif (APPLE)
+    set(CMAKE_SHARED_LINKER_FLAGS_RELEASE "${CMAKE_SHARED_LINKER_FLAGS_RELEASE} -Wl,-x")
+    set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} -Wl,-x")
+endif ()
 
 target_include_directories(${EXTENSION_NAME} PRIVATE
     third_party/utf8cpp
@@ -86,4 +91,13 @@ target_link_libraries(${EXTENSION_NAME} PRIVATE
   ${ODBC_LIBRARIES}
 )
 
-add_subdirectory(test)
+if (ENABLE_C_API_TESTS)
+    message(STATUS "CAPI tests enabled")
+
+    if (NOT DEFINED DUCKDB_ODBC_SHARED_LIB_PATH OR NOT EXISTS ${DUCKDB_ODBC_SHARED_LIB_PATH})
+        message(FATAL_ERROR "Could not find the DuckDB ODBC shared library file. Run 'make download_odbc_library' to download it.")
+    endif ()
+
+    add_subdirectory(test)
+endif ()
+

@@ -1,4 +1,4 @@
-.PHONY: clean clean_all
+.PHONY: clean clean_all format
 
 PROJ_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
@@ -13,9 +13,42 @@ USE_UNSTABLE_C_API := 0
 # The DuckDB version to target
 TARGET_DUCKDB_VERSION := v1.2.0
 
-DUCKDB_ODBC_SHARED_LIB_PATH ?= $(PROJ_DIR)/../duckdb-odbc/build/debug/libduckdb_odbc.so
+# Detect platform
+PLATFORM := $(shell uname -s)
+ifeq ($(PLATFORM),Linux)
+	DUCKDB_ODBC_LIB_NAME := libduckdb_odbc.so
+	# detect amd64 or arm64 architecture
+	ifeq ($(shell uname -m),x86_64)
+		RELEASE_BUILD = linux-amd64
+	else ifeq ($(shell uname -m),aarch64)
+		RELEASE_BUILD = linux-arm64
+	endif
+else ifeq ($(PLATFORM),Darwin)
+	DUCKDB_ODBC_LIB_NAME := libduckdb_odbc.dylib
+	RELEASE_BUILD = osx-universal
+else ifeq ($(PLATFORM),Windows_NT)
+	DUCKDB_ODBC_LIB_NAME := duckdb_odbc.dll
+	RELEASE_BUILD = windows-amd64
+else
+	$(error Unsupported platform: $(PLATFORM))
+endif
 
-CMAKE_EXTRA_BUILD_FLAGS := -DDUCKDB_ODBC_SHARED_LIB_PATH=$(DUCKDB_ODBC_SHARED_LIB_PATH)
+DUCKDB_ODBC_LOCAL_LIB_PATH ?= $(PROJ_DIR)/../duckdb-odbc/build/debug/$(DUCKDB_ODBC_LIB_NAME)
+DUCKDB_ODBC_RELEASE_LIB_PATH ?= $(PROJ_DIR)/third_party/duckdb-odbc/$(DUCKDB_ODBC_LIB_NAME)
+
+ENABLE_C_API_TESTS := TRUE
+DUCKDB_ODBC_FINAL_PATH :=
+
+# Check if the ODBC library is available - FIXED LOGIC
+ifneq ($(wildcard $(DUCKDB_ODBC_LOCAL_LIB_PATH)),)
+	DUCKDB_ODBC_FINAL_PATH := $(DUCKDB_ODBC_LOCAL_LIB_PATH)
+else ifneq ($(wildcard $(DUCKDB_ODBC_RELEASE_LIB_PATH)),)
+	DUCKDB_ODBC_FINAL_PATH := $(DUCKDB_ODBC_RELEASE_LIB_PATH)
+else
+	ENABLE_C_API_TESTS := FALSE
+endif
+
+CMAKE_EXTRA_BUILD_FLAGS := -DDUCKDB_ODBC_SHARED_LIB_PATH=$(DUCKDB_ODBC_FINAL_PATH) -DENABLE_C_API_TESTS=$(ENABLE_C_API_TESTS)
 
 all: configure release
 
@@ -28,17 +61,27 @@ configure: venv platform extension_version
 debug: build_extension_library_debug build_extension_with_metadata_debug
 release: build_extension_library_release build_extension_with_metadata_release
 
-test: test_debug
-test_debug: debug test_extension_debug
+test: debug test_sql test_c_api
+
+test_sql: debug test_extension_debug
+
+test_c_api: debug
+ifeq ($(ENABLE_C_API_TESTS), TRUE)
+	@echo "Running C API tests using DuckDB ODBC library at $(DUCKDB_ODBC_FINAL_PATH)"
 	./cmake_build/debug/test/test_odbc_scanner
-test_release: release test_extension_release
-	./cmake_build/release/test/test_odbc_scanner
+else
+	@echo "C API tests are disabled, DuckDB ODBC library not found."
+	@echo "Run 'make download_odbc_library' to download the ODBC library."
+endif
+
+download_odbc_library:
+	./resources/scripts/update_downloaded_lib.sh $(RELEASE_BUILD)
 
 clean: clean_build clean_cmake
 clean_all: clean clean_configure
 
-format:
-	python ./resources/scripts/format.py
+format-fix:
+	python3 resources/scripts/format.py --all --fix --noconfirm
 
 format-check:
-	python ./resources/scripts/format.py --check
+	python3 resources/scripts/format.py --check

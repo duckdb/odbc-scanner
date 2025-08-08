@@ -16,25 +16,25 @@ struct ScannerConn {
 	duckdb_database db = nullptr;
 	duckdb_connection conn = nullptr;
 
-  ScannerConn();
+	ScannerConn();
 
-  ~ScannerConn() noexcept;
+	~ScannerConn() noexcept;
 };
 
 struct Result {
-  duckdb_result res;
-  duckdb_data_chunk chunk = nullptr;
-  idx_t cur_row_idx = 0;
+	duckdb_result res;
+	duckdb_data_chunk chunk = nullptr;
+	idx_t cur_row_idx = 0;
 
-  ~Result() noexcept;
+	~Result() noexcept;
 
-  duckdb_result *Get();
+	duckdb_result *Get();
 
-  bool NextChunk();
+	bool NextChunk();
 
-  int32_t Int32(idx_t col_idx, idx_t row_idx);
+	int32_t Int32(idx_t col_idx, idx_t row_idx);
 
-  int64_t Int64(idx_t col_idx, idx_t row_idx);
+	int64_t Int64(idx_t col_idx, idx_t row_idx);
 
-  std::string String(idx_t col_idx, idx_t row_idx);
+	std::string String(idx_t col_idx, idx_t row_idx);
 };

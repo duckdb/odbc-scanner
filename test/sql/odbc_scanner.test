@@ -1,6 +1,6 @@
 # name: test/sql/odbc_scanner.test
 # description: test odbc_scanner extension
-# group: [odbc_scanner]
+# group: [sql]
 
 #statement ok
 #PRAGMA threads=1
