@@ -1,7 +1,7 @@
 #include "types/type_integer.hpp"
 
 #include "capi_pointers.hpp"
-#include "common.hpp"
+#include "diagnostics.hpp"
 #include "scanner_exception.hpp"
 
 DUCKDB_EXTENSION_EXTERN
@@ -13,7 +13,7 @@ void AddIntegerResultColumn(duckdb_bind_info info, const std::string &name) {
 	duckdb_bind_add_result_column(info, name.c_str(), ltype.get());
 }
 
-ScannerParam ExtractIntegerInputParam(duckdb_vector vec) {
+ScannerParam ExtractIntegerNotNullInputParam(duckdb_vector vec) {
 	int32_t *data = reinterpret_cast<int32_t *>(duckdb_vector_get_data(vec));
 	int32_t num = data[0];
 	return ScannerParam(num);

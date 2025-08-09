@@ -40,7 +40,7 @@ SET VARIABLE conn = NULL
 statement error
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42')
 ----
-Binder Error: 'odbc_query': specified ODBC connection is NULL
+Binder Error: 'odbc_query' error: specified ODBC connection must be not NULL
 
 statement ok
 SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
@@ -48,12 +48,12 @@ SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
 statement error
 SELECT * FROM odbc_query(NULL, 'SELECT 42')
 ----
-Binder Error: 'odbc_query': specified ODBC connection is NULL
+Binder Error: 'odbc_query' error: specified ODBC connection must be not NULL
 
 statement error
 SELECT * FROM odbc_query(getvariable('conn'), NULL)
 ----
-Binder Error: 'odbc_query': specified SQL query is NULL
+Binder Error: 'odbc_query' error: specified SQL query must be not NULL
 
 statement error
 SELECT * FROM odbc_query(getvariable('conn'), 'FAIL')
@@ -118,10 +118,10 @@ CALL odbc_query(getvariable('conn'), 'DROP TABLE tab1')
 ----
 -1
 
-query I
+statement error
 SELECT odbc_close(NULL)
 ----
-NULL
+Invalid Input Error: 'odbc_close' error: specified ODBC connection argument must be not NULL
 
 statement ok
 SELECT odbc_close(getvariable('conn'))

@@ -1,4 +1,4 @@
-#include "common.hpp"
+#include "diagnostics.hpp"
 #include "scanner_exception.hpp"
 #include "types/type_integer.hpp"
 #include "types/type_null.hpp"

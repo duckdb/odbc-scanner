@@ -1,6 +1,6 @@
 #include "types/type_null.hpp"
 
-#include "common.hpp"
+#include "diagnostics.hpp"
 #include "scanner_exception.hpp"
 
 DUCKDB_EXTENSION_EXTERN

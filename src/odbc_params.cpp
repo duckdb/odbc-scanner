@@ -1,6 +1,6 @@
 #include "capi_odbc_scanner.h"
 #include "capi_pointers.hpp"
-#include "common.hpp"
+#include "diagnostics.hpp"
 #include "make_unique.hpp"
 #include "params.hpp"
 #include "scanner_exception.hpp"
@@ -16,8 +16,6 @@ namespace odbcscanner {
 
 static void Params(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
 	(void)info;
-
-	CheckChunkRowsCount(input);
 
 	idx_t col_count = duckdb_data_chunk_get_column_count(input);
 	auto valvec_ptr = std_make_unique<std::vector<ScannerParam>>();

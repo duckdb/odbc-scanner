@@ -5,9 +5,11 @@
 
 namespace odbcscanner {
 
+std::pair<std::string, bool> ExtractVarcharFunctionArg(duckdb_data_chunk chunk, idx_t col_idx);
+
 void AddVarcharResultColumn(duckdb_bind_info info, const std::string &name);
 
-ScannerParam ExtractVarcharInputParam(duckdb_vector vec);
+ScannerParam ExtractVarcharNotNullInputParam(duckdb_vector vec);
 
 void SetVarcharParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
 

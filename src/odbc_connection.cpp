@@ -1,6 +1,6 @@
 #include "odbc_connection.hpp"
 
-#include "common.hpp"
+#include "diagnostics.hpp"
 #include "scanner_exception.hpp"
 #include "widechar.hpp"
 

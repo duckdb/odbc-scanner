@@ -1,6 +1,5 @@
 #include "params.hpp"
 
-#include "common.hpp"
 #include "scanner_exception.hpp"
 #include "types/type_integer.hpp"
 #include "types/type_null.hpp"
@@ -30,12 +29,23 @@ ScannerParam::ScannerParam(std::string value)
       len_bytes(wstr.length<SQLLEN>() * sizeof(SQLWCHAR)) {
 }
 
-ScannerParam ExtractInputParam(duckdb_data_chunk input, idx_t col_idx) {
-	std::string err_prefix = "Cannot extract input parameter, column: " + std::to_string(col_idx);
+ScannerParam ExtractInputParam(duckdb_data_chunk chunk, idx_t col_idx) {
+	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
+	if (col_idx >= col_count) {
+		throw ScannerException("Cannot extract input parameter: column not found, column: " + std::to_string(col_idx) +
+		                       ", columns count: " + std::to_string(col_count));
+	}
 
-	auto vec = duckdb_data_chunk_get_vector(input, col_idx);
+	auto vec = duckdb_data_chunk_get_vector(chunk, col_idx);
 	if (vec == nullptr) {
-		throw ScannerException(err_prefix + "vector is NULL");
+		throw ScannerException("Cannot extract input parameter: vector is NULL, column: " + std::to_string(col_idx) +
+		                       ", columns count: " + std::to_string(col_count));
+	}
+
+	idx_t rows_count = duckdb_data_chunk_get_size(chunk);
+	if (rows_count == 0) {
+		throw ScannerException("Cannot extract input parameter: vector contains no rows, column: " +
+		                       std::to_string(col_idx) + ", columns count: " + std::to_string(col_count));
 	}
 
 	// DUCKDB_TYPE_SQLNULL
@@ -48,9 +58,9 @@ ScannerParam ExtractInputParam(duckdb_data_chunk input, idx_t col_idx) {
 	auto type_id = duckdb_get_type_id(ltype.get());
 	switch (type_id) {
 	case DUCKDB_TYPE_INTEGER:
-		return ExtractIntegerInputParam(vec);
+		return ExtractIntegerNotNullInputParam(vec);
 	case DUCKDB_TYPE_VARCHAR:
-		return ExtractVarcharInputParam(vec);
+		return ExtractVarcharNotNullInputParam(vec);
 	default: {
 		throw ScannerException("Unsupported parameter type: " + std::to_string(type_id));
 	}

@@ -1,6 +1,6 @@
 #include "capi_odbc_scanner.h"
 #include "capi_pointers.hpp"
-#include "common.hpp"
+#include "diagnostics.hpp"
 #include "fetch.hpp"
 #include "odbc_connection.hpp"
 #include "params.hpp"
@@ -68,14 +68,14 @@ struct LocalInitData {
 static void Bind(duckdb_bind_info info) {
 	auto conn_ptr_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
 	if (duckdb_is_null_value(conn_ptr_val.get())) {
-		throw ScannerException("'odbc_query': specified ODBC connection is NULL");
+		throw ScannerException("'odbc_query' error: specified ODBC connection must be not NULL");
 	}
 	int64_t conn_ptr_num = duckdb_get_int64(conn_ptr_val.get());
 	OdbcConnection &conn = *reinterpret_cast<OdbcConnection *>(conn_ptr_num);
 
 	auto query_val = ValuePtr(duckdb_bind_get_parameter(info, 1), ValueDeleter);
 	if (duckdb_is_null_value(query_val.get())) {
-		throw ScannerException("'odbc_query': specified SQL query is NULL");
+		throw ScannerException("'odbc_query' error: specified SQL query must be not NULL");
 	}
 	auto query_ptr = VarcharPtr(duckdb_get_varchar(query_val.get()), VarcharDeleter);
 	std::string query(query_ptr.get());

@@ -1,9 +1,10 @@
 #include "capi_odbc_scanner.h"
 #include "capi_pointers.hpp"
-#include "common.hpp"
+#include "diagnostics.hpp"
 #include "make_unique.hpp"
 #include "odbc_connection.hpp"
 #include "scanner_exception.hpp"
+#include "types/type_varchar.hpp"
 
 #include <memory>
 #include <sql.h>
@@ -19,10 +20,12 @@ namespace odbcscanner {
 static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
 	(void)info;
 
-	CheckChunkRowsCount(input);
-	std::string url = ExtractStringFromChunk(input, 0);
+	auto arg = ExtractVarcharFunctionArg(input, 0);
+	if (arg.second) {
+		throw ScannerException("'odbc_connect' error: specified URL argument must be not NULL");
+	}
 
-	auto oc_ptr = std_make_unique<OdbcConnection>(url);
+	auto oc_ptr = std_make_unique<OdbcConnection>(arg.first);
 
 	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
 	result_data[0] = reinterpret_cast<int64_t>(oc_ptr.release());
