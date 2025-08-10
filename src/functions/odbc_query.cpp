@@ -1,9 +1,11 @@
 #include "capi_odbc_scanner.h"
 #include "capi_pointers.hpp"
+#include "connection.hpp"
+#include "defer.hpp"
 #include "diagnostics.hpp"
 #include "fetch.hpp"
-#include "odbc_connection.hpp"
 #include "params.hpp"
+#include "registries.hpp"
 #include "scanner_exception.hpp"
 #include "types/types.hpp"
 #include "widechar.hpp"
@@ -24,14 +26,17 @@ static void odbc_query_function(duckdb_function_info info, duckdb_data_chunk out
 namespace odbcscanner {
 
 struct BindData {
-	OdbcConnection &conn;
+	int64_t conn_id;
 	std::string query;
 	std::vector<ScannerParam> params;
 	HSTMT hstmt = SQL_NULL_HSTMT;
 
-	BindData(OdbcConnection &conn_in, std::string query_in, std::vector<ScannerParam> params_in, HSTMT hstmt_in)
-	    : conn(conn_in), query(std::move(query_in)), params(std::move(params_in)), hstmt(hstmt_in) {
+	BindData(int64_t conn_id_in, std::string query_in, std::vector<ScannerParam> params_in, HSTMT hstmt_in)
+	    : conn_id(conn_id_in), query(std::move(query_in)), params(std::move(params_in)), hstmt(hstmt_in) {
 	}
+
+	BindData(const BindData &) = delete;
+	BindData(BindData &&) = delete;
 
 	BindData &operator=(const BindData &) = delete;
 	BindData &operator=(BindData &&other) = delete;
@@ -48,16 +53,24 @@ struct BindData {
 };
 
 struct LocalInitData {
-	OdbcConnection &conn;
-
+	std::unique_ptr<OdbcConnection> conn_ptr;
 	// todo: enum
 	bool finished = false;
 
-	LocalInitData(OdbcConnection &conn_in) : conn(conn_in) {
+	LocalInitData(std::unique_ptr<OdbcConnection> conn_ptr_in) : conn_ptr(std::move(conn_ptr_in)) {
 	}
+
+	LocalInitData(const LocalInitData &) = delete;
+	LocalInitData(LocalInitData &&) = delete;
 
 	LocalInitData &operator=(const LocalInitData &) = delete;
 	LocalInitData &operator=(LocalInitData &&other);
+
+	~LocalInitData() {
+		// We are not closing the connection, even in case of error,
+		// so need to return connection to registry
+		AddConnectionToRegistry(std::move(conn_ptr));
+	}
 
 	static void Destroy(void *ctx_in) noexcept {
 		auto ctx = reinterpret_cast<LocalInitData *>(ctx_in);
@@ -66,12 +79,21 @@ struct LocalInitData {
 };
 
 static void Bind(duckdb_bind_info info) {
-	auto conn_ptr_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
-	if (duckdb_is_null_value(conn_ptr_val.get())) {
+	auto conn_id_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
+	if (duckdb_is_null_value(conn_id_val.get())) {
 		throw ScannerException("'odbc_query' error: specified ODBC connection must be not NULL");
 	}
-	int64_t conn_ptr_num = duckdb_get_int64(conn_ptr_val.get());
-	OdbcConnection &conn = *reinterpret_cast<OdbcConnection *>(conn_ptr_num);
+	int64_t conn_id = duckdb_get_int64(conn_id_val.get());
+	auto conn_ptr = RemoveConnectionFromRegistry(conn_id);
+
+	if (conn_ptr.get() == nullptr) {
+		throw ScannerException("'odbc_query' error: open ODBC connection not found, id: " + std::to_string(conn_id));
+	}
+
+	// Return the connection to registry at the end of the block
+	auto deferred = Defer([&conn_ptr] { AddConnectionToRegistry(std::move(conn_ptr)); });
+
+	OdbcConnection &conn = *conn_ptr;
 
 	auto query_val = ValuePtr(duckdb_bind_get_parameter(info, 1), ValueDeleter);
 	if (duckdb_is_null_value(query_val.get())) {
@@ -83,13 +105,16 @@ static void Bind(duckdb_bind_info info) {
 	auto params_ptr_val = ValuePtr(duckdb_bind_get_named_parameter(info, "params"), ValueDeleter);
 	std::vector<ScannerParam> params;
 	if (params_ptr_val.get() != nullptr && !duckdb_is_null_value(params_ptr_val.get())) {
-		int64_t params_ptr_num = duckdb_get_int64(params_ptr_val.get());
-		std::vector<ScannerParam> *passed_params_ptr = reinterpret_cast<std::vector<ScannerParam> *>(params_ptr_num);
-		std::vector<ScannerParam> &passed_params = *passed_params_ptr;
+		int64_t params_id = duckdb_get_int64(params_ptr_val.get());
+		auto params_ptr = RemoveParamsFromRegistry(params_id);
+		if (params_ptr.get() == nullptr) {
+			throw ScannerException("'odbc_query' error: specified parameters are not found, ID: " +
+			                       std::to_string(params_id));
+		}
+		std::vector<ScannerParam> &passed_params = *params_ptr;
 		for (ScannerParam &sp : passed_params) {
 			params.push_back(std::move(sp));
 		}
-		delete passed_params_ptr;
 	}
 
 	HSTMT hstmt = SQL_NULL_HSTMT;
@@ -162,14 +187,16 @@ static void Bind(duckdb_bind_info info) {
 		duckdb_bind_add_result_column(info, "rowcount", bigint_type.get());
 	}
 
-	auto bdata_ptr = std::unique_ptr<BindData>(new BindData(conn, std::move(query), std::move(params), hstmt));
+	auto bdata_ptr = std::unique_ptr<BindData>(new BindData(conn_id, std::move(query), std::move(params), hstmt));
 	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
 }
 
 static void LocalInit(duckdb_init_info info) {
 	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_init_get_bind_data(info));
-	auto ctx_ptr = std::unique_ptr<LocalInitData>(new LocalInitData(bdata.conn));
-	duckdb_init_set_init_data(info, ctx_ptr.release(), LocalInitData::Destroy);
+	// Keep the connection in local data while the function is running
+	auto conn_ptr = RemoveConnectionFromRegistry(bdata.conn_id);
+	auto ldata_ptr = std::unique_ptr<LocalInitData>(new LocalInitData(std::move(conn_ptr)));
+	duckdb_init_set_init_data(info, ldata_ptr.release(), LocalInitData::Destroy);
 }
 
 static void Query(duckdb_function_info info, duckdb_data_chunk output) {

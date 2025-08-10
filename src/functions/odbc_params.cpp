@@ -3,6 +3,7 @@
 #include "diagnostics.hpp"
 #include "make_unique.hpp"
 #include "params.hpp"
+#include "registries.hpp"
 #include "scanner_exception.hpp"
 
 #include <string>
@@ -25,7 +26,7 @@ static void Params(duckdb_function_info info, duckdb_data_chunk input, duckdb_ve
 	}
 
 	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
-	result_data[0] = reinterpret_cast<int64_t>(valvec_ptr.release());
+	result_data[0] = AddParamsToRegistry(std::move(valvec_ptr));
 }
 
 static duckdb_state Register(duckdb_connection conn) {

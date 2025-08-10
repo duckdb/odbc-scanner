@@ -1,7 +1,8 @@
 #include "capi_odbc_scanner.h"
 #include "capi_pointers.hpp"
+#include "connection.hpp"
 #include "diagnostics.hpp"
-#include "odbc_connection.hpp"
+#include "registries.hpp"
 #include "scanner_exception.hpp"
 #include "types/type_bigint.hpp"
 
@@ -22,8 +23,10 @@ static void Close(duckdb_function_info info, duckdb_data_chunk input, duckdb_vec
 	if (arg.second) {
 		throw ScannerException("'odbc_close' error: specified ODBC connection argument must be not NULL");
 	}
-	auto *conn = reinterpret_cast<OdbcConnection *>(arg.first);
-	delete conn;
+	{
+		auto conn_ptr = RemoveConnectionFromRegistry(arg.first);
+		// connection may or may not be already closed - we won't throw from this function either way
+	}
 
 	duckdb_vector_ensure_validity_writable(output);
 	uint64_t *result_validity = duckdb_vector_get_validity(output);

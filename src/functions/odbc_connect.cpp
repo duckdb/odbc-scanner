@@ -1,8 +1,9 @@
 #include "capi_odbc_scanner.h"
 #include "capi_pointers.hpp"
+#include "connection.hpp"
 #include "diagnostics.hpp"
 #include "make_unique.hpp"
-#include "odbc_connection.hpp"
+#include "registries.hpp"
 #include "scanner_exception.hpp"
 #include "types/type_varchar.hpp"
 
@@ -28,7 +29,7 @@ static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 	auto oc_ptr = std_make_unique<OdbcConnection>(arg.first);
 
 	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
-	result_data[0] = reinterpret_cast<int64_t>(oc_ptr.release());
+	result_data[0] = AddConnectionToRegistry(std::move(oc_ptr));
 }
 
 static duckdb_state Register(duckdb_connection conn) {

@@ -99,6 +99,14 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT coalesce(?::INTEGER, ?::IN
 42
 
 query I
+SELECT a.num + b.num
+FROM odbc_query(getvariable('conn'), 'SELECT 41::INTEGER AS num') as a
+JOIN odbc_query(getvariable('conn'), 'SELECT 42::INTEGER AS num') as b
+ON 1 = 1
+----
+83
+
+query I
 CALL odbc_query(getvariable('conn'), 'CREATE TABLE tab1 (col1 INTEGER, col2 VARCHAR)')
 ----
 -1
@@ -119,9 +127,22 @@ CALL odbc_query(getvariable('conn'), 'DROP TABLE tab1')
 -1
 
 statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'fail', params=42)
+----
+Binder Error: 'odbc_query' error: specified parameters are not found, ID: 42
+
+statement error
 SELECT odbc_close(NULL)
 ----
 Invalid Input Error: 'odbc_close' error: specified ODBC connection argument must be not NULL
 
 statement ok
 SELECT odbc_close(getvariable('conn'))
+
+statement ok
+SELECT odbc_close(42)
+
+statement error
+SELECT * FROM odbc_query(42, 'fail')
+----
+Binder Error: 'odbc_query' error: open ODBC connection not found, id: 42
