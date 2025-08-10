@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <sql.h>
 #include <sqlext.h>
 #include <string>

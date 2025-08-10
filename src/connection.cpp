@@ -1,4 +1,4 @@
-#include "odbc_connection.hpp"
+#include "connection.hpp"
 
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"

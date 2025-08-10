@@ -38,15 +38,16 @@ set(CMAKE_CXX_STANDARD "11" CACHE STRING "C++ standard to enforce")
 # Create Extension library
 set(EXTENSION_SOURCES
     src/capi_odbc_scanner.c
+    src/connection.cpp
     src/diagnostics.cpp
     src/fetch.cpp
-    src/odbc_close.cpp
-    src/odbc_connect.cpp
-    src/odbc_connection.cpp
-    src/odbc_params.cpp
-    src/odbc_query.cpp
     src/params.cpp
+    src/registries.cpp
     src/widechar.cpp
+    src/functions/odbc_close.cpp
+    src/functions/odbc_connect.cpp
+    src/functions/odbc_params.cpp
+    src/functions/odbc_query.cpp
     src/types/types.cpp
     src/types/type_bigint.cpp
     src/types/type_integer.cpp
