@@ -10,7 +10,23 @@ DUCKDB_EXTENSION_EXTERN
 
 namespace odbcscanner {
 
-std::string ReadDiagnostics(SQLHANDLE handle, SQLSMALLINT handle_type) {
+struct DiagMsg {
+	std::string state;
+	SQLINTEGER native_error;
+	std::string message;
+
+	DiagMsg(std::string state_in, SQLINTEGER native_error_in, std::string message_in)
+	    : state(std::move(state_in)), native_error(native_error_in), message(std::move(message_in)) {
+	}
+
+	DiagMsg(DiagMsg &other) = delete;
+	DiagMsg(DiagMsg &&other) = default;
+
+	DiagMsg &operator=(DiagMsg &other) = delete;
+	DiagMsg &operator=(DiagMsg &&other) = default;
+};
+
+static DiagMsg ReadDiagInternal(SQLHANDLE handle, SQLSMALLINT handle_type) {
 	idx_t state_len = 5;
 	std::vector<SQLWCHAR> sqlstate;
 	sqlstate.resize(state_len + 1);
@@ -33,9 +49,20 @@ std::string ReadDiagnostics(SQLHANDLE handle, SQLSMALLINT handle_type) {
 	}
 
 	if (state.length() > 0) {
-		return state + "(" + std::to_string(native_error) + "): " + message;
+		return DiagMsg(std::move(state), native_error, std::move(message));
 	}
-	return "N/A";
+
+	return DiagMsg("01000", 0, "N/A");
+}
+
+std::string ReadDiagnostics(SQLHANDLE handle, SQLSMALLINT handle_type) {
+	DiagMsg dm = ReadDiagInternal(handle, handle_type);
+	return dm.state + "(" + std::to_string(dm.native_error) + "): " + dm.message;
+}
+
+std::string ReadDiagnosticsCode(SQLHANDLE handle, SQLSMALLINT handle_type) {
+	DiagMsg dm = ReadDiagInternal(handle, handle_type);
+	return dm.state;
 }
 
 } // namespace odbcscanner

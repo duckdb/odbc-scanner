@@ -2,6 +2,7 @@
 add_executable(test_${EXTENSION_NAME}
   test_basic.cpp
   test_common.cpp
+  test_long_strings.cpp
   test_params.cpp
 )
 

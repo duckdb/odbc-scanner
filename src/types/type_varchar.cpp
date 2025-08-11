@@ -68,24 +68,76 @@ void SetVarcharParam(const std::string &query, HSTMT hstmt, ScannerParam &param,
 }
 
 std::pair<std::string, bool> FetchVarchar(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx) {
-	// todo: parts
 	std::vector<SQLWCHAR> buf;
-	buf.resize(1024);
-	SQLLEN len = 0;
+	buf.resize(4096);
+	SQLLEN len_bytes = 0;
 	SQLRETURN ret = SQLGetData(hstmt, col_idx, SQL_C_WCHAR, buf.data(),
-	                           static_cast<SQLSMALLINT>(buf.size() * sizeof(SQLWCHAR)), &len);
+	                           static_cast<SQLLEN>(buf.size() * sizeof(SQLWCHAR)), &len_bytes);
+
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for VARCHAR failed, column index: " + std::to_string(col_idx) +
 		                       ", query: '" + query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
 		                       "'");
 	}
-	if (len != SQL_NULL_DATA) {
-		std::string str = utf16_to_utf8_lenient(buf.data(), len / sizeof(SQLWCHAR));
-		return std::make_pair(std::move(str), false);
-	} else {
-		return std::make_pair("", true);
+
+	std::string diag_code;
+	std::string trunc_diag_code("01004");
+	if (ret == SQL_SUCCESS_WITH_INFO) {
+		diag_code = ReadDiagnosticsCode(hstmt, SQL_HANDLE_STMT);
 	}
+
+	if (ret == SQL_SUCCESS || diag_code != trunc_diag_code) {
+
+		if (len_bytes == SQL_NULL_DATA) {
+			return std::make_pair("", true);
+		}
+
+		if (len_bytes % sizeof(SQLWCHAR) != 0) {
+			len_bytes -= 1;
+		}
+
+		std::string str = utf16_to_utf8_lenient(buf.data(), len_bytes / sizeof(SQLWCHAR));
+		return std::make_pair(std::move(str), false);
+	}
+
+	// invariant: ret = SQL_SUCCESS_WITH_INFO && diag_code == "01004"
+
+	if (len_bytes % sizeof(SQLWCHAR) != 0) {
+		len_bytes -= 1;
+	}
+	size_t len = static_cast<size_t>(len_bytes / sizeof(SQLWCHAR));
+
+	size_t head_size = buf.size() - 1;
+	buf.resize(len + 1);
+
+	SQLWCHAR *buf_tail_ptr = buf.data() + head_size;
+	size_t buf_tail_size = buf.size() - head_size;
+	SQLLEN len_tail_bytes = 0;
+
+	SQLRETURN ret_tail = SQLGetData(hstmt, col_idx, SQL_C_WCHAR, buf_tail_ptr,
+	                                static_cast<SQLLEN>(buf_tail_size * sizeof(SQLWCHAR)), &len_tail_bytes);
+	if (!SQL_SUCCEEDED(ret_tail)) {
+		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
+		throw ScannerException("'SQLGetData' for VARCHAR tail failed, column index: " + std::to_string(col_idx) +
+		                       ", query: '" + query + "', return: " + std::to_string(ret_tail) + ", diagnostics: '" +
+		                       diag + "'");
+	}
+
+	if (len_tail_bytes % sizeof(SQLWCHAR) != 0) {
+		len_tail_bytes -= 1;
+	}
+	size_t len_tail = static_cast<size_t>(len_tail_bytes / sizeof(SQLWCHAR));
+	size_t len_tail_expected = len - head_size;
+	if (len_tail != len_tail_expected) {
+		throw ScannerException(
+		    "'SQLGetData' for VARCHAR failed due to inconsistent tail length reported by the driver, column index: " +
+		    std::to_string(col_idx) + ", query: '" + query + "', return: " + std::to_string(ret_tail) +
+		    ", head length: " + std::to_string(len_tail_expected) + ", actual: " + std::to_string(len_tail));
+	}
+
+	std::string str = utf16_to_utf8_lenient(buf.data(), buf.size() - 1);
+	return std::make_pair(std::move(str), false);
 }
 
 void SetVarcharResult(duckdb_vector vec, idx_t row_idx, const std::string &value) {

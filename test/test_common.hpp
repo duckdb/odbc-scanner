@@ -12,6 +12,18 @@ inline void LogicalTypeDeleter(duckdb_logical_type lt) {
 	duckdb_destroy_logical_type(&lt);
 }
 
+using PreparedStatementPtr = std::unique_ptr<_duckdb_prepared_statement, void (*)(duckdb_prepared_statement)>;
+
+inline void PreparedStatementDeleter(duckdb_prepared_statement ps) {
+	duckdb_destroy_prepare(&ps);
+}
+
+using ValuePtr = std::unique_ptr<_duckdb_value, void (*)(duckdb_value)>;
+
+inline void ValueDeleter(duckdb_value val) {
+	duckdb_destroy_value(&val);
+}
+
 struct ScannerConn {
 	duckdb_database db = nullptr;
 	duckdb_connection conn = nullptr;
