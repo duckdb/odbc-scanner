@@ -33,17 +33,14 @@ else
 	$(error Unsupported platform: $(PLATFORM))
 endif
 
-DUCKDB_ODBC_LOCAL_LIB_PATH ?= $(PROJ_DIR)/../duckdb-odbc/build/debug/$(DUCKDB_ODBC_LIB_NAME)
-DUCKDB_ODBC_RELEASE_LIB_PATH ?= $(PROJ_DIR)/third_party/duckdb-odbc/$(DUCKDB_ODBC_LIB_NAME)
-
 ENABLE_C_API_TESTS := TRUE
 DUCKDB_ODBC_FINAL_PATH :=
 
-# Check if the ODBC library is available - FIXED LOGIC
-ifneq ($(wildcard $(DUCKDB_ODBC_LOCAL_LIB_PATH)),)
-	DUCKDB_ODBC_FINAL_PATH := $(DUCKDB_ODBC_LOCAL_LIB_PATH)
-else ifneq ($(wildcard $(DUCKDB_ODBC_RELEASE_LIB_PATH)),)
-	DUCKDB_ODBC_FINAL_PATH := $(DUCKDB_ODBC_RELEASE_LIB_PATH)
+# Check if the ODBC library is available
+ifneq ("$(wildcard $(PROJ_DIR)/../duckdb-odbc/build/debug/$(DUCKDB_ODBC_LIB_NAME))","")
+	DUCKDB_ODBC_FINAL_PATH := $(PROJ_DIR)/../duckdb-odbc/build/debug/$(DUCKDB_ODBC_LIB_NAME)
+else ifneq ("$(wildcard $(PROJ_DIR)/third_party/duckdb-odbc/$(DUCKDB_ODBC_LIB_NAME))","")
+	DUCKDB_ODBC_FINAL_PATH := $(PROJ_DIR)/third_party/duckdb-odbc/$(DUCKDB_ODBC_LIB_NAME)
 else
 	ENABLE_C_API_TESTS := FALSE
 endif
@@ -81,7 +78,7 @@ clean: clean_build clean_cmake
 clean_all: clean clean_configure
 
 format-fix:
-	python3 resources/scripts/format.py --all --fix --noconfirm
+	python resources/scripts/format.py --all --fix --noconfirm
 
 format-check:
-	python3 resources/scripts/format.py --check
+	python resources/scripts/format.py --check
