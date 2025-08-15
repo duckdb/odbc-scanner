@@ -80,5 +80,5 @@ format: format-fix
 format-fix:
 	python resources/scripts/format.py --all --fix --noconfirm
 
-format-check:
-	python resources/scripts/format.py --check
+format-check-silent:
+	python resources/scripts/format.py --all --check --silent
