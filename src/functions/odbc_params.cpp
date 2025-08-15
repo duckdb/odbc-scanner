@@ -1,8 +1,9 @@
 #include "capi_odbc_scanner.h"
 #include "capi_pointers.hpp"
-#include "common.hpp"
+#include "diagnostics.hpp"
 #include "make_unique.hpp"
 #include "params.hpp"
+#include "registries.hpp"
 #include "scanner_exception.hpp"
 
 #include <string>
@@ -17,17 +18,15 @@ namespace odbcscanner {
 static void Params(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
 	(void)info;
 
-	CheckChunkRowsCount(input);
-
 	idx_t col_count = duckdb_data_chunk_get_column_count(input);
-	auto valvec_ptr = std_make_unique<std::vector<ValuePtr>>();
+	auto valvec_ptr = std_make_unique<std::vector<ScannerParam>>();
 	for (idx_t i = 0; i < col_count; i++) {
-		ValuePtr val = ExtractInputParam(input, i);
-		valvec_ptr->emplace_back(std::move(val));
+		ScannerParam param = ExtractInputParam(input, i);
+		valvec_ptr->emplace_back(std::move(param));
 	}
 
 	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
-	result_data[0] = reinterpret_cast<int64_t>(valvec_ptr.release());
+	result_data[0] = AddParamsToRegistry(std::move(valvec_ptr));
 }
 
 static duckdb_state Register(duckdb_connection conn) {
