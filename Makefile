@@ -68,14 +68,14 @@ ifeq ($(ENABLE_C_API_TESTS), TRUE)
 	./cmake_build/debug/test/test_odbc_scanner
 else
 	@echo "C API tests are disabled, DuckDB ODBC library not found."
-	@echo "Run 'make download_odbc_library' to download the ODBC library."
+	@echo "Run Clone duckdb-odbc repository and run 'make debug' to build it."
+	exit 1
 endif
-
-download_odbc_library:
-	./resources/scripts/update_downloaded_lib.sh $(RELEASE_BUILD)
 
 clean: clean_build clean_cmake
 clean_all: clean clean_configure
+
+format: format-fix
 
 format-fix:
 	python resources/scripts/format.py --all --fix --noconfirm
