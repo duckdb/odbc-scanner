@@ -1,7 +1,6 @@
-cmake_build
-build
-configure
-.idea
-duckdb_unittest_tempdir
-/test/bin
-venv
+/cmake_build
+/build
+/configure
+/.idea
+/.vscode
+/resources/scripts/__pycache__
