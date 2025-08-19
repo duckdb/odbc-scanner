@@ -14,4 +14,4 @@ target_compile_definitions(
 )
 
 target_link_libraries(test_${EXTENSION_NAME}
-                      PRIVATE ${DUCKDB_ODBC_SHARED_LIB_PATH})
+                      PRIVATE $ENV{DUCKDB_ODBC_SHARED_LIB_PATH})
