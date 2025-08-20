@@ -9,7 +9,7 @@ std::pair<std::string, bool> ExtractVarcharFunctionArg(duckdb_data_chunk chunk, 
 
 void AddVarcharResultColumn(duckdb_bind_info info, const std::string &name);
 
-ScannerParam ExtractVarcharNotNullInputParam(duckdb_vector vec);
+ScannerParam ExtractVarcharNotNullParam(duckdb_vector vec);
 
 void SetVarcharParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
 

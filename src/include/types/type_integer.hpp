@@ -7,9 +7,11 @@
 
 namespace odbcscanner {
 
+std::pair<int32_t, bool> ExtractIntegerFunctionArg(duckdb_data_chunk chunk, idx_t col_idx);
+
 void AddIntegerResultColumn(duckdb_bind_info info, const std::string &name);
 
-ScannerParam ExtractIntegerNotNullInputParam(duckdb_vector vec);
+ScannerParam ExtractIntegerNotNullParam(duckdb_vector vec);
 
 void SetIntegerParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
 

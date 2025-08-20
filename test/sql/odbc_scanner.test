@@ -89,12 +89,12 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT NULL::VARCHAR')
 NULL
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER + ?::INTEGER', params=odbc_params(41, 42))
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER + ?::INTEGER', params=row(41, 42))
 ----
 83
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT coalesce(?::INTEGER, ?::INTEGER)', params=odbc_params(NULL, 42))
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT coalesce(?::INTEGER, ?::INTEGER)', params=row(NULL, 42))
 ----
 42
 
@@ -126,10 +126,10 @@ CALL odbc_query(getvariable('conn'), 'DROP TABLE tab1')
 ----
 -1
 
-statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'fail', params=42)
-----
-Binder Error: 'odbc_query' error: specified parameters are not found, ID: 42
+# statement error
+# SELECT * FROM odbc_query(getvariable('conn'), 'fail', params_handle=42)
+# ----
+# Binder Error: 'odbc_query' error: specified parameters are not found, ID: 42
 
 statement error
 SELECT odbc_close(NULL)

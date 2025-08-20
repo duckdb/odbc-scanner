@@ -15,7 +15,7 @@ SET VARIABLE pg_conn = odbc_connect('DSN=postgres1;');
 SELECT * FROM odbc_query(getvariable('pg_conn'), 'SELECT pg_backend_pid()');
 
 -- query with parameters
-SELECT * FROM odbc_query(getvariable('pg_conn'), 'SELECT ?::INT + ?::INT', params=odbc_params(41, 42));
+SELECT * FROM odbc_query(getvariable('pg_conn'), 'SELECT ?::INT + ?::INT', params=row(41, 42));
 
 -- close connection
 SELECT odbc_close(getvariable('pg_conn'));

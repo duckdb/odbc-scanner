@@ -14,7 +14,6 @@ static std::string GenStr(size_t len) {
 
 TEST_CASE("Long string query", "[long_strings]") {
 	ScannerConn sc;
-
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn, R"(
 SELECT * FROM odbc_query(
@@ -22,7 +21,7 @@ SELECT * FROM odbc_query(
   '
     SELECT ?::VARCHAR
   ', 
-  params=odbc_params(?::VARCHAR))
+  params=row(?::VARCHAR))
 )",
 	                                         &ps_ptr);
 	REQUIRE(st_prepare == DuckDBSuccess);

@@ -47,7 +47,7 @@ void AddVarcharResultColumn(duckdb_bind_info info, const std::string &name) {
 	duckdb_bind_add_result_column(info, name.c_str(), ltype.get());
 }
 
-ScannerParam ExtractVarcharNotNullInputParam(duckdb_vector vec) {
+ScannerParam ExtractVarcharNotNullParam(duckdb_vector vec) {
 	duckdb_string_t *data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(vec));
 	duckdb_string_t dstr = data[0];
 	const char *cstr = duckdb_string_t_data(&dstr);

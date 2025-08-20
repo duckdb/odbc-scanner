@@ -26,13 +26,17 @@ static void odbc_query_function(duckdb_function_info info, duckdb_data_chunk out
 namespace odbcscanner {
 
 struct BindData {
-	int64_t conn_id;
+	int64_t conn_id = 0;
 	std::string query;
 	std::vector<ScannerParam> params;
+	int64_t params_handle = 0;
+	size_t expected_params_count = 0;
 	HSTMT hstmt = SQL_NULL_HSTMT;
 
-	BindData(int64_t conn_id_in, std::string query_in, std::vector<ScannerParam> params_in, HSTMT hstmt_in)
-	    : conn_id(conn_id_in), query(std::move(query_in)), params(std::move(params_in)), hstmt(hstmt_in) {
+	BindData(int64_t conn_id_in, std::string query_in, std::vector<ScannerParam> params_in, int64_t params_handle_in,
+	         size_t expected_params_count_in, HSTMT hstmt_in)
+	    : conn_id(conn_id_in), query(std::move(query_in)), params(std::move(params_in)),
+	      params_handle(params_handle_in), expected_params_count(expected_params_count_in), hstmt(hstmt_in) {
 	}
 
 	BindData(const BindData &) = delete;
@@ -44,6 +48,11 @@ struct BindData {
 	~BindData() noexcept {
 		SQLFreeStmt(hstmt, SQL_CLOSE);
 		SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+
+		if (params_handle != 0) {
+			auto params_ptr = RemoveParamsFromRegistry(params_handle);
+			(void)params_ptr;
+		}
 	}
 
 	static void Destroy(void *bdata_in) noexcept {
@@ -102,19 +111,17 @@ static void Bind(duckdb_bind_info info) {
 	auto query_ptr = VarcharPtr(duckdb_get_varchar(query_val.get()), VarcharDeleter);
 	std::string query(query_ptr.get());
 
-	auto params_ptr_val = ValuePtr(duckdb_bind_get_named_parameter(info, "params"), ValueDeleter);
 	std::vector<ScannerParam> params;
-	if (params_ptr_val.get() != nullptr && !duckdb_is_null_value(params_ptr_val.get())) {
-		int64_t params_id = duckdb_get_int64(params_ptr_val.get());
-		auto params_ptr = RemoveParamsFromRegistry(params_id);
-		if (params_ptr.get() == nullptr) {
-			throw ScannerException("'odbc_query' error: specified parameters are not found, ID: " +
-			                       std::to_string(params_id));
-		}
-		std::vector<ScannerParam> &passed_params = *params_ptr;
-		for (ScannerParam &sp : passed_params) {
-			params.push_back(std::move(sp));
-		}
+
+	auto params_val = ValuePtr(duckdb_bind_get_named_parameter(info, "params"), ValueDeleter);
+	if (params_val.get() != nullptr) {
+		params = ExtractStructParamsFromValue(params_val.get());
+	}
+
+	int64_t params_handle = 0;
+	auto param_handle_val = ValuePtr(duckdb_bind_get_named_parameter(info, "params_handle"), ValueDeleter);
+	if (param_handle_val.get() != nullptr && !duckdb_is_null_value(param_handle_val.get())) {
+		params_handle = duckdb_get_int64(param_handle_val.get());
 	}
 
 	HSTMT hstmt = SQL_NULL_HSTMT;
@@ -134,7 +141,8 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 
-	{
+	size_t expected_params_count = 0;
+	if (params_val.get() != nullptr || param_handle_val.get() != nullptr) {
 		SQLSMALLINT count = -1;
 		SQLRETURN ret = SQLNumParams(hstmt, &count);
 		if (!SQL_SUCCEEDED(ret)) {
@@ -142,9 +150,10 @@ static void Bind(duckdb_bind_info info) {
 			throw ScannerException("'SQLNumParams' failed, query: '" + query + "', return: " + std::to_string(ret) +
 			                       ", diagnostics: '" + diag + "'");
 		}
-		if (static_cast<size_t>(count) != params.size()) {
+		expected_params_count = static_cast<size_t>(count);
+		if (params_val.get() != nullptr && expected_params_count != params.size()) {
 			throw ScannerException(
-			    "Incorrect number of query parameters specified, expected: " + std::to_string(count) +
+			    "Incorrect number of query parameters specified, expected: " + std::to_string(expected_params_count) +
 			    ", actual: " + std::to_string(params.size()) + ", query: '" + query + "'");
 		}
 	}
@@ -187,7 +196,8 @@ static void Bind(duckdb_bind_info info) {
 		duckdb_bind_add_result_column(info, "rowcount", bigint_type.get());
 	}
 
-	auto bdata_ptr = std::unique_ptr<BindData>(new BindData(conn_id, std::move(query), std::move(params), hstmt));
+	auto bdata_ptr = std::unique_ptr<BindData>(
+	    new BindData(conn_id, std::move(query), std::move(params), params_handle, expected_params_count, hstmt));
 	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
 }
 
@@ -208,10 +218,33 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 		return;
 	}
 
-	for (size_t i = 0; i < bdata.params.size(); i++) {
-		ScannerParam &param = bdata.params.at(i);
-		SQLSMALLINT idx = static_cast<SQLSMALLINT>(i + 1);
-		SetOdbcParam(bdata.query, bdata.hstmt, param, idx);
+	if (bdata.params.size() > 0) {
+		ResetOdbcParams(bdata.hstmt);
+		for (size_t i = 0; i < bdata.params.size(); i++) {
+			ScannerParam &param = bdata.params.at(i);
+			SQLSMALLINT idx = static_cast<SQLSMALLINT>(i + 1);
+			SetOdbcParam(bdata.query, bdata.hstmt, param, idx);
+		}
+	} else if (bdata.params_handle != 0) {
+		auto params_ptr = RemoveParamsFromRegistry(bdata.params_handle);
+		if (params_ptr.get() == nullptr) {
+			throw ScannerException("'odbc_query' error: specified parameters handle not found, ID: " +
+			                       std::to_string(bdata.params_handle));
+		}
+		auto deferred = Defer([&params_ptr] { AddParamsToRegistry(std::move(params_ptr)); });
+		if (bdata.expected_params_count != params_ptr->size()) {
+			throw ScannerException("Incorrect number of query parameters specified, expected: " +
+			                       std::to_string(bdata.expected_params_count) + ", actual: " +
+			                       std::to_string(params_ptr->size()) + ", query: '" + bdata.query + "'");
+		}
+		if (params_ptr->size() > 0) {
+			ResetOdbcParams(bdata.hstmt);
+			for (size_t i = 0; i < params_ptr->size(); i++) {
+				ScannerParam &param = params_ptr->at(i);
+				SQLSMALLINT idx = static_cast<SQLSMALLINT>(i + 1);
+				SetOdbcParam(bdata.query, bdata.hstmt, param, idx);
+			}
+		}
 	}
 
 	{
@@ -310,9 +343,11 @@ static duckdb_state Register(duckdb_connection conn) {
 	// parameters
 	auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
 	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
+	auto any_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_ANY), LogicalTypeDeleter);
 	duckdb_table_function_add_parameter(fun.get(), bigint_type.get());
 	duckdb_table_function_add_parameter(fun.get(), varchar_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "params", bigint_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "params", any_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "params_handle", bigint_type.get());
 
 	// callbacks
 	duckdb_table_function_set_bind(fun.get(), odbc_query_bind);

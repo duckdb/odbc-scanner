@@ -30,9 +30,17 @@ DUCKDB_EXTENSION_ENTRYPOINT(duckdb_connection connection, duckdb_extension_info 
 	}
 
 	{
-		duckdb_state state = odbc_params_register(connection);
+		duckdb_state state = odbc_create_params_register(connection);
 		if (state != DuckDBSuccess) {
-			access->set_error(info, "'odbc_params' registration failed");
+			access->set_error(info, "'odbc_create_params' registration failed");
+			return false;
+		}
+	}
+
+	{
+		duckdb_state state = odbc_bind_params_register(connection);
+		if (state != DuckDBSuccess) {
+			access->set_error(info, "'odbc_bind_params' registration failed");
 			return false;
 		}
 	}

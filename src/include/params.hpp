@@ -1,15 +1,16 @@
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <sql.h>
+#include <sqlext.h>
+
 #include "capi_pointers.hpp"
 #include "duckdb_extension.h"
 #include "widechar.hpp"
-
-#include <cstdint>
-#include <memory>
-#include <sql.h>
-#include <sqlext.h>
-#include <string>
-#include <vector>
 
 namespace odbcscanner {
 
@@ -36,8 +37,12 @@ struct ScannerParam {
 	ScannerParam &operator=(ScannerParam &&other) = default;
 };
 
-ScannerParam ExtractInputParam(duckdb_data_chunk chunk, idx_t col_idx);
+std::vector<ScannerParam> ExtractStructParamsFromChunk(duckdb_data_chunk chunk, idx_t col_idx);
+
+std::vector<ScannerParam> ExtractStructParamsFromValue(duckdb_value struct_value);
 
 void SetOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
+
+void ResetOdbcParams(HSTMT hstmt);
 
 } // namespace odbcscanner

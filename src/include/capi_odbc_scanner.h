@@ -14,7 +14,9 @@ duckdb_state odbc_close_register(duckdb_connection connection);
 
 duckdb_state odbc_query_register(duckdb_connection connection);
 
-duckdb_state odbc_params_register(duckdb_connection connection);
+duckdb_state odbc_create_params_register(duckdb_connection connection);
+
+duckdb_state odbc_bind_params_register(duckdb_connection connection);
 
 #ifdef __cplusplus
 }
