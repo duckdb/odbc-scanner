@@ -56,12 +56,12 @@ ScannerParam ExtractVarcharNotNullParam(duckdb_vector vec) {
 }
 
 void SetVarcharParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx) {
-	SQLRETURN ret =
-	    SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, SQL_WVARCHAR, param.len_bytes, 0,
-	                     reinterpret_cast<SQLPOINTER>(param.wstr.data()), param.len_bytes, &param.len_bytes);
+	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, SQL_WVARCHAR, param.LengthBytes(),
+	                                 0, reinterpret_cast<SQLPOINTER>(param.Utf16String().data()), param.LengthBytes(),
+	                                 &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLBindParameter' VARCHAR failed, value: '" + param.str +
+		throw ScannerException("'SQLBindParameter' VARCHAR failed, value: '" + param.ToUtf8String(1 << 10) +
 		                       "', index: " + std::to_string(param_idx) + ", query: '" + query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}

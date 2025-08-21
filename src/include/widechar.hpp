@@ -14,13 +14,13 @@ struct SqlWString {
 	SqlWString() {
 	}
 
-	SqlWString(std::vector<SQLWCHAR> vec_in) : vec(std::move(vec_in)) {
+	explicit SqlWString(std::vector<SQLWCHAR> vec_in) : vec(std::move(vec_in)) {
 	}
 
 	SqlWString(SqlWString &other) = delete;
 	SqlWString(SqlWString &&other) = default;
 
-	SqlWString &operator=(const SqlWString &) = delete;
+	SqlWString &operator=(const SqlWString &other) = delete;
 	SqlWString &operator=(SqlWString &&other) = default;
 
 	template <typename INT_TYPE>

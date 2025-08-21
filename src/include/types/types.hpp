@@ -14,7 +14,7 @@ struct OdbcType {
 	SQLLEN desc_concise_type;
 	std::string desc_type_name;
 
-	OdbcType(SQLLEN desc_type_in, SQLLEN desc_concise_type_in, std::string desc_type_name_in)
+	explicit OdbcType(SQLLEN desc_type_in, SQLLEN desc_concise_type_in, std::string desc_type_name_in)
 	    : desc_type(desc_type_in), desc_concise_type(desc_concise_type_in),
 	      desc_type_name(std::move(desc_type_name_in)) {
 	}
