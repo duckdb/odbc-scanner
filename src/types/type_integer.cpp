@@ -49,11 +49,12 @@ ScannerParam ExtractIntegerNotNullParam(duckdb_vector vec) {
 }
 
 void SetIntegerParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx) {
-	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_SLONG, SQL_INTEGER, 0, 0,
-	                                 reinterpret_cast<SQLPOINTER>(&param.int32), param.len_bytes, &param.len_bytes);
+	SQLRETURN ret =
+	    SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_SLONG, SQL_INTEGER, 0, 0,
+	                     reinterpret_cast<SQLPOINTER>(&param.Int32()), param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLBindParameter' INTEGER failed, value: " + std::to_string(param.int32) +
+		throw ScannerException("'SQLBindParameter' INTEGER failed, value: " + std::to_string(param.Int32()) +
 		                       ", index: " + std::to_string(param_idx) + ", query: '" + query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}

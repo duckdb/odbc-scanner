@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -14,27 +15,60 @@
 
 namespace odbcscanner {
 
-struct ScannerParam {
+class ScannerParam {
 	duckdb_type type_id = DUCKDB_TYPE_INVALID;
-
-	// todo: union
-	int32_t int32 = 0;
-	int64_t int64 = 0;
-	std::string str;
-	SqlWString wstr;
-
 	SQLLEN len_bytes = 0;
 
+	union Value {
+		bool null_val;
+		int32_t int32;
+		int64_t int64;
+		SqlWString wstr;
+
+		Value() : null_val(true) {
+		}
+		Value(int32_t int32_in) : int32(int32_in) {
+		}
+		Value(int64_t int64_in) : int64(int64_in) {
+		}
+		Value(SqlWString wstr_in) : wstr(std::move(wstr_in)) {
+		}
+
+		Value(Value &other) = delete;
+		Value(Value &&other) = delete;
+
+		Value &operator=(Value &other) = delete;
+		Value &operator=(Value &&other) = delete;
+
+		~Value() noexcept {};
+	} val;
+
+public:
 	ScannerParam();
-	ScannerParam(int32_t value);
-	ScannerParam(int64_t value);
-	ScannerParam(std::string value);
+	explicit ScannerParam(int32_t value);
+	explicit ScannerParam(int64_t value);
+	explicit ScannerParam(const std::string &value);
 
 	ScannerParam(ScannerParam &other) = delete;
-	ScannerParam(ScannerParam &&other) = default;
+	ScannerParam(ScannerParam &&other);
 
 	ScannerParam &operator=(ScannerParam &other) = delete;
-	ScannerParam &operator=(ScannerParam &&other) = default;
+	ScannerParam &operator=(ScannerParam &&other);
+
+	~ScannerParam();
+
+	std::string ToUtf8String(size_t max_len = std::numeric_limits<size_t>::max());
+
+	duckdb_type TypeId();
+
+	SQLLEN &LengthBytes();
+
+	int32_t &Int32();
+	int64_t &Int64();
+	SqlWString &Utf16String();
+
+private:
+	void CheckType(duckdb_type expected);
 };
 
 std::vector<ScannerParam> ExtractStructParamsFromChunk(duckdb_data_chunk chunk, idx_t col_idx);
