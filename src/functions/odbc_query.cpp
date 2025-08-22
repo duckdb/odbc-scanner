@@ -13,7 +13,6 @@
 #include "diagnostics.hpp"
 #include "params.hpp"
 #include "registries.hpp"
-#include "results.hpp"
 #include "scanner_exception.hpp"
 #include "types.hpp"
 #include "widechar.hpp"
@@ -314,12 +313,11 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 		}
 
 		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(cols_count); col_idxz++) {
-
 			OdbcType &odbc_type = col_types.at(col_idxz);
 			SQLSMALLINT col_idx = static_cast<SQLSMALLINT>(col_idxz + 1);
 			duckdb_vector vec = col_vectors.at(col_idxz);
 
-			Results::FetchIntoVector(bdata.query, bdata.hstmt, col_idx, odbc_type, vec, row_idx);
+			Types::FetchAndSetResultOfType(odbc_type, bdata.query, bdata.hstmt, col_idx, vec, row_idx);
 		}
 	}
 	duckdb_data_chunk_set_size(output, row_idx);

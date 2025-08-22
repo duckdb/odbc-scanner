@@ -28,15 +28,33 @@ struct OdbcType {
 };
 
 struct Types {
+
+	// Type-dispatched functions
+
+	static ScannerParam ExtractNotNullParamOfType(duckdb_type type_id, duckdb_vector vec, idx_t param_idx);
+
+	static ScannerParam ExtractNotNullParamOfType(duckdb_type type_id, duckdb_value value, idx_t param_idx);
+
+	static void BindOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
+
+	static void AddResultColumnOfType(duckdb_bind_info info, const std::string &name, const OdbcType &odbc_type);
+
+	static void FetchAndSetResultOfType(const OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+	                                    SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx);
+
+	// Other functions
+
 	static OdbcType GetResultColumnAttributes(const std::string &query, SQLSMALLINT cols_count, HSTMT hstmt,
 	                                          SQLUSMALLINT col_idx);
-	static void AddResultColumnOfType(duckdb_bind_info info, const std::string &name, const OdbcType &odbc_ctype);
 
 	template <typename T>
 	static std::pair<T, bool> ExtractFunctionArg(duckdb_data_chunk chunk, idx_t col_idx);
 
-	template <typename T>
-	static void AddResultColumn(duckdb_bind_info info, const std::string &name);
+	static void SetNullValueToResult(duckdb_vector vec, idx_t row_idx);
+};
+
+class TypeSpecific {
+	friend struct Types;
 
 	template <typename T>
 	static ScannerParam ExtractNotNullParam(duckdb_vector vec);
@@ -47,15 +65,12 @@ struct Types {
 	template <typename T>
 	static void BindOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
 
-	static void BindNullOdbcParam(const std::string &query, HSTMT hstmt, SQLSMALLINT param_idx);
+	template <typename T>
+	static void AddResultColumn(duckdb_bind_info info, const std::string &name);
 
 	template <typename T>
-	static std::pair<T, bool> FetchOdbcValue(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx);
-
-	template <typename T>
-	static void SetValueToResult(duckdb_vector vec, idx_t row_idx, const T &value);
-
-	static void SetNullValueToResult(duckdb_vector vec, idx_t row_idx);
+	static void FetchAndSetResult(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx, duckdb_vector vec,
+	                              idx_t row_idx);
 };
 
 } // namespace odbcscanner

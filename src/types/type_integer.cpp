@@ -39,26 +39,27 @@ std::pair<int32_t, bool> Types::ExtractFunctionArg<int32_t>(duckdb_data_chunk ch
 }
 
 template <>
-void Types::AddResultColumn<int32_t>(duckdb_bind_info info, const std::string &name) {
+void TypeSpecific::AddResultColumn<int32_t>(duckdb_bind_info info, const std::string &name) {
 	auto ltype = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_INTEGER), LogicalTypeDeleter);
 	duckdb_bind_add_result_column(info, name.c_str(), ltype.get());
 }
 
 template <>
-ScannerParam Types::ExtractNotNullParam<int32_t>(duckdb_vector vec) {
+ScannerParam TypeSpecific::ExtractNotNullParam<int32_t>(duckdb_vector vec) {
 	int32_t *data = reinterpret_cast<int32_t *>(duckdb_vector_get_data(vec));
 	int32_t num = data[0];
 	return ScannerParam(num);
 }
 
 template <>
-ScannerParam Types::ExtractNotNullParam<int32_t>(duckdb_value value) {
+ScannerParam TypeSpecific::ExtractNotNullParam<int32_t>(duckdb_value value) {
 	int32_t num = duckdb_get_int32(value);
 	return ScannerParam(num);
 }
 
 template <>
-void Types::BindOdbcParam<int32_t>(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<int32_t>(const std::string &query, HSTMT hstmt, ScannerParam &param,
+                                          SQLSMALLINT param_idx) {
 	SQLRETURN ret =
 	    SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_SLONG, SQL_INTEGER, 0, 0,
 	                     reinterpret_cast<SQLPOINTER>(&param.Int32()), param.LengthBytes(), &param.LengthBytes());
@@ -71,7 +72,8 @@ void Types::BindOdbcParam<int32_t>(const std::string &query, HSTMT hstmt, Scanne
 }
 
 template <>
-std::pair<int32_t, bool> Types::FetchOdbcValue<int32_t>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx) {
+void TypeSpecific::FetchAndSetResult<int32_t>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
+                                              duckdb_vector vec, idx_t row_idx) {
 	int32_t fetched = 0;
 	SQLLEN ind;
 	SQLRETURN ret = SQLGetData(hstmt, col_idx, SQL_C_SLONG, &fetched, sizeof(fetched), &ind);
@@ -81,13 +83,14 @@ std::pair<int32_t, bool> Types::FetchOdbcValue<int32_t>(const std::string &query
 		                       ", query: '" + query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
 		                       "'");
 	}
-	return std::make_pair(fetched, ind == SQL_NULL_DATA);
-}
 
-template <>
-void Types::SetValueToResult<int32_t>(duckdb_vector vec, idx_t row_idx, const int32_t &value) {
+	if (ind == SQL_NULL_DATA) {
+		Types::SetNullValueToResult(vec, row_idx);
+		return;
+	}
+
 	int32_t *data = reinterpret_cast<int32_t *>(duckdb_vector_get_data(vec));
-	data[row_idx] = value;
+	data[row_idx] = fetched;
 }
 
 } // namespace odbcscanner

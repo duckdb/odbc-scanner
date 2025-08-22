@@ -175,23 +175,8 @@ std::vector<ScannerParam> Params::Extract(duckdb_data_chunk chunk, idx_t col_idx
 
 		auto child_type = LogicalTypePtr(duckdb_struct_type_child_type(struct_type.get(), i), LogicalTypeDeleter);
 		auto child_type_id = duckdb_get_type_id(child_type.get());
-		switch (child_type_id) {
-		case DUCKDB_TYPE_INTEGER: {
-			ScannerParam sp = Types::ExtractNotNullParam<int32_t>(child_vec);
-			params.emplace_back(std::move(sp));
-			break;
-		}
-		case DUCKDB_TYPE_VARCHAR: {
-			ScannerParam sp = Types::ExtractNotNullParam<std::string>(child_vec);
-			params.emplace_back(std::move(sp));
-			break;
-		}
-		default:
-			throw ScannerException(
-			    "Cannot extract parameters from STRUCT: specified specified type is not supported, id: " +
-			    std::to_string(child_type_id) + ", index: " + std::to_string(i) +
-			    ", column: " + std::to_string(col_idx) + ", columns count: " + std::to_string(col_count));
-		}
+		ScannerParam sp = Types::ExtractNotNullParamOfType(child_type_id, child_vec, i);
+		params.emplace_back(std::move(sp));
 	}
 
 	return params;
@@ -218,22 +203,8 @@ std::vector<ScannerParam> Params::Extract(duckdb_value struct_value) {
 
 		auto child_type = LogicalTypePtr(duckdb_struct_type_child_type(struct_type, i), LogicalTypeDeleter);
 		auto child_type_id = duckdb_get_type_id(child_type.get());
-		switch (child_type_id) {
-		case DUCKDB_TYPE_INTEGER: {
-			ScannerParam sp = Types::ExtractNotNullParam<int32_t>(child_val.get());
-			params.emplace_back(std::move(sp));
-			break;
-		}
-		case DUCKDB_TYPE_VARCHAR: {
-			ScannerParam sp = Types::ExtractNotNullParam<std::string>(child_val.get());
-			params.emplace_back(std::move(sp));
-			break;
-		}
-		default:
-			throw ScannerException(
-			    "Cannot extract parameters from STRUCT: specified specified type is not supported, id: " +
-			    std::to_string(child_type_id) + ", index: " + std::to_string(i));
-		}
+		ScannerParam sp = Types::ExtractNotNullParamOfType(child_type_id, child_val.get(), i);
+		params.emplace_back(std::move(sp));
 	}
 
 	return params;
@@ -253,24 +224,7 @@ void Params::BindToOdbc(const std::string &query, HSTMT hstmt, std::vector<Scann
 	for (size_t i = 0; i < params.size(); i++) {
 		ScannerParam &param = params.at(i);
 		SQLSMALLINT idx = static_cast<SQLSMALLINT>(i + 1);
-
-		switch (param.TypeId()) {
-		case DUCKDB_TYPE_SQLNULL: {
-			Types::BindNullOdbcParam(query, hstmt, idx);
-			break;
-		}
-		case DUCKDB_TYPE_INTEGER: {
-			Types::BindOdbcParam<int32_t>(query, hstmt, param, idx);
-			break;
-		}
-		case DUCKDB_TYPE_VARCHAR: {
-			Types::BindOdbcParam<std::string>(query, hstmt, param, idx);
-			break;
-		}
-		default: {
-			throw ScannerException("Unsupported parameter type: " + std::to_string(param.TypeId()));
-		}
-		}
+		Types::BindOdbcParam(query, hstmt, param, idx);
 	}
 }
 
