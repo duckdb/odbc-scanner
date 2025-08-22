@@ -1,27 +1,28 @@
 #pragma once
 
 #include <cstdint>
-#include <sql.h>
-#include <sqlext.h>
 #include <string>
 #include <vector>
 
+#include <sql.h>
+#include <sqlext.h>
+
 namespace odbcscanner {
 
-struct SqlWString {
+struct WideString {
 	std::vector<SQLWCHAR> vec;
 
-	SqlWString() {
+	WideString() {
 	}
 
-	explicit SqlWString(std::vector<SQLWCHAR> vec_in) : vec(std::move(vec_in)) {
+	explicit WideString(std::vector<SQLWCHAR> vec_in) : vec(std::move(vec_in)) {
 	}
 
-	SqlWString(SqlWString &other) = delete;
-	SqlWString(SqlWString &&other) = default;
+	WideString(WideString &other) = delete;
+	WideString(WideString &&other) = default;
 
-	SqlWString &operator=(const SqlWString &other) = delete;
-	SqlWString &operator=(SqlWString &&other) = default;
+	WideString &operator=(const WideString &other) = delete;
+	WideString &operator=(WideString &&other) = default;
 
 	template <typename INT_TYPE>
 	INT_TYPE length() {
@@ -33,11 +34,10 @@ struct SqlWString {
 	}
 };
 
-std::string utf16_to_utf8_lenient(const SQLWCHAR *in_buf, size_t in_buf_len,
-                                  const SQLWCHAR **first_invalid_char = nullptr);
+struct WideChar {
+	static std::string Narrow(const SQLWCHAR *in_buf, size_t in_buf_len, const SQLWCHAR **first_invalid_char = nullptr);
 
-SqlWString utf8_to_utf16_lenient(const char *in_buf, size_t in_buf_len, const char **first_invalid_char = nullptr);
-
-size_t utf16_length(const SQLWCHAR *buf);
+	static WideString Widen(const char *in_buf, size_t in_buf_len, const char **first_invalid_char = nullptr);
+};
 
 } // namespace odbcscanner

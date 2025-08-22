@@ -1,11 +1,13 @@
+#include "types.hpp"
+
 #include "scanner_exception.hpp"
-#include "types/type_integer.hpp"
 
 DUCKDB_EXTENSION_EXTERN
 
 namespace odbcscanner {
 
-std::pair<int64_t, bool> ExtractBigIntFunctionArg(duckdb_data_chunk chunk, idx_t col_idx) {
+template <>
+std::pair<int64_t, bool> Types::ExtractFunctionArg<int64_t>(duckdb_data_chunk chunk, idx_t col_idx) {
 	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
 	if (col_idx >= col_count) {
 		throw ScannerException("Cannot extract BIGINT function argument: column not found, column: " +

@@ -40,9 +40,9 @@ set(EXTENSION_SOURCES
     src/capi_odbc_scanner.c
     src/connection.cpp
     src/diagnostics.cpp
-    src/fetch.cpp
     src/params.cpp
     src/registries.cpp
+    src/results.cpp
     src/widechar.cpp
     src/functions/odbc_bind_params.cpp
     src/functions/odbc_close.cpp

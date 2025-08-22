@@ -1,4 +1,9 @@
 #include "capi_odbc_scanner.h"
+
+#include <cstdint>
+#include <string>
+#include <vector>
+
 #include "capi_pointers.hpp"
 #include "defer.hpp"
 #include "diagnostics.hpp"
@@ -6,10 +11,7 @@
 #include "params.hpp"
 #include "registries.hpp"
 #include "scanner_exception.hpp"
-#include "types/type_bigint.hpp"
-
-#include <string>
-#include <vector>
+#include "types.hpp"
 
 DUCKDB_EXTENSION_EXTERN
 
@@ -21,20 +23,20 @@ namespace odbcscanner {
 static void BindParams(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
 	(void)info;
 
-	auto handle_arg = ExtractBigIntFunctionArg(input, 0);
+	auto handle_arg = Types::ExtractFunctionArg<int64_t>(input, 0);
 	if (handle_arg.second) {
 		throw ScannerException("'odbc_bind_params' error: specified parameters handle argument must be not NULL");
 	}
 	int64_t params_handle = handle_arg.first;
-	auto params_ptr = RemoveParamsFromRegistry(params_handle);
+	auto params_ptr = ParamsRegistry::Remove(params_handle);
 	if (params_ptr.get() == nullptr) {
 		throw ScannerException("'odbc_bind_params' error: specified parameter handle not found, ID: " +
 		                       std::to_string(params_handle));
 	}
-	auto deferred = Defer([&params_ptr] { AddParamsToRegistry(std::move(params_ptr)); });
+	auto deferred = Defer([&params_ptr] { ParamsRegistry::Add(std::move(params_ptr)); });
 	params_ptr->clear();
 
-	std::vector<ScannerParam> params = ExtractStructParamsFromChunk(input, 1);
+	std::vector<ScannerParam> params = Params::Extract(input, 1);
 
 	for (ScannerParam &p : params) {
 		params_ptr->emplace_back(std::move(p));

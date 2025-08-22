@@ -8,8 +8,10 @@
 
 namespace odbcscanner {
 
-std::string ReadDiagnostics(SQLHANDLE handle, SQLSMALLINT handle_type);
+struct Diagnostics {
+	static std::string Read(SQLHANDLE handle, SQLSMALLINT handle_type);
 
-std::string ReadDiagnosticsCode(SQLHANDLE handle, SQLSMALLINT handle_type);
+	static std::string ReadCode(SQLHANDLE handle, SQLSMALLINT handle_type);
+};
 
 } // namespace odbcscanner

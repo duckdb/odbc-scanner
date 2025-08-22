@@ -1,14 +1,17 @@
 #include "capi_odbc_scanner.h"
+
+#include <cstdint>
+#include <string>
+
+#include <sql.h>
+#include <sqlext.h>
+
 #include "capi_pointers.hpp"
 #include "connection.hpp"
 #include "diagnostics.hpp"
 #include "registries.hpp"
 #include "scanner_exception.hpp"
-#include "types/type_bigint.hpp"
-
-#include <sql.h>
-#include <sqlext.h>
-#include <string>
+#include "types.hpp"
 
 DUCKDB_EXTENSION_EXTERN
 
@@ -19,12 +22,12 @@ namespace odbcscanner {
 static void Close(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
 	(void)info;
 
-	auto arg = ExtractBigIntFunctionArg(input, 0);
+	auto arg = Types::ExtractFunctionArg<int64_t>(input, 0);
 	if (arg.second) {
 		throw ScannerException("'odbc_close' error: specified ODBC connection argument must be not NULL");
 	}
 	{
-		auto conn_ptr = RemoveConnectionFromRegistry(arg.first);
+		auto conn_ptr = ConnectionsRegistry::Remove(arg.first);
 		// connection may or may not be already closed - we won't throw from this function either way
 	}
 

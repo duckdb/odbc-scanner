@@ -23,7 +23,7 @@ class ScannerParam {
 		bool null_val;
 		int32_t int32;
 		int64_t int64;
-		SqlWString wstr;
+		WideString wstr;
 
 		Value() : null_val(true) {
 		}
@@ -31,7 +31,7 @@ class ScannerParam {
 		}
 		Value(int64_t int64_in) : int64(int64_in) {
 		}
-		Value(SqlWString wstr_in) : wstr(std::move(wstr_in)) {
+		Value(WideString wstr_in) : wstr(std::move(wstr_in)) {
 		}
 
 		Value(Value &other) = delete;
@@ -47,7 +47,7 @@ public:
 	ScannerParam();
 	explicit ScannerParam(int32_t value);
 	explicit ScannerParam(int64_t value);
-	explicit ScannerParam(const std::string &value);
+	explicit ScannerParam(const char *cstr, size_t len);
 
 	ScannerParam(ScannerParam &other) = delete;
 	ScannerParam(ScannerParam &&other);
@@ -65,18 +65,18 @@ public:
 
 	int32_t &Int32();
 	int64_t &Int64();
-	SqlWString &Utf16String();
+	WideString &Utf16String();
 
 private:
 	void CheckType(duckdb_type expected);
 };
 
-std::vector<ScannerParam> ExtractStructParamsFromChunk(duckdb_data_chunk chunk, idx_t col_idx);
+struct Params {
+	static std::vector<ScannerParam> Extract(duckdb_data_chunk chunk, idx_t col_idx);
 
-std::vector<ScannerParam> ExtractStructParamsFromValue(duckdb_value struct_value);
+	static std::vector<ScannerParam> Extract(duckdb_value struct_value);
 
-void SetOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
-
-void ResetOdbcParams(HSTMT hstmt);
+	static void BindToOdbc(const std::string &query, HSTMT hstmt, std::vector<ScannerParam> &params);
+};
 
 } // namespace odbcscanner

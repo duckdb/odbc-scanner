@@ -1,20 +1,24 @@
 #pragma once
 
-#include "connection.hpp"
-#include "params.hpp"
-
 #include <cstdint>
 #include <memory>
 #include <vector>
 
+#include "connection.hpp"
+#include "params.hpp"
+
 namespace odbcscanner {
 
-int64_t AddConnectionToRegistry(std::unique_ptr<OdbcConnection> conn);
+struct ConnectionsRegistry {
+	static int64_t Add(std::unique_ptr<OdbcConnection> conn);
 
-std::unique_ptr<OdbcConnection> RemoveConnectionFromRegistry(int64_t conn_id);
+	static std::unique_ptr<OdbcConnection> Remove(int64_t conn_id);
+};
 
-int64_t AddParamsToRegistry(std::unique_ptr<std::vector<ScannerParam>> params);
+struct ParamsRegistry {
+	static int64_t Add(std::unique_ptr<std::vector<ScannerParam>> params);
 
-std::unique_ptr<std::vector<ScannerParam>> RemoveParamsFromRegistry(int64_t params_id);
+	static std::unique_ptr<std::vector<ScannerParam>> Remove(int64_t params_id);
+};
 
 } // namespace odbcscanner
