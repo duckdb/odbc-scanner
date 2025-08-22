@@ -6,7 +6,7 @@ extern "C" {
 
 #include "duckdb_extension.h"
 
-void initialize_connection_registry();
+void initialize_registries();
 
 duckdb_state odbc_connect_register(duckdb_connection connection);
 

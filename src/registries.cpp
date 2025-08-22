@@ -47,7 +47,7 @@ static std::shared_ptr<std::set<int64_t>> SharedParamsRegistry() {
 	return registry;
 }
 
-int64_t AddConnectionToRegistry(std::unique_ptr<OdbcConnection> conn) {
+int64_t ConnectionsRegistry::Add(std::unique_ptr<OdbcConnection> conn) {
 	if (conn.get() == nullptr) {
 		throw ScannerException("Cannot register invalid empty connection");
 	}
@@ -71,7 +71,7 @@ int64_t AddConnectionToRegistry(std::unique_ptr<OdbcConnection> conn) {
 	return conn_id;
 }
 
-std::unique_ptr<OdbcConnection> RemoveConnectionFromRegistry(int64_t conn_id) {
+std::unique_ptr<OdbcConnection> ConnectionsRegistry::Remove(int64_t conn_id) {
 	auto mtx = SharedMutex();
 	std::lock_guard<std::mutex> guard(*mtx);
 
@@ -87,7 +87,7 @@ std::unique_ptr<OdbcConnection> RemoveConnectionFromRegistry(int64_t conn_id) {
 	return std::unique_ptr<OdbcConnection>(conn_ptr);
 }
 
-int64_t AddParamsToRegistry(std::unique_ptr<std::vector<ScannerParam>> params) {
+int64_t ParamsRegistry::Add(std::unique_ptr<std::vector<ScannerParam>> params) {
 	if (params.get() == nullptr) {
 		throw ScannerException("Cannot register invalid empty params");
 	}
@@ -111,7 +111,7 @@ int64_t AddParamsToRegistry(std::unique_ptr<std::vector<ScannerParam>> params) {
 	return params_id;
 }
 
-std::unique_ptr<std::vector<ScannerParam>> RemoveParamsFromRegistry(int64_t params_id) {
+std::unique_ptr<std::vector<ScannerParam>> ParamsRegistry::Remove(int64_t params_id) {
 	auto mtx = SharedMutex();
 	std::lock_guard<std::mutex> guard(*mtx);
 
@@ -129,7 +129,7 @@ std::unique_ptr<std::vector<ScannerParam>> RemoveParamsFromRegistry(int64_t para
 
 } // namespace odbcscanner
 
-void initialize_connection_registry() /* noexcept */ {
+void initialize_registries() /* noexcept */ {
 	odbcscanner::SharedMutex();
 	odbcscanner::SharedConnectionsRegistry();
 	odbcscanner::SharedParamsRegistry();

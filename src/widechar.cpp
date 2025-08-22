@@ -58,7 +58,7 @@ static output_iterator utf16_replace_invalid(u16bit_iterator start, u16bit_itera
 	return out;
 }
 
-std::string utf16_to_utf8_lenient(const SQLWCHAR *in_buf, size_t in_buf_len, const SQLWCHAR **first_invalid_char) {
+std::string WideChar::Narrow(const SQLWCHAR *in_buf, size_t in_buf_len, const SQLWCHAR **first_invalid_char) {
 	std::string res;
 	auto res_bi = std::back_inserter(res);
 
@@ -83,7 +83,7 @@ std::string utf16_to_utf8_lenient(const SQLWCHAR *in_buf, size_t in_buf_len, con
 	return res;
 }
 
-SqlWString utf8_to_utf16_lenient(const char *in_buf, size_t in_buf_len, const char **first_invalid_char) {
+WideString WideChar::Widen(const char *in_buf, size_t in_buf_len, const char **first_invalid_char) {
 	std::vector<SQLWCHAR> res;
 	auto res_bi = std::back_inserter(res);
 
@@ -106,20 +106,7 @@ SqlWString utf8_to_utf16_lenient(const char *in_buf, size_t in_buf_len, const ch
 	}
 
 	res.push_back(0);
-	return SqlWString(std::move(res));
-}
-
-size_t utf16_length(const SQLWCHAR *buf) {
-	if (!buf) {
-		return 0;
-	}
-
-	const SQLWCHAR *ptr = buf;
-	while (*ptr != 0) {
-		ptr++;
-	}
-
-	return static_cast<size_t>(ptr - buf);
+	return WideString(std::move(res));
 }
 
 } // namespace odbcscanner

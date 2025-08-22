@@ -43,8 +43,8 @@ static DiagMsg ReadDiagInternal(SQLHANDLE handle, SQLSMALLINT handle_type) {
 		ret = SQLGetDiagRecW(handle_type, handle, rec_num, sqlstate.data(), &native_error, message_text.data(),
 		                     static_cast<SQLSMALLINT>(message_text.size()), &text_len);
 		if (SQL_SUCCEEDED(ret)) {
-			state = utf16_to_utf8_lenient(sqlstate.data(), state_len);
-			message += utf16_to_utf8_lenient(message_text.data(), text_len);
+			state = WideChar::Narrow(sqlstate.data(), state_len);
+			message += WideChar::Narrow(message_text.data(), text_len);
 		}
 	}
 
@@ -55,12 +55,12 @@ static DiagMsg ReadDiagInternal(SQLHANDLE handle, SQLSMALLINT handle_type) {
 	return DiagMsg("01000", 0, "N/A");
 }
 
-std::string ReadDiagnostics(SQLHANDLE handle, SQLSMALLINT handle_type) {
+std::string Diagnostics::Read(SQLHANDLE handle, SQLSMALLINT handle_type) {
 	DiagMsg dm = ReadDiagInternal(handle, handle_type);
 	return dm.state + "(" + std::to_string(dm.native_error) + "): " + dm.message;
 }
 
-std::string ReadDiagnosticsCode(SQLHANDLE handle, SQLSMALLINT handle_type) {
+std::string Diagnostics::ReadCode(SQLHANDLE handle, SQLSMALLINT handle_type) {
 	DiagMsg dm = ReadDiagInternal(handle, handle_type);
 	return dm.state;
 }

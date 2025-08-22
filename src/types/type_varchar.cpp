@@ -1,4 +1,6 @@
-#include "types/type_varchar.hpp"
+#include "types.hpp"
+
+#include <cstring>
 
 #include "capi_pointers.hpp"
 #include "diagnostics.hpp"
@@ -8,7 +10,8 @@ DUCKDB_EXTENSION_EXTERN
 
 namespace odbcscanner {
 
-std::pair<std::string, bool> ExtractVarcharFunctionArg(duckdb_data_chunk chunk, idx_t col_idx) {
+template <>
+std::pair<std::string, bool> Types::ExtractFunctionArg<std::string>(duckdb_data_chunk chunk, idx_t col_idx) {
 	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
 	if (col_idx >= col_count) {
 		throw ScannerException("Cannot extract VARCHAR function argument: column not found, column: " +
@@ -42,32 +45,44 @@ std::pair<std::string, bool> ExtractVarcharFunctionArg(duckdb_data_chunk chunk, 
 	return std::make_pair(std::move(res), false);
 }
 
-void AddVarcharResultColumn(duckdb_bind_info info, const std::string &name) {
+template <>
+void Types::AddResultColumn<std::string>(duckdb_bind_info info, const std::string &name) {
 	auto ltype = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
 	duckdb_bind_add_result_column(info, name.c_str(), ltype.get());
 }
 
-ScannerParam ExtractVarcharNotNullParam(duckdb_vector vec) {
+template <>
+ScannerParam Types::ExtractNotNullParam<std::string>(duckdb_vector vec) {
 	duckdb_string_t *data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(vec));
 	duckdb_string_t dstr = data[0];
 	const char *cstr = duckdb_string_t_data(&dstr);
 	uint32_t len = duckdb_string_t_length(dstr);
-	return ScannerParam(std::string(cstr, len));
+	return ScannerParam(cstr, len);
 }
 
-void SetVarcharParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx) {
+template <>
+ScannerParam Types::ExtractNotNullParam<std::string>(duckdb_value value) {
+	auto cstr_ptr = VarcharPtr(duckdb_get_varchar(value), VarcharDeleter);
+	return ScannerParam(cstr_ptr.get(), std::strlen(cstr_ptr.get()));
+}
+
+template <>
+void Types::BindOdbcParam<std::string>(const std::string &query, HSTMT hstmt, ScannerParam &param,
+                                       SQLSMALLINT param_idx) {
 	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, SQL_WVARCHAR, param.LengthBytes(),
 	                                 0, reinterpret_cast<SQLPOINTER>(param.Utf16String().data()), param.LengthBytes(),
 	                                 &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' VARCHAR failed, value: '" + param.ToUtf8String(1 << 10) +
 		                       "', index: " + std::to_string(param_idx) + ", query: '" + query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
 }
 
-std::pair<std::string, bool> FetchVarchar(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx) {
+template <>
+std::pair<std::string, bool> Types::FetchOdbcValue<std::string>(const std::string &query, HSTMT hstmt,
+                                                                SQLSMALLINT col_idx) {
 	std::vector<SQLWCHAR> buf;
 	buf.resize(4096);
 	SQLLEN len_bytes = 0;
@@ -75,7 +90,7 @@ std::pair<std::string, bool> FetchVarchar(const std::string &query, HSTMT hstmt,
 	                           static_cast<SQLLEN>(buf.size() * sizeof(SQLWCHAR)), &len_bytes);
 
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for VARCHAR failed, column index: " + std::to_string(col_idx) +
 		                       ", query: '" + query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
 		                       "'");
@@ -84,7 +99,7 @@ std::pair<std::string, bool> FetchVarchar(const std::string &query, HSTMT hstmt,
 	std::string diag_code;
 	std::string trunc_diag_code("01004");
 	if (ret == SQL_SUCCESS_WITH_INFO) {
-		diag_code = ReadDiagnosticsCode(hstmt, SQL_HANDLE_STMT);
+		diag_code = Diagnostics::ReadCode(hstmt, SQL_HANDLE_STMT);
 	}
 
 	if (ret == SQL_SUCCESS || diag_code != trunc_diag_code) {
@@ -97,7 +112,7 @@ std::pair<std::string, bool> FetchVarchar(const std::string &query, HSTMT hstmt,
 			len_bytes -= 1;
 		}
 
-		std::string str = utf16_to_utf8_lenient(buf.data(), len_bytes / sizeof(SQLWCHAR));
+		std::string str = WideChar::Narrow(buf.data(), len_bytes / sizeof(SQLWCHAR));
 		return std::make_pair(std::move(str), false);
 	}
 
@@ -118,7 +133,7 @@ std::pair<std::string, bool> FetchVarchar(const std::string &query, HSTMT hstmt,
 	SQLRETURN ret_tail = SQLGetData(hstmt, col_idx, SQL_C_WCHAR, buf_tail_ptr,
 	                                static_cast<SQLLEN>(buf_tail_size * sizeof(SQLWCHAR)), &len_tail_bytes);
 	if (!SQL_SUCCEEDED(ret_tail)) {
-		std::string diag = ReadDiagnostics(hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for VARCHAR tail failed, column index: " + std::to_string(col_idx) +
 		                       ", query: '" + query + "', return: " + std::to_string(ret_tail) + ", diagnostics: '" +
 		                       diag + "'");
@@ -136,11 +151,12 @@ std::pair<std::string, bool> FetchVarchar(const std::string &query, HSTMT hstmt,
 		    ", head length: " + std::to_string(len_tail_expected) + ", actual: " + std::to_string(len_tail));
 	}
 
-	std::string str = utf16_to_utf8_lenient(buf.data(), buf.size() - 1);
+	std::string str = WideChar::Narrow(buf.data(), buf.size() - 1);
 	return std::make_pair(std::move(str), false);
 }
 
-void SetVarcharResult(duckdb_vector vec, idx_t row_idx, const std::string &value) {
+template <>
+void Types::SetValueToResult<std::string>(duckdb_vector vec, idx_t row_idx, const std::string &value) {
 	duckdb_vector_assign_string_element_len(vec, row_idx, value.c_str(), value.length());
 }
 

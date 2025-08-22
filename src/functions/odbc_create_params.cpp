@@ -1,13 +1,14 @@
 #include "capi_odbc_scanner.h"
+
+#include <string>
+#include <vector>
+
 #include "capi_pointers.hpp"
 #include "diagnostics.hpp"
 #include "make_unique.hpp"
 #include "params.hpp"
 #include "registries.hpp"
 #include "scanner_exception.hpp"
-
-#include <string>
-#include <vector>
 
 DUCKDB_EXTENSION_EXTERN
 
@@ -22,7 +23,7 @@ static void CreateParams(duckdb_function_info info, duckdb_data_chunk input, duc
 
 	auto params_ptr = std_make_unique<std::vector<ScannerParam>>();
 	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
-	result_data[0] = AddParamsToRegistry(std::move(params_ptr));
+	result_data[0] = ParamsRegistry::Add(std::move(params_ptr));
 }
 
 static duckdb_state Register(duckdb_connection conn) {
