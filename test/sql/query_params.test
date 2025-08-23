@@ -1,0 +1,62 @@
+# name: test/sql/query_params.test
+# description: test for calls of odbc_query() function with params argument
+# group: [sql_query_params]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params=NULL)
+----
+Binder Error: Cannot extract parameters from STRUCT: specified STRUCT is NULL
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params=42)
+----
+Binder Error: Cannot extract parameters from STRUCT: specified value is not STRUCT
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params=row(42))
+----
+42
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params=row('foo'))
+----
+Binder Error: Parameter ODBC type mismatch, query: 'SELECT ?::INT', index: 0, expected: 4, actual: 12
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params=row(41, 42))
+----
+Binder Error: Incorrect number of parameters specified, query: 'SELECT ?::INT', expected: 1, actual: 2
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params=row(NULL))
+----
+NULL
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::VARCHAR', params=row('🌌'))
+----
+🌌
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params=row(?))
+
+query I
+EXECUTE p1(42)
+----
+42
+
+query I
+EXECUTE p1(43)
+----
+43
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

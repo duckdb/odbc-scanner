@@ -1,0 +1,75 @@
+# name: test/sql/query_basic.test
+# description: basic test for odbc_query() function
+# group: [sql_query_basic]
+
+statement error
+SELECT * FROM odbc_query()
+----
+Catalog Error: Table Function with name odbc_query does not exist!
+
+require odbc_scanner
+
+statement error
+SELECT * FROM odbc_query()
+----
+<REGEX>:.*Binder Error: No function matches the given name and argument types 'odbc_query\(\)'.*
+
+statement error
+SELECT * FROM odbc_query(NULL, 'SELECT 42')
+----
+Binder Error: 'odbc_query' error: specified ODBC connection must be not NULL
+
+statement error
+SELECT * FROM odbc_query(getvariable('fail'), 'SELECT 42')
+----
+Binder Error: 'odbc_query' error: specified ODBC connection must be not NULL
+
+statement error
+SELECT * FROM odbc_query(42, 'SELECT 42')
+----
+Binder Error: 'odbc_query' error: open ODBC connection not found, id: 42
+
+statement ok
+SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), NULL)
+----
+Binder Error: 'odbc_query' error: specified SQL query must be not NULL
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'FAIL')
+----
+<REGEX>:.*Binder Error: 'SQLPrepare' failed.*Parser Error: syntax error at or near "FAIL".*
+
+query II
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42, ''foo'' UNION ALL SELECT 43, ''bar''')
+----
+42	foo
+43	bar
+
+query II
+SELECT column_name, column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42 AS col1, ''foo'' AS col2')
+)
+----
+col1	INTEGER
+col2	VARCHAR
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''🌌''')
+----
+🌌
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT NULL')
+----
+NULL
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT NULL::INTEGER')
+----
+NULL
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

@@ -1,0 +1,53 @@
+# name: test/sql/query_multi.test
+# description: test for multiple calls of odbc_query() function
+# group: [sql_query_multi]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn1 = odbc_connect('Driver={DuckDB Driver};')
+
+query II
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 42, ''foo''')
+UNION ALL
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 43, ''bar''')
+----
+42	foo
+43	bar
+
+statement ok
+SET VARIABLE conn2 = odbc_connect('Driver={DuckDB Driver};')
+
+query II
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 42, ''foo''')
+UNION ALL
+SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT 43, ''bar''')
+----
+42	foo
+43	bar
+
+query II
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT ?::INT, ?::VARCHAR', params=row(42, 'foo'))
+UNION ALL
+SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT ?::INT, ?::VARCHAR', params=row(43, 'bar'))
+----
+42	foo
+43	bar
+
+statement ok
+PREPARE p1 AS 
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT ?::INT, ?::VARCHAR', params=row(?, ?))
+UNION ALL
+SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT ?::INT, ?::VARCHAR', params=row(?, ?))
+
+query II
+EXECUTE p1(42, 'foo', 43, 'bar')
+----
+42	foo
+43	bar
+
+statement ok
+SELECT odbc_close(getvariable('conn2'))
+
+statement ok
+SELECT odbc_close(getvariable('conn1'))

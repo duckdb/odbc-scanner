@@ -210,6 +210,56 @@ std::vector<ScannerParam> Params::Extract(duckdb_value struct_value) {
 	return params;
 }
 
+std::vector<SQLSMALLINT> Params::CollectTypes(const std::string &query, HSTMT hstmt) {
+	SQLSMALLINT count = -1;
+	{
+		SQLRETURN ret = SQLNumParams(hstmt, &count);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
+			throw ScannerException("'SQLNumParams' failed, query: '" + query + "', return: " + std::to_string(ret) +
+			                       ", diagnostics: '" + diag + "'");
+		}
+	}
+
+	std::vector<SQLSMALLINT> param_types;
+	for (SQLSMALLINT i = 0; i < count; i++) {
+		SQLSMALLINT param_idx = i + 1;
+
+		SQLSMALLINT ptype = -1;
+		SQLRETURN ret = SQLDescribeParam(hstmt, param_idx, &ptype, nullptr, nullptr, nullptr);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
+			throw ScannerException("'SQLDescribeParam' failed, query: '" + query + "', return: " + std::to_string(ret) +
+			                       ", diagnostics: '" + diag + "'");
+		}
+
+		param_types.push_back(ptype);
+	}
+
+	return param_types;
+}
+
+void Params::CheckTypes(const std::string &query, const std::vector<SQLSMALLINT> &expected,
+                        std::vector<ScannerParam> &actual) {
+	if (expected.size() != actual.size()) {
+		throw ScannerException("Incorrect number of parameters specified, query: '" + query + "', expected: " +
+		                       std::to_string(expected.size()) + ", actual: " + std::to_string(actual.size()));
+	}
+	for (size_t i = 0; i < actual.size(); i++) {
+		auto &param = actual.at(i);
+		if (param.TypeId() == DUCKDB_TYPE_SQLNULL) {
+			continue;
+		}
+		SQLSMALLINT actual_type = Types::DuckParamTypeToOdbc(param.TypeId(), i);
+		SQLSMALLINT expected_type = expected.at(i);
+		if (expected_type != actual_type) {
+			throw ScannerException("Parameter ODBC type mismatch, query: '" + query + "', index: " + std::to_string(i) +
+			                       ", expected: " + std::to_string(expected_type) +
+			                       ", actual: " + std::to_string(actual_type));
+		}
+	}
+}
+
 void Params::BindToOdbc(const std::string &query, HSTMT hstmt, std::vector<ScannerParam> &params) {
 	if (params.size() == 0) {
 		return;

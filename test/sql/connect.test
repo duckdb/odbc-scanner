@@ -1,0 +1,36 @@
+# name: test/sql/connect.test
+# description: test odbc_connect() function
+# group: [sql_connect]
+
+statement error
+SET VARIABLE conn = odbc_connect()
+----
+Catalog Error: Scalar Function with name odbc_connect does not exist!
+
+require odbc_scanner
+
+statement error
+SET VARIABLE conn = odbc_connect()
+----
+<REGEX>:.*Binder Error: No function matches the given name and argument types 'odbc_connect\(\)'.*
+
+statement error
+SET VARIABLE conn = odbc_connect(NULL)
+----
+Invalid Input Error: 'odbc_connect' error: specified URL argument must be not NULL
+
+statement error
+SET VARIABLE conn = odbc_connect('fail')
+----
+<REGEX>:.*Invalid Input Error: 'SQLDriverConnect' failed.*
+
+statement error
+SET VARIABLE conn = odbc_connect('Driver=fail')
+----
+<REGEX>:.*Invalid Input Error: 'SQLDriverConnect' failed.*
+
+statement ok
+SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

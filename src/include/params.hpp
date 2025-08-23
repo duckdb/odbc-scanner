@@ -76,6 +76,11 @@ struct Params {
 
 	static std::vector<ScannerParam> Extract(duckdb_value struct_value);
 
+	static std::vector<SQLSMALLINT> CollectTypes(const std::string &query, HSTMT hstmt);
+
+	static void CheckTypes(const std::string &query, const std::vector<SQLSMALLINT> &expected,
+	                       std::vector<ScannerParam> &actual);
+
 	static void BindToOdbc(const std::string &query, HSTMT hstmt, std::vector<ScannerParam> &params);
 };
 

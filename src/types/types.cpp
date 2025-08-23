@@ -10,53 +10,17 @@ DUCKDB_EXTENSION_EXTERN
 
 namespace odbcscanner {
 
-OdbcType Types::GetResultColumnAttributes(const std::string &query, SQLSMALLINT cols_count, HSTMT hstmt,
-                                          SQLUSMALLINT col_idx) {
-	SQLLEN desc_type = -1;
-	{
-		SQLRETURN ret = SQLColAttributeW(hstmt, col_idx, SQL_DESC_TYPE, nullptr, 0, nullptr, &desc_type);
-		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
-			throw ScannerException(
-			    "'SQLColAttribute' for SQL_DESC_TYPE failed, column index: " + std::to_string(col_idx) +
-			    ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
-			    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
-		}
-	}
-
-	SQLLEN desc_concise_type = -1;
-	{
-		SQLRETURN ret =
-		    SQLColAttributeW(hstmt, col_idx, SQL_DESC_CONCISE_TYPE, nullptr, 0, nullptr, &desc_concise_type);
-		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
-			throw ScannerException(
-			    "'SQLColAttribute' for SQL_DESC_CONCISE_TYPE failed, column index: " + std::to_string(col_idx) +
-			    ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
-			    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
-		}
-	}
-
-	std::vector<SQLWCHAR> buf;
-	buf.resize(1024);
-	SQLSMALLINT len_bytes = 0;
-	{
-		SQLRETURN ret = SQLColAttributeW(hstmt, col_idx, SQL_DESC_TYPE_NAME, buf.data(),
-		                                 static_cast<SQLSMALLINT>(buf.size() * sizeof(SQLWCHAR)), &len_bytes, nullptr);
-		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
-			throw ScannerException(
-			    "'SQLColAttribute' for SQL_DESC_TYPE_NAME failed, column index: " + std::to_string(col_idx) +
-			    ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
-			    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
-		}
-	}
-	std::string desc_type_name = WideChar::Narrow(buf.data(), len_bytes * sizeof(SQLWCHAR));
-
-	return OdbcType(desc_type, desc_concise_type, std::move(desc_type_name));
+std::string OdbcType::ToString() {
+	return "type: " + std::to_string(desc_type) + ", concise type: " + std::to_string(desc_concise_type) +
+	       ", type name: '" + desc_type_name + "'";
 }
 
-void Types::AddResultColumnOfType(duckdb_bind_info info, const std::string &name, const OdbcType &odbc_type) {
+bool OdbcType::Equals(OdbcType &other) {
+	return desc_type == other.desc_type && desc_concise_type == other.desc_concise_type &&
+	       desc_type_name == other.desc_type_name;
+}
+
+void Types::AddResultColumnOfType(const OdbcType &odbc_type, duckdb_bind_info info, const std::string &name) {
 	switch (odbc_type.desc_concise_type) {
 	case SQL_INTEGER: {
 		TypeSpecific::AddResultColumn<int32_t>(info, name);
@@ -134,6 +98,18 @@ void Types::FetchAndSetResultOfType(const OdbcType &odbc_type, const std::string
 	default:
 		throw ScannerException("Unsupported ODBC fetch type: " + std::to_string(odbc_type.desc_concise_type) +
 		                       ", name: '" + odbc_type.desc_type_name + "'");
+	}
+}
+
+SQLSMALLINT Types::DuckParamTypeToOdbc(duckdb_type type_id, size_t param_idx) {
+	switch (type_id) {
+	case DUCKDB_TYPE_INTEGER:
+		return SQL_INTEGER;
+	case DUCKDB_TYPE_VARCHAR:
+		return SQL_VARCHAR;
+	default:
+		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(type_id) +
+		                       ", index: " + std::to_string(param_idx));
 	}
 }
 

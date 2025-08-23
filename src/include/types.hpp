@@ -25,6 +25,10 @@ struct OdbcType {
 
 	OdbcType &operator=(OdbcType &other) = delete;
 	OdbcType &operator=(OdbcType &&other) = default;
+
+	std::string ToString();
+
+	bool Equals(OdbcType &other);
 };
 
 struct Types {
@@ -37,20 +41,18 @@ struct Types {
 
 	static void BindOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
 
-	static void AddResultColumnOfType(duckdb_bind_info info, const std::string &name, const OdbcType &odbc_type);
+	static void AddResultColumnOfType(const OdbcType &odbc_type, duckdb_bind_info info, const std::string &name);
 
 	static void FetchAndSetResultOfType(const OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
 	                                    SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx);
 
 	// Other functions
-
-	static OdbcType GetResultColumnAttributes(const std::string &query, SQLSMALLINT cols_count, HSTMT hstmt,
-	                                          SQLUSMALLINT col_idx);
-
 	template <typename T>
 	static std::pair<T, bool> ExtractFunctionArg(duckdb_data_chunk chunk, idx_t col_idx);
 
 	static void SetNullValueToResult(duckdb_vector vec, idx_t row_idx);
+
+	static SQLSMALLINT DuckParamTypeToOdbc(duckdb_type type_id, size_t param_idx);
 };
 
 class TypeSpecific {

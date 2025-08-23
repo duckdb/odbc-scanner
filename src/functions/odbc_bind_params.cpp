@@ -30,7 +30,7 @@ static void BindParams(duckdb_function_info info, duckdb_data_chunk input, duckd
 	int64_t params_handle = handle_arg.first;
 	auto params_ptr = ParamsRegistry::Remove(params_handle);
 	if (params_ptr.get() == nullptr) {
-		throw ScannerException("'odbc_bind_params' error: specified parameter handle not found, ID: " +
+		throw ScannerException("'odbc_bind_params' error: specified parameters handle not found, ID: " +
 		                       std::to_string(params_handle));
 	}
 	auto deferred = Defer([&params_ptr] { ParamsRegistry::Add(std::move(params_ptr)); });

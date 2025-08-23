@@ -1,0 +1,111 @@
+# name: test/sql/params_handle.test
+# description: test odbc_create_params() and odbc_bind_params() functions 
+# group: [sql_params_handle]
+
+statement error
+SET VARIABLE params1 = odbc_create_params()
+----
+Catalog Error: Scalar Function with name odbc_create_params does not exist!
+
+statement error
+SELECT odbc_bind_params()
+----
+Catalog Error: Scalar Function with name odbc_bind_params does not exist!
+
+require odbc_scanner
+
+statement error
+SELECT odbc_bind_params(NULL, row(42))
+----
+Invalid Input Error: 'odbc_bind_params' error: specified parameters handle argument must be not NULL
+
+
+statement error
+SELECT odbc_bind_params(42, row(42))
+----
+Invalid Input Error: 'odbc_bind_params' error: specified parameters handle not found, ID: 42
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement error
+SELECT odbc_bind_params(getvariable('params1'), NULL)
+----
+Invalid Input Error: Cannot extract parameters from STRUCT: specified STRUCT is NULL, column: 1, columns count: 2
+
+statement ok
+SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params_handle=getvariable('params1'))
+
+statement ok
+SELECT odbc_bind_params(getvariable('params1'), row(42))
+
+query I
+EXECUTE p1
+----
+42
+
+statement ok
+SELECT odbc_bind_params(getvariable('params1'), row('foo'))
+
+statement error
+EXECUTE p1
+----
+Invalid Input Error: Parameter ODBC type mismatch, query: 'SELECT ?::INT', index: 0, expected: 4, actual: 12
+
+statement ok
+SELECT odbc_bind_params(getvariable('params1'), row(42, 43))
+
+statement error
+EXECUTE p1
+----
+Invalid Input Error: Incorrect number of parameters specified, query: 'SELECT ?::INT', expected: 1, actual: 2
+
+statement ok
+SELECT odbc_bind_params(getvariable('params1'), row(43))
+
+query I
+EXECUTE p1
+----
+43
+
+statement ok
+DEALLOCATE p1
+
+statement error
+PREPARE p2 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::VARCHAR', params_handle=getvariable('params1'))
+----
+<REGEX>:.*Binder Error: 'odbc_query' error: specified parameters handle not found.*
+
+statement error
+SELECT odbc_bind_params(getvariable('params1'), row(42))
+----
+<REGEX>:.*Invalid Input Error: 'odbc_bind_params' error: specified parameters handle not found.*
+
+statement ok
+SET VARIABLE params2 = odbc_create_params()
+
+statement ok
+PREPARE p2 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::VARCHAR', params_handle=getvariable('params2'))
+
+statement ok
+PREPARE p2_bind AS SELECT odbc_bind_params(getvariable('params2'), row(?))
+
+statement ok
+EXECUTE p2_bind('🌌')
+
+query I
+EXECUTE p2
+----
+🌌
+
+statement ok
+DEALLOCATE p2_bind
+
+statement ok
+DEALLOCATE p2
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
