@@ -40,6 +40,10 @@ ScannerParam Types::ExtractNotNullParamOfType(duckdb_type type_id, duckdb_vector
 		return TypeSpecific::ExtractNotNullParam<int64_t>(vec);
 	case DUCKDB_TYPE_UBIGINT:
 		return TypeSpecific::ExtractNotNullParam<uint64_t>(vec);
+	case DUCKDB_TYPE_FLOAT:
+		return TypeSpecific::ExtractNotNullParam<float>(vec);
+	case DUCKDB_TYPE_DOUBLE:
+		return TypeSpecific::ExtractNotNullParam<double>(vec);
 	case DUCKDB_TYPE_VARCHAR:
 		return TypeSpecific::ExtractNotNullParam<std::string>(vec);
 	default:
@@ -68,6 +72,10 @@ ScannerParam Types::ExtractNotNullParamFromValue(duckdb_value value, idx_t param
 		return ScannerParam(duckdb_get_int64(value));
 	case DUCKDB_TYPE_UBIGINT:
 		return ScannerParam(duckdb_get_uint64(value));
+	case DUCKDB_TYPE_FLOAT:
+		return ScannerParam(duckdb_get_float(value));
+	case DUCKDB_TYPE_DOUBLE:
+		return ScannerParam(duckdb_get_double(value));
 	case DUCKDB_TYPE_VARCHAR:
 		return ScannerParam(duckdb_get_varchar(value));
 	default:
@@ -104,6 +112,12 @@ void Types::BindOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &p
 		break;
 	case DUCKDB_TYPE_UBIGINT:
 		TypeSpecific::BindOdbcParam<uint64_t>(query, hstmt, param, param_idx);
+		break;
+	case DUCKDB_TYPE_FLOAT:
+		TypeSpecific::BindOdbcParam<float>(query, hstmt, param, param_idx);
+		break;
+	case DUCKDB_TYPE_DOUBLE:
+		TypeSpecific::BindOdbcParam<double>(query, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_VARCHAR:
 		TypeSpecific::BindOdbcParam<std::string>(query, hstmt, param, param_idx);
@@ -144,6 +158,12 @@ void Types::FetchAndSetResultOfType(const OdbcType &odbc_type, const std::string
 			TypeSpecific::FetchAndSetResult<int64_t>(query, hstmt, col_idx, vec, row_idx);
 		}
 		break;
+	case SQL_FLOAT:
+		TypeSpecific::FetchAndSetResult<float>(query, hstmt, col_idx, vec, row_idx);
+		break;
+	case SQL_DOUBLE:
+		TypeSpecific::FetchAndSetResult<double>(query, hstmt, col_idx, vec, row_idx);
+		break;
 	case SQL_VARCHAR:
 		TypeSpecific::FetchAndSetResult<std::string>(query, hstmt, col_idx, vec, row_idx);
 		break;
@@ -169,6 +189,10 @@ SQLSMALLINT Types::DuckParamTypeToOdbc(duckdb_type type_id, size_t param_idx) {
 	case DUCKDB_TYPE_BIGINT:
 	case DUCKDB_TYPE_UBIGINT:
 		return SQL_BIGINT;
+	case DUCKDB_TYPE_FLOAT:
+		return SQL_FLOAT;
+	case DUCKDB_TYPE_DOUBLE:
+		return SQL_DOUBLE;
 	case DUCKDB_TYPE_VARCHAR:
 		return SQL_VARCHAR;
 	default:
@@ -187,6 +211,10 @@ duckdb_type Types::OdbcColumnTypeToDuck(ResultColumn &column) {
 		return column.odbc_type.is_unsigned ? DUCKDB_TYPE_UINTEGER : DUCKDB_TYPE_INTEGER;
 	case SQL_BIGINT:
 		return column.odbc_type.is_unsigned ? DUCKDB_TYPE_UBIGINT : DUCKDB_TYPE_BIGINT;
+	case SQL_FLOAT:
+		return DUCKDB_TYPE_FLOAT;
+	case SQL_DOUBLE:
+		return DUCKDB_TYPE_DOUBLE;
 	case SQL_VARCHAR:
 		return DUCKDB_TYPE_VARCHAR;
 	default:

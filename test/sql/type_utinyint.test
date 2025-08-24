@@ -13,6 +13,13 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::UTINYINT')
 42
 
 query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::UTINYINT')
+)
+----
+UTINYINT
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::UTINYINT', params=row(42::UTINYINT))
 ----
 42
