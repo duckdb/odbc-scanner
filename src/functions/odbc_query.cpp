@@ -167,7 +167,9 @@ static void Bind(duckdb_bind_info info) {
 		duckdb_bind_add_result_column(info, "rowcount", bigint_type.get());
 	} else {
 		for (ResultColumn &col : columns) {
-			Types::AddResultColumnOfType(col.odbc_type, info, col.name);
+			duckdb_type type_id = Types::OdbcColumnTypeToDuck(col);
+			auto ltype = LogicalTypePtr(duckdb_create_logical_type(type_id), LogicalTypeDeleter);
+			duckdb_bind_add_result_column(info, col.name.c_str(), ltype.get());
 		}
 	}
 

@@ -14,7 +14,7 @@ SELECT * FROM odbc_query(
 	                               res.Get());
 	REQUIRE(st == DuckDBSuccess);
 	REQUIRE(res.NextChunk());
-	REQUIRE(res.Int32(0, 0) == 42);
+	REQUIRE(res.Value<int32_t>(0, 0) == 42);
 }
 
 TEST_CASE("Basic query with multiple rows and columns", "[basic]") {
@@ -30,8 +30,8 @@ SELECT * FROM odbc_query(
 	                               res.Get());
 	REQUIRE(st == DuckDBSuccess);
 	REQUIRE(res.NextChunk());
-	REQUIRE(res.String(0, 0) == "foo");
-	REQUIRE(res.Int32(1, 0) == 41);
-	REQUIRE(res.String(0, 1) == "foo");
-	REQUIRE(res.Int32(1, 1) == 42);
+	REQUIRE(res.Value<std::string>(0, 0) == "foo");
+	REQUIRE(res.Value<int32_t>(1, 0) == 41);
+	REQUIRE(res.Value<std::string>(0, 1) == "foo");
+	REQUIRE(res.Value<int32_t>(1, 1) == 42);
 }

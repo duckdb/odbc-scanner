@@ -95,17 +95,32 @@ static CTYPE *NotNullData(duckdb_type expected_type_id, duckdb_data_chunk chunk,
 	return reinterpret_cast<CTYPE *>(duckdb_vector_get_data(vec));
 }
 
-int32_t Result::Int32(idx_t col_idx, idx_t row_idx) {
+template <>
+uint8_t Result::Value<uint8_t>(idx_t col_idx, idx_t row_idx) {
+	uint8_t *data = NotNullData<uint8_t>(DUCKDB_TYPE_UTINYINT, chunk, cur_row_idx, col_idx, row_idx);
+	return data[row_idx];
+}
+
+template <>
+int16_t Result::Value<int16_t>(idx_t col_idx, idx_t row_idx) {
+	int16_t *data = NotNullData<int16_t>(DUCKDB_TYPE_SMALLINT, chunk, cur_row_idx, col_idx, row_idx);
+	return data[row_idx];
+}
+
+template <>
+int32_t Result::Value<int32_t>(idx_t col_idx, idx_t row_idx) {
 	int32_t *data = NotNullData<int32_t>(DUCKDB_TYPE_INTEGER, chunk, cur_row_idx, col_idx, row_idx);
 	return data[row_idx];
 }
 
-int64_t Result::Int64(idx_t col_idx, idx_t row_idx) {
+template <>
+int64_t Result::Value<int64_t>(idx_t col_idx, idx_t row_idx) {
 	int64_t *data = NotNullData<int64_t>(DUCKDB_TYPE_BIGINT, chunk, cur_row_idx, col_idx, row_idx);
 	return data[row_idx];
 }
 
-std::string Result::String(idx_t col_idx, idx_t row_idx) {
+template <>
+std::string Result::Value<std::string>(idx_t col_idx, idx_t row_idx) {
 	duckdb_string_t *data = NotNullData<duckdb_string_t>(DUCKDB_TYPE_VARCHAR, chunk, cur_row_idx, col_idx, row_idx);
 	duckdb_string_t dstr = data[row_idx];
 	const char *cstr = duckdb_string_t_data(&dstr);

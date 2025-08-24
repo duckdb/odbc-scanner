@@ -49,11 +49,10 @@ set(EXTENSION_SOURCES
     src/functions/odbc_connect.cpp
     src/functions/odbc_create_params.cpp
     src/functions/odbc_query.cpp
+    src/types/integer_types.cpp
+    src/types/null_type.cpp
     src/types/types.cpp
-    src/types/type_bigint.cpp
-    src/types/type_integer.cpp
-    src/types/type_null.cpp
-    src/types/type_varchar.cpp
+    src/types/varchar_type.cpp
 )
 
 if (DUCKDB_WASM_EXTENSION)

@@ -46,12 +46,6 @@ std::pair<std::string, bool> Types::ExtractFunctionArg<std::string>(duckdb_data_
 }
 
 template <>
-void TypeSpecific::AddResultColumn<std::string>(duckdb_bind_info info, const std::string &name) {
-	auto ltype = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
-	duckdb_bind_add_result_column(info, name.c_str(), ltype.get());
-}
-
-template <>
 ScannerParam TypeSpecific::ExtractNotNullParam<std::string>(duckdb_vector vec) {
 	duckdb_string_t *data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(vec));
 	duckdb_string_t dstr = data[0];
@@ -61,17 +55,11 @@ ScannerParam TypeSpecific::ExtractNotNullParam<std::string>(duckdb_vector vec) {
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<std::string>(duckdb_value value) {
-	auto cstr_ptr = VarcharPtr(duckdb_get_varchar(value), VarcharDeleter);
-	return ScannerParam(cstr_ptr.get(), std::strlen(cstr_ptr.get()));
-}
-
-template <>
 void TypeSpecific::BindOdbcParam<std::string>(const std::string &query, HSTMT hstmt, ScannerParam &param,
                                               SQLSMALLINT param_idx) {
 	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, SQL_WVARCHAR, param.LengthBytes(),
-	                                 0, reinterpret_cast<SQLPOINTER>(param.Utf16String().data()), param.LengthBytes(),
-	                                 &param.LengthBytes());
+	                                 0, reinterpret_cast<SQLPOINTER>(param.Value<WideString>().data()),
+	                                 param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' VARCHAR failed, value: '" + param.ToUtf8String(1 << 10) +

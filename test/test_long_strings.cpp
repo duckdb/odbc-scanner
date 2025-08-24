@@ -59,6 +59,6 @@ SELECT * FROM odbc_query(
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
 		REQUIRE(st_exec == DuckDBSuccess);
 		REQUIRE(res.NextChunk());
-		REQUIRE(res.String(0, 0) == str);
+		REQUIRE(res.Value<std::string>(0, 0) == str);
 	}
 }

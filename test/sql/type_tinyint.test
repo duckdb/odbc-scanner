@@ -1,0 +1,59 @@
+# name: test/sql/type_tinyint.test
+# description: test for TINYINT type
+# group: [sql_type_tinyint]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::TINYINT')
+----
+42
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(42::TINYINT))
+----
+42
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(0::TINYINT))
+----
+0
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(127::TINYINT))
+----
+127
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(-127::TINYINT))
+----
+-127
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind(127::TINYINT)
+
+query I
+EXECUTE p1
+----
+127
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

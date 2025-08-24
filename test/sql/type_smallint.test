@@ -1,0 +1,59 @@
+# name: test/sql/type_smallint.test
+# description: test for SMALLINT type
+# group: [sql_type_smallint]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::SMALLINT')
+----
+42
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::SMALLINT', params=row(42::SMALLINT))
+----
+42
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::SMALLINT', params=row(0::SMALLINT))
+----
+0
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::SMALLINT', params=row(32767::SMALLINT))
+----
+32767
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::SMALLINT', params=row(-32767::SMALLINT))
+----
+-32767
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::SMALLINT', params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind(32767::SMALLINT)
+
+query I
+EXECUTE p1
+----
+32767
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

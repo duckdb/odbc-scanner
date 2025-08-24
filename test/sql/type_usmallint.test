@@ -1,0 +1,54 @@
+# name: test/sql/type_usmallint.test
+# description: test for USMALLINT type
+# group: [sql_type_usmallint]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::USMALLINT')
+----
+42
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::USMALLINT', params=row(42::USMALLINT))
+----
+42
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::USMALLINT', params=row(0::USMALLINT))
+----
+0
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::USMALLINT', params=row(65535::USMALLINT))
+----
+65535
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::USMALLINT', params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind(65535::USMALLINT)
+
+query I
+EXECUTE p1
+----
+65535
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

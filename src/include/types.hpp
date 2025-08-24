@@ -6,17 +6,22 @@
 #include <sqlext.h>
 
 #include "duckdb_extension.h"
+
 #include "params.hpp"
 
 namespace odbcscanner {
 
+struct ResultColumn;
+
 struct OdbcType {
 	SQLLEN desc_type;
 	SQLLEN desc_concise_type;
+	bool is_unsigned;
 	std::string desc_type_name;
 
-	explicit OdbcType(SQLLEN desc_type_in, SQLLEN desc_concise_type_in, std::string desc_type_name_in)
-	    : desc_type(desc_type_in), desc_concise_type(desc_concise_type_in),
+	explicit OdbcType(SQLLEN desc_type_in, SQLLEN desc_concise_type_in, bool is_unsigned_in,
+	                  std::string desc_type_name_in)
+	    : desc_type(desc_type_in), desc_concise_type(desc_concise_type_in), is_unsigned(is_unsigned_in),
 	      desc_type_name(std::move(desc_type_name_in)) {
 	}
 
@@ -37,11 +42,7 @@ struct Types {
 
 	static ScannerParam ExtractNotNullParamOfType(duckdb_type type_id, duckdb_vector vec, idx_t param_idx);
 
-	static ScannerParam ExtractNotNullParamOfType(duckdb_type type_id, duckdb_value value, idx_t param_idx);
-
 	static void BindOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
-
-	static void AddResultColumnOfType(const OdbcType &odbc_type, duckdb_bind_info info, const std::string &name);
 
 	static void FetchAndSetResultOfType(const OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
 	                                    SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx);
@@ -50,9 +51,13 @@ struct Types {
 	template <typename T>
 	static std::pair<T, bool> ExtractFunctionArg(duckdb_data_chunk chunk, idx_t col_idx);
 
+	static ScannerParam ExtractNotNullParamFromValue(duckdb_value value, idx_t param_idx);
+
 	static void SetNullValueToResult(duckdb_vector vec, idx_t row_idx);
 
 	static SQLSMALLINT DuckParamTypeToOdbc(duckdb_type type_id, size_t param_idx);
+
+	static duckdb_type OdbcColumnTypeToDuck(ResultColumn &column);
 };
 
 class TypeSpecific {
@@ -66,9 +71,6 @@ class TypeSpecific {
 
 	template <typename T>
 	static void BindOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
-
-	template <typename T>
-	static void AddResultColumn(duckdb_bind_info info, const std::string &name);
 
 	template <typename T>
 	static void FetchAndSetResult(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx, duckdb_vector vec,

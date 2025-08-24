@@ -44,9 +44,7 @@ struct Result {
 
 	bool NextChunk();
 
-	int32_t Int32(idx_t col_idx, idx_t row_idx);
+	template<typename T>
+	T Value(idx_t col_idx, idx_t row_idx);
 
-	int64_t Int64(idx_t col_idx, idx_t row_idx);
-
-	std::string String(idx_t col_idx, idx_t row_idx);
 };

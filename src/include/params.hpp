@@ -19,35 +19,60 @@ class ScannerParam {
 	duckdb_type type_id = DUCKDB_TYPE_INVALID;
 	SQLLEN len_bytes = 0;
 
-	union Value {
+	union IntenalValue {
 		bool null_val;
+		int8_t int8;
+		uint8_t uint8;
+		int16_t int16;
+		uint16_t uint16;
 		int32_t int32;
+		uint32_t uint32;
 		int64_t int64;
+		uint64_t uint64;
 		WideString wstr;
 
-		Value() : null_val(true) {
+		IntenalValue() : null_val(true) {
 		}
-		Value(int32_t int32_in) : int32(int32_in) {
+		IntenalValue(int8_t value) : int8(value) {
 		}
-		Value(int64_t int64_in) : int64(int64_in) {
+		IntenalValue(uint8_t value) : uint8(value) {
 		}
-		Value(WideString wstr_in) : wstr(std::move(wstr_in)) {
+		IntenalValue(int16_t value) : int16(value) {
+		}
+		IntenalValue(uint16_t value) : uint16(value) {
+		}
+		IntenalValue(int32_t value) : int32(value) {
+		}
+		IntenalValue(uint32_t value) : uint32(value) {
+		}
+		IntenalValue(int64_t value) : int64(value) {
+		}
+		IntenalValue(uint64_t value) : uint64(value) {
+		}
+		IntenalValue(WideString wstr_in) : wstr(std::move(wstr_in)) {
 		}
 
-		Value(Value &other) = delete;
-		Value(Value &&other) = delete;
+		IntenalValue(IntenalValue &other) = delete;
+		IntenalValue(IntenalValue &&other) = delete;
 
-		Value &operator=(Value &other) = delete;
-		Value &operator=(Value &&other) = delete;
+		IntenalValue &operator=(IntenalValue &other) = delete;
+		IntenalValue &operator=(IntenalValue &&other) = delete;
 
-		~Value() noexcept {};
+		~IntenalValue() noexcept {};
 	} val;
 
 public:
 	ScannerParam();
+	explicit ScannerParam(int8_t value);
+	explicit ScannerParam(uint8_t value);
+	explicit ScannerParam(int16_t value);
+	explicit ScannerParam(uint16_t value);
 	explicit ScannerParam(int32_t value);
+	explicit ScannerParam(uint32_t value);
 	explicit ScannerParam(int64_t value);
+	explicit ScannerParam(uint64_t value);
 	explicit ScannerParam(const char *cstr, size_t len);
+	explicit ScannerParam(const char *cstr);
 
 	ScannerParam(ScannerParam &other) = delete;
 	ScannerParam(ScannerParam &&other);
@@ -63,9 +88,8 @@ public:
 
 	SQLLEN &LengthBytes();
 
-	int32_t &Int32();
-	int64_t &Int64();
-	WideString &Utf16String();
+	template <typename T>
+	T &Value();
 
 private:
 	void CheckType(duckdb_type expected);

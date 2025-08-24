@@ -36,6 +36,18 @@ static OdbcType GetTypeAttributes(const std::string &query, SQLSMALLINT cols_cou
 		}
 	}
 
+	SQLLEN is_unsigned = -1;
+	{
+		SQLRETURN ret = SQLColAttributeW(hstmt, col_idx, SQL_DESC_UNSIGNED, nullptr, 0, nullptr, &is_unsigned);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
+			throw ScannerException(
+			    "'SQLColAttribute' for SQL_DESC_UNSIGNED failed, column index: " + std::to_string(col_idx) +
+			    ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
+			    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
+	}
+
 	std::vector<SQLWCHAR> buf;
 	buf.resize(1024);
 	SQLSMALLINT len_bytes = 0;
@@ -50,9 +62,9 @@ static OdbcType GetTypeAttributes(const std::string &query, SQLSMALLINT cols_cou
 			    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 		}
 	}
-	std::string desc_type_name = WideChar::Narrow(buf.data(), len_bytes * sizeof(SQLWCHAR));
+	std::string desc_type_name = WideChar::Narrow(buf.data(), len_bytes / sizeof(SQLWCHAR));
 
-	return OdbcType(desc_type, desc_concise_type, std::move(desc_type_name));
+	return OdbcType(desc_type, desc_concise_type, is_unsigned == SQL_TRUE, std::move(desc_type_name));
 }
 
 std::vector<ResultColumn> Columns::Collect(const std::string &query, HSTMT hstmt) {

@@ -14,7 +14,7 @@ SELECT * FROM odbc_query(
 	                               res.Get());
 	REQUIRE(st == DuckDBSuccess);
 	REQUIRE(res.NextChunk());
-	REQUIRE(res.Int32(0, 0) == 42);
+	REQUIRE(res.Value<int32_t>(0, 0) == 42);
 }
 
 TEST_CASE("Params query with a varchar param literal", "[params]") {
@@ -31,7 +31,24 @@ SELECT * FROM odbc_query(
 	                               res.Get());
 	REQUIRE(st == DuckDBSuccess);
 	REQUIRE(res.NextChunk());
-	REQUIRE(res.String(0, 0) == "foo");
+	REQUIRE(res.Value<std::string>(0, 0) == "foo");
+}
+
+TEST_CASE("Params query with an unsigned integer param", "[params]") {
+	ScannerConn sc;
+	Result res;
+	duckdb_state st = duckdb_query(sc.conn, R"(
+SELECT * FROM odbc_query(
+  getvariable('conn'),
+  '
+    SELECT ?::UTINYINT
+  ', 
+  params=row(255::UTINYINT))
+)",
+	                               res.Get());
+	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.NextChunk());
+	REQUIRE(res.Value<uint8_t>(0, 0) == 255);
 }
 
 TEST_CASE("Params query with multiple params including NULL", "[params]") {
@@ -48,7 +65,7 @@ SELECT * FROM odbc_query(
 	                               res.Get());
 	REQUIRE(st == DuckDBSuccess);
 	REQUIRE(res.NextChunk());
-	REQUIRE(res.Int32(0, 0) == 42);
+	REQUIRE(res.Value<int32_t>(0, 0) == 42);
 }
 
 TEST_CASE("Params query with rebinding", "[params]") {
@@ -75,7 +92,7 @@ SELECT * FROM odbc_query(
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
 		REQUIRE(st_exec == DuckDBSuccess);
 		REQUIRE(res.NextChunk());
-		REQUIRE(res.Int32(0, 0) == 42);
+		REQUIRE(res.Value<int32_t>(0, 0) == 42);
 	}
 
 	{
@@ -87,7 +104,7 @@ SELECT * FROM odbc_query(
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
 		REQUIRE(st_exec == DuckDBSuccess);
 		REQUIRE(res.NextChunk());
-		REQUIRE(res.Int32(0, 0) == 43);
+		REQUIRE(res.Value<int32_t>(0, 0) == 43);
 	}
 }
 
@@ -128,7 +145,7 @@ SELECT odbc_bind_params(getvariable('params1'), row(42))
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
 		REQUIRE(st_exec == DuckDBSuccess);
 		REQUIRE(res.NextChunk());
-		REQUIRE(res.Int32(0, 0) == 42);
+		REQUIRE(res.Value<int32_t>(0, 0) == 42);
 	}
 
 	{
@@ -144,6 +161,6 @@ SELECT odbc_bind_params(getvariable('params1'), row(43))
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
 		REQUIRE(st_exec == DuckDBSuccess);
 		REQUIRE(res.NextChunk());
-		REQUIRE(res.Int32(0, 0) == 43);
+		REQUIRE(res.Value<int32_t>(0, 0) == 43);
 	}
 }
