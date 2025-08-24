@@ -1,0 +1,67 @@
+# name: test/sql/type_time.test
+# description: test for TIME type
+# group: [sql_type_time]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''23:59:59''::TIME')
+----
+23:59:59
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''23:59:59''::TIME')
+)
+----
+TIME
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TIME', params=row('23:59:59'::TIME))
+----
+23:59:59
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TIME', params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind('23:59:59'::TIME)
+
+query I
+EXECUTE p1
+----
+23:59:59
+
+statement ok
+EXECUTE p1_bind('00:00:00'::TIME)
+
+query I
+EXECUTE p1
+----
+00:00:00
+
+statement ok
+EXECUTE p1_bind('23:59:59.123'::TIME)
+
+query I
+EXECUTE p1
+----
+23:59:59
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

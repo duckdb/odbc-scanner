@@ -12,7 +12,7 @@ static std::string GenStr(size_t len) {
 	return res;
 }
 
-TEST_CASE("Long string query", "[long_strings]") {
+TEST_CASE("Long string query", "[capi_long_strings]") {
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn, R"(

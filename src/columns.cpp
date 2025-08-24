@@ -97,7 +97,7 @@ std::vector<ResultColumn> Columns::Collect(const std::string &query, HSTMT hstmt
 				    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 			}
 		}
-		std::string name = WideChar::Narrow(buf.data(), len_bytes * sizeof(SQLWCHAR));
+		std::string name = WideChar::Narrow(buf.data(), len_bytes / sizeof(SQLWCHAR));
 		OdbcType odbc_type = GetTypeAttributes(query, cols_count, hstmt, col_idx);
 		ResultColumn col(std::move(name), std::move(odbc_type));
 		vec.emplace_back(std::move(col));

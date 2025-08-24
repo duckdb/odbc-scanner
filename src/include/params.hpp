@@ -19,7 +19,7 @@ class ScannerParam {
 	duckdb_type type_id = DUCKDB_TYPE_INVALID;
 	SQLLEN len_bytes = 0;
 
-	union IntenalValue {
+	union InternalValue {
 		bool null_val;
 		int8_t int8;
 		uint8_t uint8;
@@ -32,39 +32,48 @@ class ScannerParam {
 		float float_val;
 		double double_val;
 		WideString wstr;
+		SQL_DATE_STRUCT date;
+		SQL_TIME_STRUCT time;
+		SQL_TIMESTAMP_STRUCT timestamp;
 
-		IntenalValue() : null_val(true) {
+		InternalValue() : null_val(true) {
 		}
-		IntenalValue(int8_t value) : int8(value) {
+		InternalValue(int8_t value) : int8(value) {
 		}
-		IntenalValue(uint8_t value) : uint8(value) {
+		InternalValue(uint8_t value) : uint8(value) {
 		}
-		IntenalValue(int16_t value) : int16(value) {
+		InternalValue(int16_t value) : int16(value) {
 		}
-		IntenalValue(uint16_t value) : uint16(value) {
+		InternalValue(uint16_t value) : uint16(value) {
 		}
-		IntenalValue(int32_t value) : int32(value) {
+		InternalValue(int32_t value) : int32(value) {
 		}
-		IntenalValue(uint32_t value) : uint32(value) {
+		InternalValue(uint32_t value) : uint32(value) {
 		}
-		IntenalValue(int64_t value) : int64(value) {
+		InternalValue(int64_t value) : int64(value) {
 		}
-		IntenalValue(uint64_t value) : uint64(value) {
+		InternalValue(uint64_t value) : uint64(value) {
 		}
-		IntenalValue(float value) : float_val(value) {
+		InternalValue(float value) : float_val(value) {
 		}
-		IntenalValue(double value) : double_val(value) {
+		InternalValue(double value) : double_val(value) {
 		}
-		IntenalValue(WideString wstr_in) : wstr(std::move(wstr_in)) {
+		InternalValue(WideString wstr_in) : wstr(std::move(wstr_in)) {
+		}
+		InternalValue(SQL_DATE_STRUCT value) : date(value) {
+		}
+		InternalValue(SQL_TIME_STRUCT value) : time(value) {
+		}
+		InternalValue(SQL_TIMESTAMP_STRUCT value) : timestamp(value) {
 		}
 
-		IntenalValue(IntenalValue &other) = delete;
-		IntenalValue(IntenalValue &&other) = delete;
+		InternalValue(InternalValue &other) = delete;
+		InternalValue(InternalValue &&other) = delete;
 
-		IntenalValue &operator=(IntenalValue &other) = delete;
-		IntenalValue &operator=(IntenalValue &&other) = delete;
+		InternalValue &operator=(InternalValue &other) = delete;
+		InternalValue &operator=(InternalValue &&other) = delete;
 
-		~IntenalValue() noexcept {};
+		~InternalValue() noexcept {};
 	} val;
 
 public:
@@ -81,6 +90,9 @@ public:
 	explicit ScannerParam(double value);
 	explicit ScannerParam(const char *cstr, size_t len);
 	explicit ScannerParam(const char *cstr);
+	explicit ScannerParam(duckdb_date_struct value);
+	explicit ScannerParam(duckdb_time_struct value);
+	explicit ScannerParam(duckdb_timestamp_struct value);
 
 	ScannerParam(ScannerParam &other) = delete;
 	ScannerParam(ScannerParam &&other);

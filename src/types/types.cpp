@@ -46,6 +46,12 @@ ScannerParam Types::ExtractNotNullParamOfType(duckdb_type type_id, duckdb_vector
 		return TypeSpecific::ExtractNotNullParam<double>(vec);
 	case DUCKDB_TYPE_VARCHAR:
 		return TypeSpecific::ExtractNotNullParam<std::string>(vec);
+	case DUCKDB_TYPE_DATE:
+		return TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(vec);
+	case DUCKDB_TYPE_TIME:
+		return TypeSpecific::ExtractNotNullParam<duckdb_time_struct>(vec);
+	case DUCKDB_TYPE_TIMESTAMP:
+		return TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(vec);
 	default:
 		throw ScannerException("Cannot extract parameters from STRUCT: specified type is not supported, id: " +
 		                       std::to_string(type_id) + ", index: " + std::to_string(param_idx));
@@ -78,6 +84,12 @@ ScannerParam Types::ExtractNotNullParamFromValue(duckdb_value value, idx_t param
 		return ScannerParam(duckdb_get_double(value));
 	case DUCKDB_TYPE_VARCHAR:
 		return ScannerParam(duckdb_get_varchar(value));
+	case DUCKDB_TYPE_DATE:
+		return ScannerParam(duckdb_from_date(duckdb_get_date(value)));
+	case DUCKDB_TYPE_TIME:
+		return ScannerParam(duckdb_from_time(duckdb_get_time(value)));
+	case DUCKDB_TYPE_TIMESTAMP:
+		return ScannerParam(duckdb_from_timestamp(duckdb_get_timestamp(value)));
 	default:
 		throw ScannerException("Cannot extract parameters from STRUCT value: specified type is not supported, ID: " +
 		                       std::to_string(type_id) + ", index: " + std::to_string(param_idx));
@@ -121,6 +133,15 @@ void Types::BindOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &p
 		break;
 	case DUCKDB_TYPE_VARCHAR:
 		TypeSpecific::BindOdbcParam<std::string>(query, hstmt, param, param_idx);
+		break;
+	case DUCKDB_TYPE_DATE:
+		TypeSpecific::BindOdbcParam<duckdb_date_struct>(query, hstmt, param, param_idx);
+		break;
+	case DUCKDB_TYPE_TIME:
+		TypeSpecific::BindOdbcParam<duckdb_time_struct>(query, hstmt, param, param_idx);
+		break;
+	case DUCKDB_TYPE_TIMESTAMP:
+		TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(query, hstmt, param, param_idx);
 		break;
 	default:
 		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(param.TypeId()));
@@ -167,6 +188,15 @@ void Types::FetchAndSetResultOfType(const OdbcType &odbc_type, const std::string
 	case SQL_VARCHAR:
 		TypeSpecific::FetchAndSetResult<std::string>(query, hstmt, col_idx, vec, row_idx);
 		break;
+	case SQL_TYPE_DATE:
+		TypeSpecific::FetchAndSetResult<duckdb_date_struct>(query, hstmt, col_idx, vec, row_idx);
+		break;
+	case SQL_TYPE_TIME:
+		TypeSpecific::FetchAndSetResult<duckdb_time_struct>(query, hstmt, col_idx, vec, row_idx);
+		break;
+	case SQL_TYPE_TIMESTAMP:
+		TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(query, hstmt, col_idx, vec, row_idx);
+		break;
 	default:
 		throw ScannerException("Unsupported ODBC fetch type: " + std::to_string(odbc_type.desc_concise_type) +
 		                       ", name: '" + odbc_type.desc_type_name + "'");
@@ -195,6 +225,12 @@ SQLSMALLINT Types::DuckParamTypeToOdbc(duckdb_type type_id, size_t param_idx) {
 		return SQL_DOUBLE;
 	case DUCKDB_TYPE_VARCHAR:
 		return SQL_VARCHAR;
+	case DUCKDB_TYPE_DATE:
+		return SQL_TYPE_DATE;
+	case DUCKDB_TYPE_TIME:
+		return SQL_TYPE_TIME;
+	case DUCKDB_TYPE_TIMESTAMP:
+		return SQL_TYPE_TIMESTAMP;
 	default:
 		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(type_id) +
 		                       ", index: " + std::to_string(param_idx));
@@ -217,6 +253,12 @@ duckdb_type Types::OdbcColumnTypeToDuck(ResultColumn &column) {
 		return DUCKDB_TYPE_DOUBLE;
 	case SQL_VARCHAR:
 		return DUCKDB_TYPE_VARCHAR;
+	case SQL_TYPE_DATE:
+		return DUCKDB_TYPE_DATE;
+	case SQL_TYPE_TIME:
+		return DUCKDB_TYPE_TIME;
+	case SQL_TYPE_TIMESTAMP:
+		return DUCKDB_TYPE_TIMESTAMP;
 	default:
 		throw ScannerException("Unsupported ODBC column type: " + column.odbc_type.ToString() + ", column name: '" +
 		                       column.name + "'");

@@ -1,6 +1,6 @@
 #include "test_common.hpp"
 
-TEST_CASE("Params query with a single param literal", "[params]") {
+TEST_CASE("Params query with a single param literal", "[capi_params]") {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -17,7 +17,7 @@ SELECT * FROM odbc_query(
 	REQUIRE(res.Value<int32_t>(0, 0) == 42);
 }
 
-TEST_CASE("Params query with a varchar param literal", "[params]") {
+TEST_CASE("Params query with a varchar param literal", "[capi_params]") {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -34,7 +34,7 @@ SELECT * FROM odbc_query(
 	REQUIRE(res.Value<std::string>(0, 0) == "foo");
 }
 
-TEST_CASE("Params query with an unsigned integer param", "[params]") {
+TEST_CASE("Params query with an unsigned integer param", "[capi_params]") {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -51,7 +51,7 @@ SELECT * FROM odbc_query(
 	REQUIRE(res.Value<uint8_t>(0, 0) == 255);
 }
 
-TEST_CASE("Params query with multiple params including NULL", "[params]") {
+TEST_CASE("Params query with multiple params including NULL", "[capi_params]") {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -68,7 +68,7 @@ SELECT * FROM odbc_query(
 	REQUIRE(res.Value<int32_t>(0, 0) == 42);
 }
 
-TEST_CASE("Params query with rebinding", "[params]") {
+TEST_CASE("Params query with rebinding", "[capi_params]") {
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn, R"(
@@ -108,7 +108,7 @@ SELECT * FROM odbc_query(
 	}
 }
 
-TEST_CASE("Params query without rebinding", "[params]") {
+TEST_CASE("Params query without rebinding", "[capi_params]") {
 	ScannerConn sc;
 
 	{

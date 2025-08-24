@@ -80,6 +80,24 @@ WideString &ScannerParam::Value<WideString>() {
 	return val.wstr;
 }
 
+template <>
+SQL_DATE_STRUCT &ScannerParam::Value<SQL_DATE_STRUCT>() {
+	CheckType(DUCKDB_TYPE_DATE);
+	return val.date;
+}
+
+template <>
+SQL_TIME_STRUCT &ScannerParam::Value<SQL_TIME_STRUCT>() {
+	CheckType(DUCKDB_TYPE_TIME);
+	return val.time;
+}
+
+template <>
+SQL_TIMESTAMP_STRUCT &ScannerParam::Value<SQL_TIMESTAMP_STRUCT>() {
+	CheckType(DUCKDB_TYPE_TIMESTAMP);
+	return val.timestamp;
+}
+
 ScannerParam::ScannerParam() : type_id(DUCKDB_TYPE_SQLNULL) {
 }
 
@@ -123,6 +141,40 @@ ScannerParam::ScannerParam(const char *cstr, size_t len) : type_id(DUCKDB_TYPE_V
 ScannerParam::ScannerParam(const char *cstr) : ScannerParam(cstr, std::strlen(cstr)) {
 }
 
+ScannerParam::ScannerParam(duckdb_date_struct value) : type_id(DUCKDB_TYPE_DATE) {
+	SQL_DATE_STRUCT dt;
+	std::memset(&dt, '\0', sizeof(dt));
+	dt.day = static_cast<SQLUSMALLINT>(value.day);
+	dt.month = static_cast<SQLUSMALLINT>(value.month);
+	dt.year = static_cast<SQLSMALLINT>(value.year);
+	this->val.date = dt;
+	this->len_bytes = sizeof(dt);
+}
+
+ScannerParam::ScannerParam(duckdb_time_struct value) : type_id(DUCKDB_TYPE_TIME) {
+	SQL_TIME_STRUCT tm;
+	std::memset(&tm, '\0', sizeof(tm));
+	tm.hour = static_cast<SQLUSMALLINT>(value.hour);
+	tm.minute = static_cast<SQLUSMALLINT>(value.min);
+	tm.second = static_cast<SQLUSMALLINT>(value.sec);
+	this->val.time = tm;
+	this->len_bytes = sizeof(tm);
+}
+
+ScannerParam::ScannerParam(duckdb_timestamp_struct value) : type_id(DUCKDB_TYPE_TIMESTAMP) {
+	SQL_TIMESTAMP_STRUCT ts;
+	std::memset(&ts, '\0', sizeof(ts));
+	ts.day = static_cast<SQLUSMALLINT>(value.date.day);
+	ts.month = static_cast<SQLUSMALLINT>(value.date.month);
+	ts.year = static_cast<SQLSMALLINT>(value.date.year);
+	ts.hour = static_cast<SQLUSMALLINT>(value.time.hour);
+	ts.minute = static_cast<SQLUSMALLINT>(value.time.min);
+	ts.second = static_cast<SQLUSMALLINT>(value.time.sec);
+	ts.fraction = static_cast<SQLUINTEGER>(value.time.micros * 1000);
+	this->val.timestamp = ts;
+	this->len_bytes = sizeof(ts);
+}
+
 ScannerParam::ScannerParam(ScannerParam &&other) : type_id(other.type_id), len_bytes(other.len_bytes) {
 	switch (type_id) {
 	case DUCKDB_TYPE_SQLNULL:
@@ -160,6 +212,15 @@ ScannerParam::ScannerParam(ScannerParam &&other) : type_id(other.type_id), len_b
 	case DUCKDB_TYPE_VARCHAR:
 		new (&this->val.wstr) WideString;
 		this->val.wstr = std::move(other.Value<WideString>());
+		break;
+	case DUCKDB_TYPE_DATE:
+		this->val.date = other.Value<SQL_DATE_STRUCT>();
+		break;
+	case DUCKDB_TYPE_TIME:
+		this->val.time = other.Value<SQL_TIME_STRUCT>();
+		break;
+	case DUCKDB_TYPE_TIMESTAMP:
+		this->val.timestamp = other.Value<SQL_TIMESTAMP_STRUCT>();
 		break;
 	default:
 		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(type_id));
@@ -205,6 +266,15 @@ ScannerParam &ScannerParam::operator=(ScannerParam &&other) {
 	case DUCKDB_TYPE_VARCHAR:
 		new (&this->val.wstr) WideString;
 		this->val.wstr = std::move(other.Value<WideString>());
+		break;
+	case DUCKDB_TYPE_DATE:
+		this->val.date = other.Value<SQL_DATE_STRUCT>();
+		break;
+	case DUCKDB_TYPE_TIME:
+		this->val.time = other.Value<SQL_TIME_STRUCT>();
+		break;
+	case DUCKDB_TYPE_TIMESTAMP:
+		this->val.timestamp = other.Value<SQL_TIMESTAMP_STRUCT>();
 		break;
 	default:
 		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(type_id));

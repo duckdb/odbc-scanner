@@ -1,0 +1,67 @@
+# name: test/sql/type_date.test
+# description: test for DATE type
+# group: [sql_type_date]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''2020-12-31''::DATE')
+----
+2020-12-31
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''2020-12-31''::DATE')
+)
+----
+DATE
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::DATE', params=row('2020-12-31'::DATE))
+----
+2020-12-31
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::DATE', params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind('2020-12-31'::DATE)
+
+query I
+EXECUTE p1
+----
+2020-12-31
+
+statement ok
+EXECUTE p1_bind('1970-01-01'::DATE)
+
+query I
+EXECUTE p1
+----
+1970-01-01
+
+statement ok
+EXECUTE p1_bind('1969-12-31'::DATE)
+
+query I
+EXECUTE p1
+----
+1969-12-31
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

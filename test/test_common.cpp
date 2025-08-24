@@ -127,3 +127,10 @@ std::string Result::Value<std::string>(idx_t col_idx, idx_t row_idx) {
 	uint32_t len = duckdb_string_t_length(dstr);
 	return std::string(cstr, len);
 }
+
+template <>
+duckdb_date_struct Result::Value<duckdb_date_struct>(idx_t col_idx, idx_t row_idx) {
+	duckdb_date *data = NotNullData<duckdb_date>(DUCKDB_TYPE_DATE, chunk, cur_row_idx, col_idx, row_idx);
+	duckdb_date dt = data[row_idx];
+	return duckdb_from_date(dt);
+}

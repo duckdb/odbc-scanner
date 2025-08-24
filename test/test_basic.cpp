@@ -1,6 +1,6 @@
 #include "test_common.hpp"
 
-TEST_CASE("Basic query with a single value", "[basic]") {
+TEST_CASE("Basic query with a single value", "[capi_basic]") {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -17,7 +17,7 @@ SELECT * FROM odbc_query(
 	REQUIRE(res.Value<int32_t>(0, 0) == 42);
 }
 
-TEST_CASE("Basic query with multiple rows and columns", "[basic]") {
+TEST_CASE("Basic query with multiple rows and columns", "[capi_basic]") {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
