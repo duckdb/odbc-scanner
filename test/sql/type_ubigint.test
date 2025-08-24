@@ -13,6 +13,13 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::UBIGINT')
 42
 
 query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::UBIGINT')
+)
+----
+UBIGINT
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::UBIGINT', params=row(42::UBIGINT))
 ----
 42

@@ -63,6 +63,18 @@ uint64_t &ScannerParam::Value<uint64_t>() {
 }
 
 template <>
+float &ScannerParam::Value<float>() {
+	CheckType(DUCKDB_TYPE_FLOAT);
+	return val.float_val;
+}
+
+template <>
+double &ScannerParam::Value<double>() {
+	CheckType(DUCKDB_TYPE_DOUBLE);
+	return val.double_val;
+}
+
+template <>
 WideString &ScannerParam::Value<WideString>() {
 	CheckType(DUCKDB_TYPE_VARCHAR);
 	return val.wstr;
@@ -93,6 +105,12 @@ ScannerParam::ScannerParam(int64_t value) : type_id(DUCKDB_TYPE_BIGINT), len_byt
 }
 
 ScannerParam::ScannerParam(uint64_t value) : type_id(DUCKDB_TYPE_UBIGINT), len_bytes(sizeof(value)), val(value) {
+}
+
+ScannerParam::ScannerParam(float value) : type_id(DUCKDB_TYPE_FLOAT), len_bytes(sizeof(value)), val(value) {
+}
+
+ScannerParam::ScannerParam(double value) : type_id(DUCKDB_TYPE_DOUBLE), len_bytes(sizeof(value)), val(value) {
 }
 
 ScannerParam::ScannerParam(const char *cstr, size_t len) : type_id(DUCKDB_TYPE_VARCHAR) {
@@ -133,6 +151,12 @@ ScannerParam::ScannerParam(ScannerParam &&other) : type_id(other.type_id), len_b
 	case DUCKDB_TYPE_UBIGINT:
 		this->val.uint64 = other.Value<uint64_t>();
 		break;
+	case DUCKDB_TYPE_FLOAT:
+		this->val.float_val = other.Value<float>();
+		break;
+	case DUCKDB_TYPE_DOUBLE:
+		this->val.double_val = other.Value<double>();
+		break;
 	case DUCKDB_TYPE_VARCHAR:
 		new (&this->val.wstr) WideString;
 		this->val.wstr = std::move(other.Value<WideString>());
@@ -171,6 +195,12 @@ ScannerParam &ScannerParam::operator=(ScannerParam &&other) {
 		break;
 	case DUCKDB_TYPE_UBIGINT:
 		this->val.uint64 = other.Value<uint64_t>();
+		break;
+	case DUCKDB_TYPE_FLOAT:
+		this->val.float_val = other.Value<float>();
+		break;
+	case DUCKDB_TYPE_DOUBLE:
+		this->val.double_val = other.Value<double>();
 		break;
 	case DUCKDB_TYPE_VARCHAR:
 		new (&this->val.wstr) WideString;

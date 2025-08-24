@@ -29,6 +29,8 @@ class ScannerParam {
 		uint32_t uint32;
 		int64_t int64;
 		uint64_t uint64;
+		float float_val;
+		double double_val;
 		WideString wstr;
 
 		IntenalValue() : null_val(true) {
@@ -48,6 +50,10 @@ class ScannerParam {
 		IntenalValue(int64_t value) : int64(value) {
 		}
 		IntenalValue(uint64_t value) : uint64(value) {
+		}
+		IntenalValue(float value) : float_val(value) {
+		}
+		IntenalValue(double value) : double_val(value) {
 		}
 		IntenalValue(WideString wstr_in) : wstr(std::move(wstr_in)) {
 		}
@@ -71,6 +77,8 @@ public:
 	explicit ScannerParam(uint32_t value);
 	explicit ScannerParam(int64_t value);
 	explicit ScannerParam(uint64_t value);
+	explicit ScannerParam(float value);
+	explicit ScannerParam(double value);
 	explicit ScannerParam(const char *cstr, size_t len);
 	explicit ScannerParam(const char *cstr);
 
