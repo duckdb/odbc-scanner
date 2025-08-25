@@ -47,4 +47,6 @@ struct Result {
 	template<typename T>
 	T Value(idx_t col_idx, idx_t row_idx);
 
+	template<typename T>
+	T DecimalValue(idx_t col_idx, idx_t row_idx);
 };

@@ -31,6 +31,8 @@ struct Columns {
 
 	static void CheckSame(const std::string &query, std::vector<ResultColumn> &expected,
 	                      std::vector<ResultColumn> &actual);
+
+	static void AddToResults(duckdb_bind_info info, ResultColumn &col);
 };
 
 } // namespace odbcscanner

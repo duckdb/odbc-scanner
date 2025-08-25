@@ -75,6 +75,12 @@ double &ScannerParam::Value<double>() {
 }
 
 template <>
+SQL_NUMERIC_STRUCT &ScannerParam::Value<SQL_NUMERIC_STRUCT>() {
+	CheckType(DUCKDB_TYPE_DECIMAL);
+	return val.decimal;
+}
+
+template <>
 WideString &ScannerParam::Value<WideString>() {
 	CheckType(DUCKDB_TYPE_VARCHAR);
 	return val.wstr;
@@ -131,6 +137,26 @@ ScannerParam::ScannerParam(float value) : type_id(DUCKDB_TYPE_FLOAT), len_bytes(
 ScannerParam::ScannerParam(double value) : type_id(DUCKDB_TYPE_DOUBLE), len_bytes(sizeof(value)), val(value) {
 }
 
+ScannerParam::ScannerParam(duckdb_decimal value) : type_id(DUCKDB_TYPE_DECIMAL) {
+	SQL_NUMERIC_STRUCT ns;
+	std::memset(&ns, '\0', sizeof(ns));
+	ns.precision = value.width;
+	ns.scale = value.scale;
+	ns.sign = (value.value.upper & (1LL << 63)) == 0;
+	if (ns.sign == 0) {
+		// negate
+		value.value.lower = ~value.value.lower + 1;
+		value.value.upper = ~value.value.upper;
+		if (value.value.lower == 0) {
+			value.value.upper += 1; // carry from low to high
+		}
+	}
+	std::memcpy(ns.val, &value.value.lower, sizeof(value.value.lower));
+	std::memcpy(ns.val + sizeof(value.value.lower), &value.value.upper, sizeof(value.value.upper));
+	this->val.decimal = ns;
+	this->len_bytes = sizeof(ns);
+}
+
 ScannerParam::ScannerParam(const char *cstr, size_t len) : type_id(DUCKDB_TYPE_VARCHAR) {
 	WideString wstr = WideChar::Widen(cstr, len);
 	new (&this->val.wstr) WideString;
@@ -175,110 +201,69 @@ ScannerParam::ScannerParam(duckdb_timestamp_struct value) : type_id(DUCKDB_TYPE_
 	this->len_bytes = sizeof(ts);
 }
 
-ScannerParam::ScannerParam(ScannerParam &&other) : type_id(other.type_id), len_bytes(other.len_bytes) {
+void ScannerParam::AssignByType(duckdb_type type_id, InternalValue &val, ScannerParam &other) {
 	switch (type_id) {
 	case DUCKDB_TYPE_SQLNULL:
 		break;
 	case DUCKDB_TYPE_TINYINT:
-		this->val.int8 = other.Value<int8_t>();
+		val.int8 = other.Value<int8_t>();
 		break;
 	case DUCKDB_TYPE_UTINYINT:
-		this->val.uint8 = other.Value<uint8_t>();
+		val.uint8 = other.Value<uint8_t>();
 		break;
 	case DUCKDB_TYPE_SMALLINT:
-		this->val.int16 = other.Value<int16_t>();
+		val.int16 = other.Value<int16_t>();
 		break;
 	case DUCKDB_TYPE_USMALLINT:
-		this->val.uint16 = other.Value<uint16_t>();
+		val.uint16 = other.Value<uint16_t>();
 		break;
 	case DUCKDB_TYPE_INTEGER:
-		this->val.int32 = other.Value<int32_t>();
+		val.int32 = other.Value<int32_t>();
 		break;
 	case DUCKDB_TYPE_UINTEGER:
-		this->val.uint32 = other.Value<uint32_t>();
+		val.uint32 = other.Value<uint32_t>();
 		break;
 	case DUCKDB_TYPE_BIGINT:
-		this->val.int64 = other.Value<int64_t>();
+		val.int64 = other.Value<int64_t>();
 		break;
 	case DUCKDB_TYPE_UBIGINT:
-		this->val.uint64 = other.Value<uint64_t>();
+		val.uint64 = other.Value<uint64_t>();
 		break;
 	case DUCKDB_TYPE_FLOAT:
-		this->val.float_val = other.Value<float>();
+		val.float_val = other.Value<float>();
 		break;
 	case DUCKDB_TYPE_DOUBLE:
-		this->val.double_val = other.Value<double>();
+		val.double_val = other.Value<double>();
+		break;
+	case DUCKDB_TYPE_DECIMAL:
+		val.decimal = other.Value<SQL_NUMERIC_STRUCT>();
 		break;
 	case DUCKDB_TYPE_VARCHAR:
-		new (&this->val.wstr) WideString;
-		this->val.wstr = std::move(other.Value<WideString>());
+		new (&val.wstr) WideString;
+		val.wstr = std::move(other.Value<WideString>());
 		break;
 	case DUCKDB_TYPE_DATE:
-		this->val.date = other.Value<SQL_DATE_STRUCT>();
+		val.date = other.Value<SQL_DATE_STRUCT>();
 		break;
 	case DUCKDB_TYPE_TIME:
-		this->val.time = other.Value<SQL_TIME_STRUCT>();
+		val.time = other.Value<SQL_TIME_STRUCT>();
 		break;
 	case DUCKDB_TYPE_TIMESTAMP:
-		this->val.timestamp = other.Value<SQL_TIMESTAMP_STRUCT>();
+		val.timestamp = other.Value<SQL_TIMESTAMP_STRUCT>();
 		break;
 	default:
 		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(type_id));
 	}
 }
 
+ScannerParam::ScannerParam(ScannerParam &&other) : type_id(other.type_id), len_bytes(other.len_bytes) {
+	AssignByType(type_id, this->val, other);
+}
+
 ScannerParam &ScannerParam::operator=(ScannerParam &&other) {
 	this->type_id = other.type_id;
 	this->len_bytes = other.len_bytes;
-	switch (type_id) {
-	case DUCKDB_TYPE_SQLNULL:
-		break;
-	case DUCKDB_TYPE_TINYINT:
-		this->val.int8 = other.Value<int8_t>();
-		break;
-	case DUCKDB_TYPE_UTINYINT:
-		this->val.uint8 = other.Value<uint8_t>();
-		break;
-	case DUCKDB_TYPE_SMALLINT:
-		this->val.int16 = other.Value<int16_t>();
-		break;
-	case DUCKDB_TYPE_USMALLINT:
-		this->val.uint16 = other.Value<uint16_t>();
-		break;
-	case DUCKDB_TYPE_INTEGER:
-		this->val.int32 = other.Value<int32_t>();
-		break;
-	case DUCKDB_TYPE_UINTEGER:
-		this->val.uint32 = other.Value<uint32_t>();
-		break;
-	case DUCKDB_TYPE_BIGINT:
-		this->val.int64 = other.Value<int64_t>();
-		break;
-	case DUCKDB_TYPE_UBIGINT:
-		this->val.uint64 = other.Value<uint64_t>();
-		break;
-	case DUCKDB_TYPE_FLOAT:
-		this->val.float_val = other.Value<float>();
-		break;
-	case DUCKDB_TYPE_DOUBLE:
-		this->val.double_val = other.Value<double>();
-		break;
-	case DUCKDB_TYPE_VARCHAR:
-		new (&this->val.wstr) WideString;
-		this->val.wstr = std::move(other.Value<WideString>());
-		break;
-	case DUCKDB_TYPE_DATE:
-		this->val.date = other.Value<SQL_DATE_STRUCT>();
-		break;
-	case DUCKDB_TYPE_TIME:
-		this->val.time = other.Value<SQL_TIME_STRUCT>();
-		break;
-	case DUCKDB_TYPE_TIMESTAMP:
-		this->val.timestamp = other.Value<SQL_TIMESTAMP_STRUCT>();
-		break;
-	default:
-		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(type_id));
-	}
+	AssignByType(type_id, this->val, other);
 	return *this;
 }
 

@@ -50,6 +50,7 @@ set(EXTENSION_SOURCES
     src/functions/odbc_create_params.cpp
     src/functions/odbc_query.cpp
     src/types/date_types.cpp
+    src/types/decimal_type.cpp
     src/types/float_types.cpp
     src/types/integer_types.cpp
     src/types/null_type.cpp

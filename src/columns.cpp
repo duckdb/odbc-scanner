@@ -64,7 +64,38 @@ static OdbcType GetTypeAttributes(const std::string &query, SQLSMALLINT cols_cou
 	}
 	std::string desc_type_name = WideChar::Narrow(buf.data(), len_bytes / sizeof(SQLWCHAR));
 
-	return OdbcType(desc_type, desc_concise_type, is_unsigned == SQL_TRUE, std::move(desc_type_name));
+	uint8_t decimal_precision = 0;
+	uint8_t decimal_scale = 0;
+	if (desc_concise_type == SQL_DECIMAL || desc_concise_type == SQL_NUMERIC) {
+		{
+			SQLLEN precision = -1;
+			SQLRETURN ret = SQLColAttributeW(hstmt, col_idx, SQL_DESC_PRECISION, nullptr, 0, nullptr, &precision);
+			if (!SQL_SUCCEEDED(ret)) {
+				std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
+				throw ScannerException(
+				    "'SQLColAttribute' for SQL_DESC_PRECISION failed, column index: " + std::to_string(col_idx) +
+				    ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
+				    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+			}
+			decimal_precision = static_cast<uint8_t>(precision);
+		}
+
+		{
+			SQLLEN scale = -1;
+			SQLRETURN ret = SQLColAttributeW(hstmt, col_idx, SQL_DESC_SCALE, nullptr, 0, nullptr, &scale);
+			if (!SQL_SUCCEEDED(ret)) {
+				std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
+				throw ScannerException(
+				    "'SQLColAttribute' for SQL_DESC_SCALE failed, column index: " + std::to_string(col_idx) +
+				    ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
+				    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+			}
+			decimal_scale = static_cast<uint8_t>(scale);
+		}
+	}
+
+	return OdbcType(desc_type, desc_concise_type, is_unsigned == SQL_TRUE, std::move(desc_type_name), decimal_precision,
+	                decimal_scale);
 }
 
 std::vector<ResultColumn> Columns::Collect(const std::string &query, HSTMT hstmt) {
@@ -129,6 +160,20 @@ void Columns::CheckSame(const std::string &query, std::vector<ResultColumn> &exp
 			                       expected_col.odbc_type.ToString() + "', actual: '" +
 			                       actual_col.odbc_type.ToString() + "'");
 		}
+	}
+}
+
+void Columns::AddToResults(duckdb_bind_info info, ResultColumn &col) {
+	duckdb_type type_id = Types::OdbcColumnTypeToDuck(col);
+
+	if (type_id == DUCKDB_TYPE_DECIMAL) {
+		auto ltype =
+		    LogicalTypePtr(duckdb_create_decimal_type(col.odbc_type.decimal_precision, col.odbc_type.decimal_scale),
+		                   LogicalTypeDeleter);
+		duckdb_bind_add_result_column(info, col.name.c_str(), ltype.get());
+	} else {
+		auto ltype = LogicalTypePtr(duckdb_create_logical_type(type_id), LogicalTypeDeleter);
+		duckdb_bind_add_result_column(info, col.name.c_str(), ltype.get());
 	}
 }
 

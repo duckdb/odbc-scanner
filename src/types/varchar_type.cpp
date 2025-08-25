@@ -142,8 +142,10 @@ static std::pair<std::string, bool> FetchInternal(const std::string &query, HSTM
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<std::string>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                                  duckdb_vector vec, idx_t row_idx) {
+void TypeSpecific::FetchAndSetResult<std::string>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                                  SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+	(void)odbc_type;
+
 	auto fetched = FetchInternal(query, hstmt, col_idx);
 
 	if (fetched.second) {

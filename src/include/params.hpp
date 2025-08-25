@@ -31,6 +31,7 @@ class ScannerParam {
 		uint64_t uint64;
 		float float_val;
 		double double_val;
+		SQL_NUMERIC_STRUCT decimal;
 		WideString wstr;
 		SQL_DATE_STRUCT date;
 		SQL_TIME_STRUCT time;
@@ -57,6 +58,8 @@ class ScannerParam {
 		InternalValue(float value) : float_val(value) {
 		}
 		InternalValue(double value) : double_val(value) {
+		}
+		InternalValue(SQL_NUMERIC_STRUCT value) : decimal(value) {
 		}
 		InternalValue(WideString wstr_in) : wstr(std::move(wstr_in)) {
 		}
@@ -88,6 +91,7 @@ public:
 	explicit ScannerParam(uint64_t value);
 	explicit ScannerParam(float value);
 	explicit ScannerParam(double value);
+	explicit ScannerParam(duckdb_decimal value);
 	explicit ScannerParam(const char *cstr, size_t len);
 	explicit ScannerParam(const char *cstr);
 	explicit ScannerParam(duckdb_date_struct value);
@@ -113,6 +117,8 @@ public:
 
 private:
 	void CheckType(duckdb_type expected);
+
+	static void AssignByType(duckdb_type type_id, InternalValue &val, ScannerParam &other);
 };
 
 struct Params {

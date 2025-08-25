@@ -162,16 +162,16 @@ void TypeSpecific::BindOdbcParam<uint64_t>(const std::string &query, HSTMT hstmt
 }
 
 template <typename INT_TYPE>
-static void FetchAndSetResultInternal(SQLSMALLINT ctype, const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                      duckdb_vector vec, idx_t row_idx) {
+static void FetchAndSetResultInternal(SQLSMALLINT ctype, OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                      SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
 	INT_TYPE fetched = 0;
 	SQLLEN ind;
 	SQLRETURN ret = SQLGetData(hstmt, col_idx, ctype, &fetched, sizeof(fetched), &ind);
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(ctype) +
-		                       ", column index: " + std::to_string(col_idx) + ", query: '" + query +
-		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(ctype) + ", column index: " +
+		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
+		                       query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
 
 	if (ind == SQL_NULL_DATA) {
@@ -184,51 +184,51 @@ static void FetchAndSetResultInternal(SQLSMALLINT ctype, const std::string &quer
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<int8_t>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                             duckdb_vector vec, idx_t row_idx) {
-	FetchAndSetResultInternal<int8_t>(SQL_C_STINYINT, query, hstmt, col_idx, vec, row_idx);
+void TypeSpecific::FetchAndSetResult<int8_t>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                             SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+	FetchAndSetResultInternal<int8_t>(SQL_C_STINYINT, odbc_type, query, hstmt, col_idx, vec, row_idx);
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<uint8_t>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                              duckdb_vector vec, idx_t row_idx) {
-	FetchAndSetResultInternal<uint8_t>(SQL_C_UTINYINT, query, hstmt, col_idx, vec, row_idx);
+void TypeSpecific::FetchAndSetResult<uint8_t>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                              SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+	FetchAndSetResultInternal<uint8_t>(SQL_C_UTINYINT, odbc_type, query, hstmt, col_idx, vec, row_idx);
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<int16_t>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                              duckdb_vector vec, idx_t row_idx) {
-	FetchAndSetResultInternal<int16_t>(SQL_C_SSHORT, query, hstmt, col_idx, vec, row_idx);
+void TypeSpecific::FetchAndSetResult<int16_t>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                              SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+	FetchAndSetResultInternal<int16_t>(SQL_C_SSHORT, odbc_type, query, hstmt, col_idx, vec, row_idx);
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<uint16_t>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                               duckdb_vector vec, idx_t row_idx) {
-	FetchAndSetResultInternal<uint16_t>(SQL_C_USHORT, query, hstmt, col_idx, vec, row_idx);
+void TypeSpecific::FetchAndSetResult<uint16_t>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                               SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+	FetchAndSetResultInternal<uint16_t>(SQL_C_USHORT, odbc_type, query, hstmt, col_idx, vec, row_idx);
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<int32_t>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                              duckdb_vector vec, idx_t row_idx) {
-	FetchAndSetResultInternal<int32_t>(SQL_C_SLONG, query, hstmt, col_idx, vec, row_idx);
+void TypeSpecific::FetchAndSetResult<int32_t>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                              SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+	FetchAndSetResultInternal<int32_t>(SQL_C_SLONG, odbc_type, query, hstmt, col_idx, vec, row_idx);
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<uint32_t>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                               duckdb_vector vec, idx_t row_idx) {
-	FetchAndSetResultInternal<uint32_t>(SQL_C_ULONG, query, hstmt, col_idx, vec, row_idx);
+void TypeSpecific::FetchAndSetResult<uint32_t>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                               SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+	FetchAndSetResultInternal<uint32_t>(SQL_C_ULONG, odbc_type, query, hstmt, col_idx, vec, row_idx);
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<int64_t>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                              duckdb_vector vec, idx_t row_idx) {
-	FetchAndSetResultInternal<int64_t>(SQL_C_SBIGINT, query, hstmt, col_idx, vec, row_idx);
+void TypeSpecific::FetchAndSetResult<int64_t>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                              SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+	FetchAndSetResultInternal<int64_t>(SQL_C_SBIGINT, odbc_type, query, hstmt, col_idx, vec, row_idx);
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<uint64_t>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                               duckdb_vector vec, idx_t row_idx) {
-	FetchAndSetResultInternal<uint64_t>(SQL_C_UBIGINT, query, hstmt, col_idx, vec, row_idx);
+void TypeSpecific::FetchAndSetResult<uint64_t>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                               SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+	FetchAndSetResultInternal<uint64_t>(SQL_C_UBIGINT, odbc_type, query, hstmt, col_idx, vec, row_idx);
 }
 
 } // namespace odbcscanner

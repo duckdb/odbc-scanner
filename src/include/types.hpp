@@ -18,11 +18,14 @@ struct OdbcType {
 	SQLLEN desc_concise_type;
 	bool is_unsigned;
 	std::string desc_type_name;
+	uint8_t decimal_precision;
+	uint8_t decimal_scale;
 
 	explicit OdbcType(SQLLEN desc_type_in, SQLLEN desc_concise_type_in, bool is_unsigned_in,
-	                  std::string desc_type_name_in)
+	                  std::string desc_type_name_in, uint8_t decimal_precision_in, uint8_t decimal_scale_in)
 	    : desc_type(desc_type_in), desc_concise_type(desc_concise_type_in), is_unsigned(is_unsigned_in),
-	      desc_type_name(std::move(desc_type_name_in)) {
+	      desc_type_name(std::move(desc_type_name_in)), decimal_precision(decimal_precision_in),
+	      decimal_scale(decimal_scale_in) {
 	}
 
 	OdbcType(OdbcType &other) = delete;
@@ -44,8 +47,8 @@ struct Types {
 
 	static void BindOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
 
-	static void FetchAndSetResultOfType(const OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
-	                                    SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx);
+	static void FetchAndSetResultOfType(OdbcType &odbc_type, const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
+	                                    duckdb_vector vec, idx_t row_idx);
 
 	// Other functions
 	template <typename T>
@@ -73,8 +76,8 @@ class TypeSpecific {
 	static void BindOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx);
 
 	template <typename T>
-	static void FetchAndSetResult(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx, duckdb_vector vec,
-	                              idx_t row_idx);
+	static void FetchAndSetResult(OdbcType &odbc_type, const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
+	                              duckdb_vector vec, idx_t row_idx);
 };
 
 } // namespace odbcscanner

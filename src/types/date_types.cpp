@@ -78,8 +78,8 @@ void TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(const std::string &que
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<duckdb_date_struct>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                                         duckdb_vector vec, idx_t row_idx) {
+void TypeSpecific::FetchAndSetResult<duckdb_date_struct>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                                         SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
 	SQL_DATE_STRUCT fetched;
 	std::memset(&fetched, '\0', sizeof(fetched));
 	SQLLEN ind;
@@ -87,8 +87,9 @@ void TypeSpecific::FetchAndSetResult<duckdb_date_struct>(const std::string &quer
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(SQL_C_TYPE_DATE) +
-		                       ", column index: " + std::to_string(col_idx) + ", query: '" + query +
-		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
+		                       ",  query: '" + query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
+		                       "'");
 	}
 
 	if (ind == SQL_NULL_DATA) {
@@ -109,8 +110,8 @@ void TypeSpecific::FetchAndSetResult<duckdb_date_struct>(const std::string &quer
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<duckdb_time_struct>(const std::string &query, HSTMT hstmt, SQLSMALLINT col_idx,
-                                                         duckdb_vector vec, idx_t row_idx) {
+void TypeSpecific::FetchAndSetResult<duckdb_time_struct>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
+                                                         SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
 	SQL_TIME_STRUCT fetched;
 	std::memset(&fetched, '\0', sizeof(fetched));
 	SQLLEN ind;
@@ -118,8 +119,9 @@ void TypeSpecific::FetchAndSetResult<duckdb_time_struct>(const std::string &quer
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(SQL_C_TYPE_TIME) +
-		                       ", column index: " + std::to_string(col_idx) + ", query: '" + query +
-		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
+		                       ",  query: '" + query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
+		                       "'");
 	}
 
 	if (ind == SQL_NULL_DATA) {
@@ -140,8 +142,9 @@ void TypeSpecific::FetchAndSetResult<duckdb_time_struct>(const std::string &quer
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(const std::string &query, HSTMT hstmt,
-                                                              SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(OdbcType &odbc_type, const std::string &query,
+                                                              HSTMT hstmt, SQLSMALLINT col_idx, duckdb_vector vec,
+                                                              idx_t row_idx) {
 	SQL_TIMESTAMP_STRUCT fetched;
 	std::memset(&fetched, '\0', sizeof(fetched));
 	SQLLEN ind;
@@ -149,8 +152,9 @@ void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(const std::string 
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(SQL_C_TYPE_TIMESTAMP) +
-		                       ", column index: " + std::to_string(col_idx) + ", query: '" + query +
-		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
+		                       ",  query: '" + query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
+		                       "'");
 	}
 
 	if (ind == SQL_NULL_DATA) {
