@@ -98,13 +98,16 @@ target_link_libraries(${EXTENSION_NAME} PRIVATE
   ${ODBC_LIBRARIES}
 )
 
-if (ENABLE_C_API_TESTS)
-    message(STATUS "C API tests enabled using shared lib: $ENV{DUCKDB_ODBC_SHARED_LIB_PATH}")
+SET (CAPI_ERROR_MSG "C API test suite is disabled, to enable it specify DuckDB shared library in 'DUCKDB_SHARED_LIB_PATH' environment variable.")
 
-    if (NOT DEFINED ENV{DUCKDB_ODBC_SHARED_LIB_PATH} OR NOT EXISTS $ENV{DUCKDB_ODBC_SHARED_LIB_PATH})
-        message(FATAL_ERROR "Could not find the DuckDB ODBC shared library file. Clone duckdb-odbc repository and run 'make debug' to build it.")
+if (ENABLE_C_API_TESTS)
+    message(STATUS "C API test suite is enabled using shared lib: $ENV{DUCKDB_SHARED_LIB_PATH}")
+
+    if (NOT DEFINED ENV{DUCKDB_SHARED_LIB_PATH} OR NOT EXISTS $ENV{DUCKDB_SHARED_LIB_PATH})
+        message(FATAL_ERROR ${CAPI_ERROR_MSG})
     endif ()
 
     add_subdirectory(test)
+else ()
+    message(STATUS ${CAPI_ERROR_MSG})
 endif ()
-
