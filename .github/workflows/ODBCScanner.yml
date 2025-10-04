@@ -20,7 +20,8 @@ jobs:
     needs: format-check
     env:
       GEN: ninja
-      DUCKDB_ODBC_SHARED_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.so
+      DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.so
+      DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,46 +35,97 @@ jobs:
             unixodbc-dev \
             ninja-build
 
-      - name: Setup ODBC env
+      - name: Download Shared Libs
         run: |
           mkdir odbc
-          cd odbc
+          pushd odbc
           curl --no-progress-meter -LO https://github.com/duckdb/duckdb-odbc/releases/latest/download/duckdb_odbc-linux-amd64.zip
           unzip -q duckdb_odbc-linux-amd64.zip
-          ls -l
-          echo "[DuckDB Driver]" > ~/.odbcinst.ini
-          echo "Driver = ${DUCKDB_ODBC_SHARED_LIB_PATH}" >> ~/.odbcinst.ini
+          ls -laR
+          popd
+          mkdir libduckdb
+          pushd libduckdb
+          curl --no-progress-meter -LO https://github.com/duckdb/duckdb/releases/latest/download/libduckdb-linux-amd64.zip
+          unzip -q libduckdb-linux-amd64.zip
+          ls -laR
+          popd
 
-      - name: Build and Test
+      - name: Configure
         run: |
           make configure
+
+      - name: Build
+        run: |
+          make release
+
+      - name: Setup ODBC Env
+        run: |
+          echo "[DuckDB Driver]" > ~/.odbcinst.ini
+          echo "Driver = ${DUCKDB_ODBC_LIB_PATH}" >> ~/.odbcinst.ini
+          cat ~/.odbcinst.ini
+
+      - name: SQL Tests
+        run: |
           make test
 
+      - name: C API Tests
+        run: |
+          make test_c_api
+
   osx-universal:
-    name: ODBC OSX (Universal)
-    runs-on: macos-14
+    name: MacOS (aarch64)
+    runs-on: macos-latest
+    needs: linux-amd64
     env:
       GEN: ninja
-      OSX_BUILD_UNIVERSAL: 1
-      DUCKDB_ODBC_SHARED_LIB_PATH: ${{ github.workspace }}/third_party/duckdb-odbc/libduckdb_odbc.dylib
-    needs: linux-amd64
+      DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.dylib
+      DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.dylib
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: 'true'
 
-      - name: Setup ODBC env
-        shell: bash
+      - name: Install Dependencies
         run: |
-          brew install unixodbc
-          ${{ github.workspace }}/resources/scripts/update_downloaded_lib.sh osx-universal
-          echo "[DuckDB Driver]" > ~/.odbcinst.ini
-          echo "Driver = ${DUCKDB_ODBC_SHARED_LIB_PATH}" >> ~/.odbcinst.ini
-          cat ~/.odbcinst.ini
+          brew install \
+            unixodbc \
+            ninja
 
-      - name: Build and Test
-        shell: bash
+      - name: Download Shared Libs
+        run: |
+          mkdir odbc
+          pushd odbc
+          curl --no-progress-meter -LO https://github.com/duckdb/duckdb-odbc/releases/latest/download/duckdb_odbc-osx-universal.zip
+          unzip -q duckdb_odbc-osx-universal.zip
+          ls -laR
+          popd
+          ./resources/scripts/macos_update_downloaded_lib.sh ${DUCKDB_ODBC_LIB_PATH}
+          mkdir libduckdb
+          pushd libduckdb
+          curl --no-progress-meter -LO https://github.com/duckdb/duckdb/releases/latest/download/libduckdb-osx-universal.zip
+          unzip -q libduckdb-osx-universal.zip
+          ls -laR
+          popd
+
+      - name: Configure
         run: |
           make configure
+
+      - name: Build
+        run: |
+          make release
+
+      - name: Setup ODBC Env
+        run: |
+          echo "[DuckDB Driver]" > ~/.odbcinst.ini
+          echo "Driver = ${DUCKDB_ODBC_LIB_PATH}" >> ~/.odbcinst.ini
+          cat ~/.odbcinst.ini
+
+      - name: SQL Tests
+        run: |
           make test
+
+      - name: C API Tests
+        run: |
+          make test_c_api

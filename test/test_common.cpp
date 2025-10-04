@@ -35,7 +35,7 @@ ScannerConn::ScannerConn() {
 	REQUIRE(state_odbc_conn == DuckDBSuccess);
 }
 
-ScannerConn::~ScannerConn() {
+ScannerConn::~ScannerConn() noexcept {
 	duckdb_state state_close = duckdb_query(conn, "SELECT odbc_close(getvariable('conn'))", nullptr);
 	REQUIRE(state_close == DuckDBSuccess);
 
