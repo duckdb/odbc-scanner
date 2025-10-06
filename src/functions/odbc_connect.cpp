@@ -1,7 +1,9 @@
 #include "capi_odbc_scanner.h"
 
+#include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <sql.h>
 #include <sqlext.h>
@@ -12,9 +14,12 @@
 #include "make_unique.hpp"
 #include "registries.hpp"
 #include "scanner_exception.hpp"
+#include "strings.hpp"
 #include "types.hpp"
 
 DUCKDB_EXTENSION_EXTERN
+
+static const std::string ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR = "ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR";
 
 static void odbc_connect_function(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) noexcept;
 
@@ -28,7 +33,20 @@ static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 		throw ScannerException("'odbc_connect' error: specified URL argument must be not NULL");
 	}
 
-	auto oc_ptr = std_make_unique<OdbcConnection>(arg.first);
+	std::string url = arg.first;
+
+	// Env var fetch is not thread-safe, should be used only for debugging,
+	// ideally this logic should be moved into SQLLogic test runner.
+	if (url.rfind(ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR, 0) == 0 && url.find(";") == std::string::npos) {
+		std::vector<std::string> parts = Strings::Split(url, '=');
+		if (parts.size() == 2 && ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR == parts.at(0)) {
+			std::string &var_name = parts.at(1);
+			char *var = std::getenv(var_name.c_str());
+			url = var != nullptr ? std::string(var) : "Driver={DuckDB Driver};";
+		}
+	}
+
+	auto oc_ptr = std_make_unique<OdbcConnection>(url);
 
 	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
 	result_data[0] = ConnectionsRegistry::Add(std::move(oc_ptr));

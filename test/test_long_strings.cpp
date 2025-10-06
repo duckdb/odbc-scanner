@@ -2,6 +2,8 @@
 
 #include <vector>
 
+static const std::string group_name = "[capi_long_strings]";
+
 static std::string GenStr(size_t len) {
 	std::string res;
 	for (size_t i = 0; i < len; i++) {
@@ -12,7 +14,7 @@ static std::string GenStr(size_t len) {
 	return res;
 }
 
-TEST_CASE("Long string query", "[capi_long_strings]") {
+TEST_CASE("Long string query", group_name) {
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn, R"(

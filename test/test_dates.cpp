@@ -1,6 +1,8 @@
 #include "test_common.hpp"
 
-TEST_CASE("Date query with a DATE literal", "[capi_dates]") {
+static const std::string group_name = "[capi_dates]";
+
+TEST_CASE("Date query with a DATE literal", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -11,14 +13,14 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).year == 2020);
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).month == 12);
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).day == 31);
 }
 
-TEST_CASE("Date query with a DATE literal parameter", "[capi_dates]") {
+TEST_CASE("Date query with a DATE literal parameter", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -30,14 +32,14 @@ SELECT * FROM odbc_query(
 	params=row('2020-12-31'::DATE))
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).year == 2020);
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).month == 12);
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).day == 31);
 }
 
-TEST_CASE("Date query with a DATE parameter", "[capi_dates]") {
+TEST_CASE("Date query with a DATE parameter", group_name) {
 	ScannerConn sc;
 
 	duckdb_state st_create_params = duckdb_query(sc.conn, R"(

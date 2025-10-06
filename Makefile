@@ -35,6 +35,8 @@ configure: venv platform extension_version
 
 debug: build_extension_library_debug build_extension_with_metadata_debug
 
+#build_extension_with_metadata_release: build_extension_library_release 
+
 release: build_extension_library_release build_extension_with_metadata_release
 
 test: test_extension_release
