@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -42,6 +43,8 @@ struct Result {
 
 	duckdb_result *Get();
 
+	bool Success(duckdb_state st);
+
 	bool NextChunk();
 
 	template<typename T>
@@ -50,3 +53,5 @@ struct Result {
 	template<typename T>
 	T DecimalValue(idx_t col_idx, idx_t row_idx);
 };
+
+bool DBMSConfigured(const std::string dbms_name);

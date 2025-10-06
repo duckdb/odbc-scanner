@@ -43,6 +43,7 @@ set(EXTENSION_SOURCES
     src/diagnostics.cpp
     src/params.cpp
     src/registries.cpp
+    src/strings.cpp
     src/widechar.cpp
     src/functions/odbc_bind_params.cpp
     src/functions/odbc_close.cpp

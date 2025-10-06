@@ -5,6 +5,7 @@ add_executable(test_${EXTENSION_NAME}
     test_decimal.cpp
     test_long_strings.cpp
     test_params.cpp
+    test_version.cpp
 )
 
 target_include_directories(test_${EXTENSION_NAME} PRIVATE

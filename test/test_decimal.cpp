@@ -1,6 +1,8 @@
 #include "test_common.hpp"
 
-TEST_CASE("Decimal INT16 query with a literal", "[capi_decimal]") {
+static const std::string group_name = "[capi_decimal]";
+
+TEST_CASE("Decimal INT16 query with a literal", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -11,12 +13,12 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == 1234);
 }
 
-TEST_CASE("Decimal INT16 query with a negative literal", "[capi_decimal]") {
+TEST_CASE("Decimal INT16 query with a negative literal", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -27,12 +29,12 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == -1234);
 }
 
-TEST_CASE("Decimal INT32 query with a literal", "[capi_decimal]") {
+TEST_CASE("Decimal INT32 query with a literal", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -43,12 +45,12 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int32_t>(0, 0) == 123456789);
 }
 
-TEST_CASE("Decimal INT32 query with a negative literal", "[capi_decimal]") {
+TEST_CASE("Decimal INT32 query with a negative literal", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -59,12 +61,12 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int32_t>(0, 0) == -123456789);
 }
 
-TEST_CASE("Decimal INT64 query with a literal", "[capi_decimal]") {
+TEST_CASE("Decimal INT64 query with a literal", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -75,12 +77,12 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int64_t>(0, 0) == 123456789012345123LL);
 }
 
-TEST_CASE("Decimal INT64 query with a negative literal", "[capi_decimal]") {
+TEST_CASE("Decimal INT64 query with a negative literal", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -91,12 +93,12 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int64_t>(0, 0) == -123456789012345123LL);
 }
 
-TEST_CASE("Decimal INT128 query with a literal", "[capi_decimal]") {
+TEST_CASE("Decimal INT128 query with a literal", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -107,13 +109,13 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).lower == 14143994781733810467ULL);
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).upper == 669260594276348691ULL);
 }
 
-TEST_CASE("Decimal INT128 query with a negative 1 literal", "[capi_decimal]") {
+TEST_CASE("Decimal INT128 query with a negative 1 literal", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -124,13 +126,13 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).lower == 18446744073709551615ULL);
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).upper == -1LL);
 }
 
-TEST_CASE("Decimal INT128 query with a negative literal", "[capi_decimal]") {
+TEST_CASE("Decimal INT128 query with a negative literal", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -141,13 +143,13 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).lower == 4302749291975741149ULL);
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).upper == -669260594276348692LL);
 }
 
-TEST_CASE("Decimal INT16 query with a literal parameter", "[capi_decimal]") {
+TEST_CASE("Decimal INT16 query with a literal parameter", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -159,12 +161,12 @@ SELECT * FROM odbc_query(
   params=row('1.234'::DECIMAL))
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == 1234);
 }
 
-TEST_CASE("Decimal INT16 query with a negative literal parameter", "[capi_decimal]") {
+TEST_CASE("Decimal INT16 query with a negative literal parameter", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -176,12 +178,12 @@ SELECT * FROM odbc_query(
   params=row('-1.234'::DECIMAL))
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == -1234);
 }
 
-TEST_CASE("Decimal INT128 query with a negative literal parameter", "[capi_decimal]") {
+TEST_CASE("Decimal INT128 query with a negative literal parameter", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
@@ -193,13 +195,13 @@ SELECT * FROM odbc_query(
   params=row('-12345678901234567890123456789012345.123'::DECIMAL(38,3)))
 )",
 	                               res.Get());
-	REQUIRE(st == DuckDBSuccess);
+	REQUIRE(res.Success(st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).lower == 4302749291975741149ULL);
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).upper == -669260594276348692LL);
 }
 
-TEST_CASE("Decimal INT16 query with a negative parameter", "[capi_decimal]") {
+TEST_CASE("Decimal INT16 query with a negative parameter", group_name) {
 	ScannerConn sc;
 
 	duckdb_state st_create_params = duckdb_query(sc.conn, R"(
@@ -235,7 +237,7 @@ SELECT odbc_bind_params(getvariable('params1'), row('-1.234'::DECIMAL))
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == -1234);
 }
 
-TEST_CASE("Decimal INT128 query with a negative parameter", "[capi_decimal]") {
+TEST_CASE("Decimal INT128 query with a negative parameter", group_name) {
 	ScannerConn sc;
 
 	duckdb_state st_create_params = duckdb_query(sc.conn, R"(

@@ -30,8 +30,15 @@ ScannerConn::ScannerConn() {
 	duckdb_state state_load = duckdb_query(conn, load_query.c_str(), nullptr);
 	REQUIRE(state_load == DuckDBSuccess);
 
-	duckdb_state state_odbc_conn =
-	    duckdb_query(conn, "SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};threads=1;')", nullptr);
+	char *conn_cstr = std::getenv("ODBC_CONN_STRING");
+	std::string conn_str = conn_cstr != nullptr ? std::string(conn_cstr) : "Driver={DuckDB Driver};threads=1;";
+
+	std::string sql = std::string() + "SET VARIABLE conn = odbc_connect('" + conn_str + "')";
+	Result conn_res;
+	duckdb_state state_odbc_conn = duckdb_query(conn, sql.c_str(), conn_res.Get());
+	if (DuckDBError == state_odbc_conn) {
+		std::cerr << duckdb_result_error(conn_res.Get()) << std::endl;
+	}
 	REQUIRE(state_odbc_conn == DuckDBSuccess);
 }
 
@@ -52,6 +59,16 @@ Result::~Result() noexcept {
 
 duckdb_result *Result::Get() {
 	return &res;
+}
+
+bool Result::Success(duckdb_state st) {
+	if (st != DuckDBSuccess) {
+		const char *cerr = duckdb_result_error(&res);
+		std::string err = cerr != nullptr ? std::string(cerr) : "N/A";
+		std::cerr << "Query error, message: [" + err + "]" << std::endl;
+		return false;
+	}
+	return true;
 }
 
 bool Result::NextChunk() {
@@ -157,4 +174,14 @@ template <>
 duckdb_hugeint Result::DecimalValue<duckdb_hugeint>(idx_t col_idx, idx_t row_idx) {
 	duckdb_hugeint *data = NotNullData<duckdb_hugeint>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
 	return data[row_idx];
+}
+
+bool DBMSConfigured(const std::string dbms_name) {
+	char *cstr = std::getenv("ODBC_CONN_STRING");
+	if (cstr == nullptr) {
+		return dbms_name == "DuckDB";
+	}
+	std::string str(cstr);
+	std::string needle = std::string("{" + dbms_name + " Driver}");
+	return str.find(needle) != std::string::npos;
 }
