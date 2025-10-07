@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "capi_pointers.hpp"
+#include "columns.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
 
@@ -114,51 +115,59 @@ static void BindOdbcParamInternal(SQLSMALLINT ctype, SQLSMALLINT sqltype, const 
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<int8_t>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                         SQLSMALLINT param_idx) {
-	BindOdbcParamInternal<int8_t>(SQL_C_STINYINT, SQL_TINYINT, query, hstmt, param, param_idx);
+void TypeSpecific::BindOdbcParam<int8_t>(const std::string &query, const std::string &, HSTMT hstmt,
+                                         ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_TINYINT;
+	BindOdbcParamInternal<int8_t>(SQL_C_STINYINT, sqltype, query, hstmt, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<uint8_t>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                          SQLSMALLINT param_idx) {
-	BindOdbcParamInternal<uint8_t>(SQL_C_UTINYINT, SQL_TINYINT, query, hstmt, param, param_idx);
+void TypeSpecific::BindOdbcParam<uint8_t>(const std::string &query, const std::string &, HSTMT hstmt,
+                                          ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_TINYINT;
+	BindOdbcParamInternal<uint8_t>(SQL_C_UTINYINT, sqltype, query, hstmt, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<int16_t>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                          SQLSMALLINT param_idx) {
-	BindOdbcParamInternal<int16_t>(SQL_C_SSHORT, SQL_SMALLINT, query, hstmt, param, param_idx);
+void TypeSpecific::BindOdbcParam<int16_t>(const std::string &query, const std::string &, HSTMT hstmt,
+                                          ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_SMALLINT;
+	BindOdbcParamInternal<int16_t>(SQL_C_SSHORT, sqltype, query, hstmt, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<uint16_t>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                           SQLSMALLINT param_idx) {
-	BindOdbcParamInternal<uint16_t>(SQL_C_USHORT, SQL_SMALLINT, query, hstmt, param, param_idx);
+void TypeSpecific::BindOdbcParam<uint16_t>(const std::string &query, const std::string &, HSTMT hstmt,
+                                           ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_SMALLINT;
+	BindOdbcParamInternal<uint16_t>(SQL_C_USHORT, sqltype, query, hstmt, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<int32_t>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                          SQLSMALLINT param_idx) {
-	BindOdbcParamInternal<int32_t>(SQL_C_SLONG, SQL_INTEGER, query, hstmt, param, param_idx);
+void TypeSpecific::BindOdbcParam<int32_t>(const std::string &query, const std::string &, HSTMT hstmt,
+                                          ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_INTEGER;
+	BindOdbcParamInternal<int32_t>(SQL_C_SLONG, sqltype, query, hstmt, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<uint32_t>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                           SQLSMALLINT param_idx) {
-	BindOdbcParamInternal<uint32_t>(SQL_C_ULONG, SQL_INTEGER, query, hstmt, param, param_idx);
+void TypeSpecific::BindOdbcParam<uint32_t>(const std::string &query, const std::string &, HSTMT hstmt,
+                                           ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_INTEGER;
+	BindOdbcParamInternal<uint32_t>(SQL_C_ULONG, sqltype, query, hstmt, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<int64_t>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                          SQLSMALLINT param_idx) {
-	BindOdbcParamInternal<int64_t>(SQL_C_SBIGINT, SQL_BIGINT, query, hstmt, param, param_idx);
+void TypeSpecific::BindOdbcParam<int64_t>(const std::string &query, const std::string &, HSTMT hstmt,
+                                          ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_BIGINT;
+	BindOdbcParamInternal<int64_t>(SQL_C_SBIGINT, sqltype, query, hstmt, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<uint64_t>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                           SQLSMALLINT param_idx) {
-	BindOdbcParamInternal<uint64_t>(SQL_C_UBIGINT, SQL_BIGINT, query, hstmt, param, param_idx);
+void TypeSpecific::BindOdbcParam<uint64_t>(const std::string &query, const std::string &, HSTMT hstmt,
+                                           ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_BIGINT;
+	BindOdbcParamInternal<uint64_t>(SQL_C_UBIGINT, sqltype, query, hstmt, param, param_idx);
 }
 
 template <typename INT_TYPE>
@@ -229,6 +238,46 @@ template <>
 void TypeSpecific::FetchAndSetResult<uint64_t>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
                                                SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
 	FetchAndSetResultInternal<uint64_t>(SQL_C_UBIGINT, odbc_type, query, hstmt, col_idx, vec, row_idx);
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<int8_t>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_TINYINT;
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<uint8_t>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_UTINYINT;
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<int16_t>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_SMALLINT;
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<uint16_t>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_USMALLINT;
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<int32_t>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_INTEGER;
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<uint32_t>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_UINTEGER;
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<int64_t>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_BIGINT;
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<uint64_t>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_UBIGINT;
 }
 
 } // namespace odbcscanner

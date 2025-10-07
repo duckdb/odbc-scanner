@@ -55,16 +55,18 @@ ScannerParam TypeSpecific::ExtractNotNullParam<std::string>(duckdb_vector vec) {
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<std::string>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                              SQLSMALLINT param_idx) {
-	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, SQL_WVARCHAR, param.LengthBytes(),
-	                                 0, reinterpret_cast<SQLPOINTER>(param.Value<WideString>().data()),
+void TypeSpecific::BindOdbcParam<std::string>(const std::string &query, const std::string &, HSTMT hstmt,
+                                              ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = SQL_WVARCHAR;
+	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, sqltype, param.LengthBytes(), 0,
+	                                 reinterpret_cast<SQLPOINTER>(param.Value<WideString>().data()),
 	                                 param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLBindParameter' VARCHAR failed, value: '" + param.ToUtf8String(1 << 10) +
-		                       "', index: " + std::to_string(param_idx) + ", query: '" + query +
-		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		throw ScannerException("'SQLBindParameter' VARCHAR failed, expected type: " + std::to_string(sqltype) +
+		                       ", value: '" + param.ToUtf8String(1 << 10) + "', index: " + std::to_string(param_idx) +
+		                       ", query: '" + query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
+		                       "'");
 	}
 }
 
@@ -154,6 +156,11 @@ void TypeSpecific::FetchAndSetResult<std::string>(OdbcType &odbc_type, const std
 	}
 
 	duckdb_vector_assign_string_element_len(vec, row_idx, fetched.first.c_str(), fetched.first.length());
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<std::string>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_VARCHAR;
 }
 
 } // namespace odbcscanner

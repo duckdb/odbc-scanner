@@ -14,7 +14,7 @@ SELECT * FROM odbc_query(
 	)
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.Value<int32_t>(0, 0) == 42);
 }
@@ -32,7 +32,7 @@ SELECT * FROM odbc_query(
 	')
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.Value<std::string>(0, 0) == "foo");
 	REQUIRE(res.Value<int32_t>(1, 0) == 41);

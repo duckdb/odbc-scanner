@@ -9,11 +9,11 @@ TEST_CASE("Date query with a DATE literal", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT ''2020-12-31''::DATE
+    SELECT CAST(''2020-12-31'' AS DATE)
   ')
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).year == 2020);
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).month == 12);
@@ -27,12 +27,12 @@ TEST_CASE("Date query with a DATE literal parameter", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT ?::DATE
+    SELECT CAST(? AS DATE)
   ',
 	params=row('2020-12-31'::DATE))
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).year == 2020);
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).month == 12);
@@ -42,30 +42,32 @@ SELECT * FROM odbc_query(
 TEST_CASE("Date query with a DATE parameter", group_name) {
 	ScannerConn sc;
 
+	Result res_create_params;
 	duckdb_state st_create_params = duckdb_query(sc.conn, R"(
 SET VARIABLE params1 = odbc_create_params()
 )",
-	                                             nullptr);
-	REQUIRE(st_create_params == DuckDBSuccess);
+	                                             res_create_params.Get());
+	REQUIRE(QuerySuccess(res_create_params.Get(), st_create_params));
 
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn, R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT ?::DATE
+    SELECT CAST(? AS DATE)
   ', 
   params_handle=getvariable('params1'))
 )",
 	                                         &ps_ptr);
-	REQUIRE(st_prepare == DuckDBSuccess);
+	REQUIRE(PreparedSuccess(ps_ptr, st_prepare));
 	auto ps = PreparedStatementPtr(ps_ptr, PreparedStatementDeleter);
 
+	Result res_bind_params;
 	duckdb_state st_bind_params = duckdb_query(sc.conn, R"(
 SELECT odbc_bind_params(getvariable('params1'), row('2020-12-31'::DATE))
 )",
-	                                           nullptr);
-	REQUIRE(st_bind_params == DuckDBSuccess);
+	                                           res_bind_params.Get());
+	REQUIRE(QuerySuccess(res_bind_params.Get(), st_bind_params));
 
 	Result res;
 	duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());

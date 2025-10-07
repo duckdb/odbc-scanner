@@ -2,9 +2,10 @@
 
 #include "duckdb_extension.h"
 
+#include <string>
+
 #include <sql.h>
 #include <sqlext.h>
-#include <string>
 
 namespace odbcscanner {
 

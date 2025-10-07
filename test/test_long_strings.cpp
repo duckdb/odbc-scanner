@@ -21,7 +21,7 @@ TEST_CASE("Long string query", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT ?::VARCHAR
+    SELECT CAST(? AS VARCHAR)
   ', 
   params=row(?::VARCHAR))
 )",

@@ -5,6 +5,7 @@
 #include "widechar.hpp"
 
 #include <cstdint>
+#include <vector>
 
 namespace odbcscanner {
 
@@ -42,6 +43,19 @@ OdbcConnection::OdbcConnection(const std::string &url) {
 			throw ScannerException("'SQLDriverConnect' failed, url: '" + url + "', return: " + std::to_string(ret) +
 			                       ", diagnostics: '" + diag + "'");
 		}
+	}
+
+	{
+		std::vector<char> buf;
+		buf.resize(256);
+		SQLSMALLINT len = 0;
+		SQLRETURN ret = SQLGetInfo(dbc, SQL_DBMS_NAME, buf.data(), static_cast<SQLSMALLINT>(buf.size()), &len);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(dbc, SQL_HANDLE_DBC);
+			throw ScannerException("'SQLGetInfo' failed for SQL_DBMS_NAME, url: '" + url +
+			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
+		this->dbms_name = std::string(buf.data(), len);
 	}
 }
 

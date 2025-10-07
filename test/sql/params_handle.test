@@ -53,7 +53,7 @@ SELECT odbc_bind_params(getvariable('params1'), row('foo'))
 statement error
 EXECUTE p1
 ----
-Invalid Input Error: Parameter ODBC type mismatch, query: 'SELECT ?::INT', index: 0, expected: 4, actual: 12
+Invalid Input Error: 'SQLExecute' failed, query: 'SELECT ?::INT'
 
 statement ok
 SELECT odbc_bind_params(getvariable('params1'), row(42, 43))

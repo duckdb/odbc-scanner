@@ -43,9 +43,9 @@ struct Result {
 
 	duckdb_result *Get();
 
-	bool Success(duckdb_state st);
-
 	bool NextChunk();
+
+	bool IsNull(idx_t col_idx, idx_t row_idx);
 
 	template<typename T>
 	T Value(idx_t col_idx, idx_t row_idx);
@@ -55,3 +55,7 @@ struct Result {
 };
 
 bool DBMSConfigured(const std::string dbms_name);
+
+bool QuerySuccess(duckdb_result *res, duckdb_state st);
+
+bool PreparedSuccess(duckdb_prepared_statement ps, duckdb_state st);

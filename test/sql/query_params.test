@@ -25,7 +25,7 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params=row(42))
 statement error
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params=row('foo'))
 ----
-Binder Error: Parameter ODBC type mismatch, query: 'SELECT ?::INT', index: 0, expected: 4, actual: 12
+Invalid Input Error: 'SQLExecute' failed, query: 'SELECT ?::INT'
 
 statement error
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params=row(41, 42))

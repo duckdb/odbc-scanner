@@ -17,7 +17,7 @@ SELECT * FROM odbc_query(
 	)
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
 }
@@ -37,7 +37,7 @@ SELECT * FROM odbc_query(
 	)
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
 }

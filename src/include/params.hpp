@@ -18,6 +18,7 @@ namespace odbcscanner {
 class ScannerParam {
 	duckdb_type type_id = DUCKDB_TYPE_INVALID;
 	SQLLEN len_bytes = 0;
+	SQLSMALLINT expected_type = SQL_PARAM_TYPE_UNKNOWN;
 
 	union InternalValue {
 		bool null_val;
@@ -112,6 +113,10 @@ public:
 
 	SQLLEN &LengthBytes();
 
+	SQLSMALLINT ExpectedType();
+
+	void SetExpectedType(SQLSMALLINT expected_type_in);
+
 	template <typename T>
 	T &Value();
 
@@ -128,10 +133,11 @@ struct Params {
 
 	static std::vector<SQLSMALLINT> CollectTypes(const std::string &query, HSTMT hstmt);
 
-	static void CheckTypes(const std::string &query, const std::vector<SQLSMALLINT> &expected,
-	                       std::vector<ScannerParam> &actual);
+	static void SetExpectedTypes(const std::string &query, const std::vector<SQLSMALLINT> &expected,
+	                             std::vector<ScannerParam> &actual);
 
-	static void BindToOdbc(const std::string &query, HSTMT hstmt, std::vector<ScannerParam> &params);
+	static void BindToOdbc(const std::string &query, const std::string &dbms_name, HSTMT hstmt,
+	                       std::vector<ScannerParam> &params);
 };
 
 } // namespace odbcscanner
