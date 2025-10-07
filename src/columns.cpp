@@ -163,9 +163,7 @@ void Columns::CheckSame(const std::string &query, std::vector<ResultColumn> &exp
 	}
 }
 
-void Columns::AddToResults(duckdb_bind_info info, ResultColumn &col) {
-	duckdb_type type_id = Types::OdbcColumnTypeToDuck(col);
-
+void Columns::AddToResults(duckdb_bind_info info, duckdb_type type_id, ResultColumn &col) {
 	if (type_id == DUCKDB_TYPE_DECIMAL) {
 		auto ltype =
 		    LogicalTypePtr(duckdb_create_decimal_type(col.odbc_type.decimal_precision, col.odbc_type.decimal_scale),

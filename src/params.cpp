@@ -104,7 +104,7 @@ SQL_TIMESTAMP_STRUCT &ScannerParam::Value<SQL_TIMESTAMP_STRUCT>() {
 	return val.timestamp;
 }
 
-ScannerParam::ScannerParam() : type_id(DUCKDB_TYPE_SQLNULL) {
+ScannerParam::ScannerParam() : type_id(DUCKDB_TYPE_SQLNULL), len_bytes(SQL_NULL_DATA) {
 }
 
 ScannerParam::ScannerParam(int8_t value) : type_id(DUCKDB_TYPE_TINYINT), len_bytes(sizeof(value)), val(value) {
@@ -256,13 +256,15 @@ void ScannerParam::AssignByType(duckdb_type type_id, InternalValue &val, Scanner
 	}
 }
 
-ScannerParam::ScannerParam(ScannerParam &&other) : type_id(other.type_id), len_bytes(other.len_bytes) {
+ScannerParam::ScannerParam(ScannerParam &&other)
+    : type_id(other.type_id), len_bytes(other.len_bytes), expected_type(other.expected_type) {
 	AssignByType(type_id, this->val, other);
 }
 
 ScannerParam &ScannerParam::operator=(ScannerParam &&other) {
 	this->type_id = other.type_id;
 	this->len_bytes = other.len_bytes;
+	this->expected_type = other.expected_type;
 	AssignByType(type_id, this->val, other);
 	return *this;
 }
@@ -290,6 +292,17 @@ duckdb_type ScannerParam::TypeId() {
 
 SQLLEN &ScannerParam::LengthBytes() {
 	return len_bytes;
+}
+
+SQLSMALLINT ScannerParam::ExpectedType() {
+	return expected_type;
+}
+
+void ScannerParam::SetExpectedType(SQLSMALLINT expected_type_in) {
+	if (expected_type != SQL_PARAM_TYPE_UNKNOWN) {
+		throw ScannerException("Parameter expected type is already set, value: " + std::to_string(expected_type));
+	}
+	this->expected_type = expected_type_in;
 }
 
 void ScannerParam::CheckType(duckdb_type expected) {
@@ -416,8 +429,8 @@ std::vector<SQLSMALLINT> Params::CollectTypes(const std::string &query, HSTMT hs
 	return param_types;
 }
 
-void Params::CheckTypes(const std::string &query, const std::vector<SQLSMALLINT> &expected,
-                        std::vector<ScannerParam> &actual) {
+void Params::SetExpectedTypes(const std::string &query, const std::vector<SQLSMALLINT> &expected,
+                              std::vector<ScannerParam> &actual) {
 	if (expected.size() != actual.size()) {
 		throw ScannerException("Incorrect number of parameters specified, query: '" + query + "', expected: " +
 		                       std::to_string(expected.size()) + ", actual: " + std::to_string(actual.size()));
@@ -425,19 +438,12 @@ void Params::CheckTypes(const std::string &query, const std::vector<SQLSMALLINT>
 	for (size_t i = 0; i < actual.size(); i++) {
 		SQLSMALLINT expected_type = expected.at(i);
 		auto &param = actual.at(i);
-		SQLSMALLINT actual_type = Types::DuckParamTypeToOdbc(param.TypeId(), i);
-		if (expected_type == SQL_TYPE_NULL || param.TypeId() == DUCKDB_TYPE_SQLNULL) {
-			continue;
-		}
-		if (expected_type != actual_type) {
-			throw ScannerException("Parameter ODBC type mismatch, query: '" + query + "', index: " + std::to_string(i) +
-			                       ", expected: " + std::to_string(expected_type) +
-			                       ", actual: " + std::to_string(actual_type));
-		}
+		param.SetExpectedType(expected_type);
 	}
 }
 
-void Params::BindToOdbc(const std::string &query, HSTMT hstmt, std::vector<ScannerParam> &params) {
+void Params::BindToOdbc(const std::string &query, const std::string &dbms_name, HSTMT hstmt,
+                        std::vector<ScannerParam> &params) {
 	if (params.size() == 0) {
 		return;
 	}
@@ -451,7 +457,7 @@ void Params::BindToOdbc(const std::string &query, HSTMT hstmt, std::vector<Scann
 	for (size_t i = 0; i < params.size(); i++) {
 		ScannerParam &param = params.at(i);
 		SQLSMALLINT idx = static_cast<SQLSMALLINT>(i + 1);
-		Types::BindOdbcParam(query, hstmt, param, idx);
+		Types::BindOdbcParam(query, dbms_name, hstmt, param, idx);
 	}
 }
 

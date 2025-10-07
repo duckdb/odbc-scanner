@@ -9,11 +9,11 @@ TEST_CASE("Decimal INT16 query with a literal", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT ''1.234''::DECIMAL(4,3)
+    SELECT CAST(''1.234'' AS DECIMAL(4,3))
   ')
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == 1234);
 }
@@ -29,7 +29,7 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == -1234);
 }
@@ -45,7 +45,7 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int32_t>(0, 0) == 123456789);
 }
@@ -61,7 +61,7 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int32_t>(0, 0) == -123456789);
 }
@@ -77,7 +77,7 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int64_t>(0, 0) == 123456789012345123LL);
 }
@@ -93,7 +93,7 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int64_t>(0, 0) == -123456789012345123LL);
 }
@@ -109,7 +109,7 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).lower == 14143994781733810467ULL);
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).upper == 669260594276348691ULL);
@@ -126,7 +126,7 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).lower == 18446744073709551615ULL);
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).upper == -1LL);
@@ -143,7 +143,7 @@ SELECT * FROM odbc_query(
   ')
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).lower == 4302749291975741149ULL);
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).upper == -669260594276348692LL);
@@ -161,7 +161,7 @@ SELECT * FROM odbc_query(
   params=row('1.234'::DECIMAL))
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == 1234);
 }
@@ -178,7 +178,7 @@ SELECT * FROM odbc_query(
   params=row('-1.234'::DECIMAL))
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == -1234);
 }
@@ -195,7 +195,7 @@ SELECT * FROM odbc_query(
   params=row('-12345678901234567890123456789012345.123'::DECIMAL(38,3)))
 )",
 	                               res.Get());
-	REQUIRE(res.Success(st));
+	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).lower == 4302749291975741149ULL);
 	REQUIRE(res.DecimalValue<duckdb_hugeint>(0, 0).upper == -669260594276348692LL);

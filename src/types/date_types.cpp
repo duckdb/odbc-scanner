@@ -36,42 +36,45 @@ ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(duckdb_v
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<duckdb_date_struct>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                                     SQLSMALLINT param_idx) {
-	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_DATE, SQL_TYPE_DATE, 0, 0,
+void TypeSpecific::BindOdbcParam<duckdb_date_struct>(const std::string &query, const std::string &, HSTMT hstmt,
+                                                     ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_TYPE_DATE;
+	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_DATE, sqltype, 0, 0,
 	                                 reinterpret_cast<SQLPOINTER>(&param.Value<SQL_DATE_STRUCT>()), param.LengthBytes(),
 	                                 &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(SQL_TYPE_DATE) +
+		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
 		                       ", index: " + std::to_string(param_idx) + ", query: '" + query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<duckdb_time_struct>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                                     SQLSMALLINT param_idx) {
-	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_TIME, SQL_TYPE_TIME, 0, 0,
+void TypeSpecific::BindOdbcParam<duckdb_time_struct>(const std::string &query, const std::string &, HSTMT hstmt,
+                                                     ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_TYPE_TIME;
+	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_TIME, sqltype, 0, 0,
 	                                 reinterpret_cast<SQLPOINTER>(&param.Value<SQL_TIME_STRUCT>()), param.LengthBytes(),
 	                                 &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(SQL_TYPE_TIME) +
+		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
 		                       ", index: " + std::to_string(param_idx) + ", query: '" + query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                                          SQLSMALLINT param_idx) {
-	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_TIMESTAMP, SQL_TYPE_TIMESTAMP, 0, 0,
+void TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(const std::string &query, const std::string &, HSTMT hstmt,
+                                                          ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_TYPE_TIMESTAMP;
+	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_TIMESTAMP, sqltype, 0, 0,
 	                                 reinterpret_cast<SQLPOINTER>(&param.Value<SQL_TIMESTAMP_STRUCT>()),
 	                                 param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(SQL_TYPE_TIMESTAMP) +
+		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
 		                       ", index: " + std::to_string(param_idx) + ", query: '" + query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
@@ -176,6 +179,24 @@ void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(OdbcType &odbc_typ
 
 	duckdb_timestamp *data = reinterpret_cast<duckdb_timestamp *>(duckdb_vector_get_data(vec));
 	data[row_idx] = ts;
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<duckdb_date_struct>(const std::string &, const std::string &,
+                                                                ResultColumn &) {
+	return DUCKDB_TYPE_DATE;
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<duckdb_time_struct>(const std::string &, const std::string &,
+                                                                ResultColumn &) {
+	return DUCKDB_TYPE_TIME;
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<duckdb_timestamp_struct>(const std::string &, const std::string &,
+                                                                     ResultColumn &) {
+	return DUCKDB_TYPE_TIMESTAMP;
 }
 
 } // namespace odbcscanner

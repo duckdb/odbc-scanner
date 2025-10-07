@@ -43,15 +43,17 @@ static void BindOdbcParamInternal(SQLSMALLINT ctype, SQLSMALLINT sqltype, const 
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<float>(const std::string &query, HSTMT hstmt, ScannerParam &param,
+void TypeSpecific::BindOdbcParam<float>(const std::string &query, const std::string &, HSTMT hstmt, ScannerParam &param,
                                         SQLSMALLINT param_idx) {
-	BindOdbcParamInternal<float>(SQL_C_FLOAT, SQL_FLOAT, query, hstmt, param, param_idx);
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_FLOAT;
+	BindOdbcParamInternal<float>(SQL_C_FLOAT, sqltype, query, hstmt, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<double>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                         SQLSMALLINT param_idx) {
-	BindOdbcParamInternal<double>(SQL_C_DOUBLE, SQL_DOUBLE, query, hstmt, param, param_idx);
+void TypeSpecific::BindOdbcParam<double>(const std::string &query, const std::string &, HSTMT hstmt,
+                                         ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_DOUBLE;
+	BindOdbcParamInternal<double>(SQL_C_DOUBLE, sqltype, query, hstmt, param, param_idx);
 }
 
 template <typename FLOAT_TYPE>
@@ -86,6 +88,16 @@ template <>
 void TypeSpecific::FetchAndSetResult<double>(OdbcType &odbc_type, const std::string &query, HSTMT hstmt,
                                              SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
 	FetchAndSetResultInternal<double>(SQL_C_DOUBLE, odbc_type, query, hstmt, col_idx, vec, row_idx);
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<float>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_FLOAT;
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<double>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_DOUBLE;
 }
 
 } // namespace odbcscanner

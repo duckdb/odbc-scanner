@@ -156,7 +156,7 @@ static void Bind(duckdb_bind_info info) {
 	if (params_val.get() != nullptr || param_handle_val.get() != nullptr) {
 		param_types = Params::CollectTypes(query, hstmt);
 		if (params_val.get() != nullptr) {
-			Params::CheckTypes(query, param_types, params);
+			Params::SetExpectedTypes(query, param_types, params);
 		}
 	}
 
@@ -167,7 +167,8 @@ static void Bind(duckdb_bind_info info) {
 		duckdb_bind_add_result_column(info, "rowcount", bigint_type.get());
 	} else {
 		for (ResultColumn &col : columns) {
-			Columns::AddToResults(info, col);
+			duckdb_type type_id = Types::ResolveColumnType(query, conn.dbms_name, col);
+			Columns::AddToResults(info, type_id, col);
 		}
 	}
 
@@ -194,7 +195,7 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 	}
 
 	if (bdata.params.size() > 0) {
-		Params::BindToOdbc(bdata.query, bdata.hstmt, bdata.params);
+		Params::BindToOdbc(bdata.query, ldata.conn_ptr->dbms_name, bdata.hstmt, bdata.params);
 	} else if (bdata.params_handle != 0) {
 		auto params_ptr = ParamsRegistry::Remove(bdata.params_handle);
 		if (params_ptr.get() == nullptr) {
@@ -202,8 +203,8 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 			                       std::to_string(bdata.params_handle));
 		}
 		auto deferred = Defer([&params_ptr] { ParamsRegistry::Add(std::move(params_ptr)); });
-		Params::CheckTypes(bdata.query, bdata.param_types, *params_ptr);
-		Params::BindToOdbc(bdata.query, bdata.hstmt, *params_ptr);
+		Params::SetExpectedTypes(bdata.query, bdata.param_types, *params_ptr);
+		Params::BindToOdbc(bdata.query, ldata.conn_ptr->dbms_name, bdata.hstmt, *params_ptr);
 	}
 
 	{

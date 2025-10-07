@@ -50,15 +50,16 @@ ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_decimal>(duckdb_vector vec
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<duckdb_decimal>(const std::string &query, HSTMT hstmt, ScannerParam &param,
-                                                 SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<duckdb_decimal>(const std::string &query, const std::string &, HSTMT hstmt,
+                                                 ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_NUMERIC;
 	SQL_NUMERIC_STRUCT &ns = param.Value<SQL_NUMERIC_STRUCT>();
-	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_NUMERIC, SQL_NUMERIC,
+	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_NUMERIC, sqltype,
 	                                 static_cast<SQLULEN>(ns.precision), static_cast<SQLSMALLINT>(ns.scale),
 	                                 reinterpret_cast<SQLPOINTER>(&ns), param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(SQL_DECIMAL) +
+		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
 		                       ", index: " + std::to_string(param_idx) + ", query: '" + query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
@@ -116,6 +117,11 @@ void TypeSpecific::FetchAndSetResult<duckdb_decimal>(OdbcType &odbc_type, const 
 		throw ScannerException("Invalid unsupported DECIMAL precision: " + std::to_string(odbc_type.decimal_precision) +
 		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
 		                       ",  query: '" + query);
+}
+
+template <>
+duckdb_type TypeSpecific::ResolveColumnType<duckdb_decimal>(const std::string &, const std::string &, ResultColumn &) {
+	return DUCKDB_TYPE_DECIMAL;
 }
 
 } // namespace odbcscanner

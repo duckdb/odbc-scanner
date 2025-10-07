@@ -61,16 +61,6 @@ duckdb_result *Result::Get() {
 	return &res;
 }
 
-bool Result::Success(duckdb_state st) {
-	if (st != DuckDBSuccess) {
-		const char *cerr = duckdb_result_error(&res);
-		std::string err = cerr != nullptr ? std::string(cerr) : "N/A";
-		std::cerr << "Query error, message: [" + err + "]" << std::endl;
-		return false;
-	}
-	return true;
-}
-
 bool Result::NextChunk() {
 	bool first = chunk == nullptr;
 	if (!first) {
@@ -84,6 +74,26 @@ bool Result::NextChunk() {
 		cur_row_idx += duckdb_vector_size();
 	}
 	return true;
+}
+
+bool Result::IsNull(idx_t col_idx, idx_t row_idx) {
+	REQUIRE(chunk != nullptr);
+
+	idx_t rel_row_idx = row_idx - cur_row_idx;
+	REQUIRE(rel_row_idx < duckdb_vector_size());
+
+	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
+	REQUIRE(col_idx < col_count);
+
+	duckdb_vector vec = duckdb_data_chunk_get_vector(chunk, col_idx);
+	REQUIRE(vec != nullptr);
+
+	uint64_t *validity = duckdb_vector_get_validity(vec);
+	if (validity != nullptr) {
+		return !duckdb_validity_row_is_valid(validity, rel_row_idx);
+	}
+
+	return false;
 }
 
 template <typename CTYPE>
@@ -184,4 +194,24 @@ bool DBMSConfigured(const std::string dbms_name) {
 	std::string str(cstr);
 	std::string needle = std::string("{" + dbms_name + " Driver}");
 	return str.find(needle) != std::string::npos;
+}
+
+bool QuerySuccess(duckdb_result *res, duckdb_state st) {
+	if (st != DuckDBSuccess) {
+		const char *cerr = duckdb_result_error(res);
+		std::string err = cerr != nullptr ? std::string(cerr) : "N/A";
+		std::cerr << "Query error, message: [\n" + err + "\n]" << std::endl;
+		return false;
+	}
+	return true;
+}
+
+bool PreparedSuccess(duckdb_prepared_statement ps, duckdb_state st) {
+	if (st != DuckDBSuccess) {
+		const char *cerr = duckdb_prepare_error(ps);
+		std::string err = cerr != nullptr ? std::string(cerr) : "N/A";
+		std::cerr << "Prepared statement error, message: [\n" + err + "\n]" << std::endl;
+		return false;
+	}
+	return true;
 }

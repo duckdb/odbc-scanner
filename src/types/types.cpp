@@ -102,55 +102,56 @@ ScannerParam Types::ExtractNotNullParamFromValue(duckdb_value value, idx_t param
 	}
 }
 
-void Types::BindOdbcParam(const std::string &query, HSTMT hstmt, ScannerParam &param, SQLSMALLINT param_idx) {
+void Types::BindOdbcParam(const std::string &query, const std::string &dbms_name, HSTMT hstmt, ScannerParam &param,
+                          SQLSMALLINT param_idx) {
 	switch (param.TypeId()) {
 	case DUCKDB_TYPE_SQLNULL:
-		TypeSpecific::BindOdbcParam<std::nullptr_t>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<std::nullptr_t>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_TINYINT:
-		TypeSpecific::BindOdbcParam<int8_t>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<int8_t>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_UTINYINT:
-		TypeSpecific::BindOdbcParam<uint8_t>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<uint8_t>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_SMALLINT:
-		TypeSpecific::BindOdbcParam<int16_t>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<int16_t>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_USMALLINT:
-		TypeSpecific::BindOdbcParam<uint16_t>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<uint16_t>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_INTEGER:
-		TypeSpecific::BindOdbcParam<int32_t>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<int32_t>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_UINTEGER:
-		TypeSpecific::BindOdbcParam<uint32_t>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<uint32_t>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_BIGINT:
-		TypeSpecific::BindOdbcParam<int64_t>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<int64_t>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_UBIGINT:
-		TypeSpecific::BindOdbcParam<uint64_t>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<uint64_t>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_FLOAT:
-		TypeSpecific::BindOdbcParam<float>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<float>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_DOUBLE:
-		TypeSpecific::BindOdbcParam<double>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<double>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_DECIMAL:
-		TypeSpecific::BindOdbcParam<duckdb_decimal>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<duckdb_decimal>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_VARCHAR:
-		TypeSpecific::BindOdbcParam<std::string>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<std::string>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_DATE:
-		TypeSpecific::BindOdbcParam<duckdb_date_struct>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<duckdb_date_struct>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_TIME:
-		TypeSpecific::BindOdbcParam<duckdb_time_struct>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<duckdb_time_struct>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	case DUCKDB_TYPE_TIMESTAMP:
-		TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(query, hstmt, param, param_idx);
+		TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(query, dbms_name, hstmt, param, param_idx);
 		break;
 	default:
 		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(param.TypeId()));
@@ -195,9 +196,15 @@ void Types::FetchAndSetResultOfType(OdbcType &odbc_type, const std::string &quer
 		TypeSpecific::FetchAndSetResult<double>(odbc_type, query, hstmt, col_idx, vec, row_idx);
 		break;
 	case SQL_DECIMAL:
+	case SQL_NUMERIC:
 		TypeSpecific::FetchAndSetResult<duckdb_decimal>(odbc_type, query, hstmt, col_idx, vec, row_idx);
 		break;
+	case SQL_CHAR:
 	case SQL_VARCHAR:
+	case SQL_LONGVARCHAR:
+	case SQL_WCHAR:
+	case SQL_WVARCHAR:
+	case SQL_WLONGVARCHAR:
 		TypeSpecific::FetchAndSetResult<std::string>(odbc_type, query, hstmt, col_idx, vec, row_idx);
 		break;
 	case SQL_TYPE_DATE:
@@ -215,67 +222,52 @@ void Types::FetchAndSetResultOfType(OdbcType &odbc_type, const std::string &quer
 	}
 }
 
-SQLSMALLINT Types::DuckParamTypeToOdbc(duckdb_type type_id, size_t param_idx) {
-	switch (type_id) {
-	case DUCKDB_TYPE_SQLNULL:
-		return SQL_TYPE_NULL;
-	case DUCKDB_TYPE_TINYINT:
-	case DUCKDB_TYPE_UTINYINT:
-		return SQL_TINYINT;
-	case DUCKDB_TYPE_SMALLINT:
-	case DUCKDB_TYPE_USMALLINT:
-		return SQL_SMALLINT;
-	case DUCKDB_TYPE_INTEGER:
-	case DUCKDB_TYPE_UINTEGER:
-		return SQL_INTEGER;
-	case DUCKDB_TYPE_BIGINT:
-	case DUCKDB_TYPE_UBIGINT:
-		return SQL_BIGINT;
-	case DUCKDB_TYPE_FLOAT:
-		return SQL_FLOAT;
-	case DUCKDB_TYPE_DOUBLE:
-		return SQL_DOUBLE;
-	case DUCKDB_TYPE_DECIMAL:
-		return SQL_DECIMAL;
-	case DUCKDB_TYPE_VARCHAR:
-		return SQL_VARCHAR;
-	case DUCKDB_TYPE_DATE:
-		return SQL_TYPE_DATE;
-	case DUCKDB_TYPE_TIME:
-		return SQL_TYPE_TIME;
-	case DUCKDB_TYPE_TIMESTAMP:
-		return SQL_TYPE_TIMESTAMP;
-	default:
-		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(type_id) +
-		                       ", index: " + std::to_string(param_idx));
-	}
-}
-
-duckdb_type Types::OdbcColumnTypeToDuck(ResultColumn &column) {
+duckdb_type Types::ResolveColumnType(const std::string &query, const std::string &dbms_name, ResultColumn &column) {
 	switch (column.odbc_type.desc_concise_type) {
 	case SQL_TINYINT:
-		return column.odbc_type.is_unsigned ? DUCKDB_TYPE_UTINYINT : DUCKDB_TYPE_TINYINT;
+		if (column.odbc_type.is_unsigned) {
+			return TypeSpecific::ResolveColumnType<uint8_t>(query, dbms_name, column);
+		} else {
+			return TypeSpecific::ResolveColumnType<int8_t>(query, dbms_name, column);
+		}
 	case SQL_SMALLINT:
-		return column.odbc_type.is_unsigned ? DUCKDB_TYPE_USMALLINT : DUCKDB_TYPE_SMALLINT;
+		if (column.odbc_type.is_unsigned) {
+			return TypeSpecific::ResolveColumnType<uint16_t>(query, dbms_name, column);
+		} else {
+			return TypeSpecific::ResolveColumnType<int16_t>(query, dbms_name, column);
+		}
 	case SQL_INTEGER:
-		return column.odbc_type.is_unsigned ? DUCKDB_TYPE_UINTEGER : DUCKDB_TYPE_INTEGER;
+		if (column.odbc_type.is_unsigned) {
+			return TypeSpecific::ResolveColumnType<uint32_t>(query, dbms_name, column);
+		} else {
+			return TypeSpecific::ResolveColumnType<int32_t>(query, dbms_name, column);
+		}
 	case SQL_BIGINT:
-		return column.odbc_type.is_unsigned ? DUCKDB_TYPE_UBIGINT : DUCKDB_TYPE_BIGINT;
+		if (column.odbc_type.is_unsigned) {
+			return TypeSpecific::ResolveColumnType<uint64_t>(query, dbms_name, column);
+		} else {
+			return TypeSpecific::ResolveColumnType<int64_t>(query, dbms_name, column);
+		}
 	case SQL_FLOAT:
-		return DUCKDB_TYPE_FLOAT;
+		return TypeSpecific::ResolveColumnType<float>(query, dbms_name, column);
 	case SQL_DOUBLE:
-		return DUCKDB_TYPE_DOUBLE;
+		return TypeSpecific::ResolveColumnType<double>(query, dbms_name, column);
 	case SQL_DECIMAL:
 	case SQL_NUMERIC:
-		return DUCKDB_TYPE_DECIMAL;
+		return TypeSpecific::ResolveColumnType<duckdb_decimal>(query, dbms_name, column);
+	case SQL_CHAR:
 	case SQL_VARCHAR:
-		return DUCKDB_TYPE_VARCHAR;
+	case SQL_LONGVARCHAR:
+	case SQL_WCHAR:
+	case SQL_WVARCHAR:
+	case SQL_WLONGVARCHAR:
+		return TypeSpecific::ResolveColumnType<std::string>(query, dbms_name, column);
 	case SQL_TYPE_DATE:
-		return DUCKDB_TYPE_DATE;
+		return TypeSpecific::ResolveColumnType<duckdb_date_struct>(query, dbms_name, column);
 	case SQL_TYPE_TIME:
-		return DUCKDB_TYPE_TIME;
+		return TypeSpecific::ResolveColumnType<duckdb_time_struct>(query, dbms_name, column);
 	case SQL_TYPE_TIMESTAMP:
-		return DUCKDB_TYPE_TIMESTAMP;
+		return TypeSpecific::ResolveColumnType<duckdb_timestamp_struct>(query, dbms_name, column);
 	default:
 		throw ScannerException("Unsupported ODBC column type: " + column.odbc_type.ToString() + ", column name: '" +
 		                       column.name + "'");
