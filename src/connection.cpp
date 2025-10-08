@@ -37,7 +37,7 @@ OdbcConnection::OdbcConnection(const std::string &url) {
 	{
 		auto wurl = WideChar::Widen(url.data(), url.length());
 		SQLRETURN ret = SQLDriverConnectW(dbc, nullptr, wurl.data(), wurl.length<SQLSMALLINT>(), nullptr, 0, nullptr,
-		                                  SQL_DRIVER_COMPLETE_REQUIRED);
+		                                  SQL_DRIVER_NOPROMPT);
 		if (!SQL_SUCCEEDED(ret)) {
 			std::string diag = Diagnostics::Read(dbc, SQL_HANDLE_DBC);
 			throw ScannerException("'SQLDriverConnect' failed, url: '" + url + "', return: " + std::to_string(ret) +

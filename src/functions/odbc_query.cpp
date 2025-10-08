@@ -266,6 +266,12 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 					throw ScannerException("'SQLFetch' failed, query: '" + bdata.query +
 					                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 				}
+				SQLRETURN ret_close = SQLFreeStmt(bdata.hstmt, SQL_CLOSE);
+				if (!SQL_SUCCEEDED(ret_close)) {
+					std::string diag = Diagnostics::Read(bdata.hstmt, SQL_HANDLE_STMT);
+					throw ScannerException("'SQLFreeStmt' with SQL_CLOSE failed, query: '" + bdata.query +
+					                       "', return: " + std::to_string(ret_close) + ", diagnostics: '" + diag + "'");
+				}
 				break;
 			}
 		}

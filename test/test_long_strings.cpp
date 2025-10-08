@@ -15,18 +15,24 @@ static std::string GenStr(size_t len) {
 }
 
 TEST_CASE("Long string query", group_name) {
+	std::string typmod = "20000";
+	if (DBMSConfigured("MSSQL")) {
+		typmod = "max";
+	}
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;
-	duckdb_state st_prepare = duckdb_prepare(sc.conn, R"(
+	duckdb_state st_prepare = duckdb_prepare(sc.conn,
+	                                         std::string(R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS VARCHAR)
+    SELECT CAST(? AS VARCHAR()" + typmod + R"())
   ', 
   params=row(?::VARCHAR))
-)",
+)")
+	                                             .c_str(),
 	                                         &ps_ptr);
-	REQUIRE(st_prepare == DuckDBSuccess);
+	REQUIRE(PreparedSuccess(ps_ptr, st_prepare));
 	auto ps = PreparedStatementPtr(ps_ptr, PreparedStatementDeleter);
 
 	std::vector<std::string> vec;
@@ -55,11 +61,11 @@ SELECT * FROM odbc_query(
 	for (std::string &str : vec) {
 		auto param_val = ValuePtr(duckdb_create_varchar_length(str.c_str(), str.length()), ValueDeleter);
 		duckdb_state st_bind = duckdb_bind_value(ps.get(), 1, param_val.get());
-		REQUIRE(st_bind == DuckDBSuccess);
+		REQUIRE(PreparedSuccess(ps_ptr, st_bind));
 
 		Result res;
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
-		REQUIRE(st_exec == DuckDBSuccess);
+		REQUIRE(QuerySuccess(res.Get(), st_exec));
 		REQUIRE(res.NextChunk());
 		REQUIRE(res.Value<std::string>(0, 0) == str);
 	}

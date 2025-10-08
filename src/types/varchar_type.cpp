@@ -10,6 +10,8 @@ DUCKDB_EXTENSION_EXTERN
 
 namespace odbcscanner {
 
+static const std::string trunc_diag_code("01004");
+
 template <>
 std::pair<std::string, bool> Types::ExtractFunctionArg<std::string>(duckdb_data_chunk chunk, idx_t col_idx) {
 	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
@@ -57,7 +59,7 @@ ScannerParam TypeSpecific::ExtractNotNullParam<std::string>(duckdb_vector vec) {
 template <>
 void TypeSpecific::BindOdbcParam<std::string>(const std::string &query, const std::string &, HSTMT hstmt,
                                               ScannerParam &param, SQLSMALLINT param_idx) {
-	SQLSMALLINT sqltype = SQL_WVARCHAR;
+	SQLSMALLINT sqltype = SQL_WLONGVARCHAR;
 	SQLRETURN ret = SQLBindParameter(hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, sqltype, param.LengthBytes(), 0,
 	                                 reinterpret_cast<SQLPOINTER>(param.Value<WideString>().data()),
 	                                 param.LengthBytes(), &param.LengthBytes());
@@ -85,11 +87,11 @@ static std::pair<std::string, bool> FetchInternal(const std::string &query, HSTM
 	}
 
 	std::string diag_code;
-	std::string trunc_diag_code("01004");
 	if (ret == SQL_SUCCESS_WITH_INFO) {
 		diag_code = Diagnostics::ReadCode(hstmt, SQL_HANDLE_STMT);
 	}
 
+	// single read
 	if (ret == SQL_SUCCESS || diag_code != trunc_diag_code) {
 
 		if (len_bytes == SQL_NULL_DATA) {
@@ -100,47 +102,88 @@ static std::pair<std::string, bool> FetchInternal(const std::string &query, HSTM
 			len_bytes -= 1;
 		}
 
-		std::string str = WideChar::Narrow(buf.data(), len_bytes / sizeof(SQLWCHAR));
+		size_t len = len_bytes / sizeof(SQLWCHAR);
+		std::string str = WideChar::Narrow(buf.data(), len);
 		return std::make_pair(std::move(str), false);
 	}
 
 	// invariant: ret = SQL_SUCCESS_WITH_INFO && diag_code == "01004"
 
-	if (len_bytes % sizeof(SQLWCHAR) != 0) {
-		len_bytes -= 1;
+	// head + tail reads
+	if (len_bytes != SQL_NO_TOTAL) {
+		if (len_bytes % sizeof(SQLWCHAR) != 0) {
+			len_bytes -= 1;
+		}
+		size_t len = static_cast<size_t>(len_bytes / sizeof(SQLWCHAR));
+
+		size_t head_size = buf.size() - 1;
+		buf.resize(len + 1);
+
+		SQLWCHAR *buf_tail_ptr = buf.data() + head_size;
+		size_t buf_tail_size = buf.size() - head_size;
+		SQLLEN len_tail_bytes = 0;
+
+		SQLRETURN ret_tail = SQLGetData(hstmt, col_idx, SQL_C_WCHAR, buf_tail_ptr,
+		                                static_cast<SQLLEN>(buf_tail_size * sizeof(SQLWCHAR)), &len_tail_bytes);
+		if (!SQL_SUCCEEDED(ret_tail)) {
+			std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
+			throw ScannerException("'SQLGetData' for VARCHAR tail failed, column index: " + std::to_string(col_idx) +
+			                       ", query: '" + query + "', return: " + std::to_string(ret_tail) +
+			                       ", diagnostics: '" + diag + "'");
+		}
+
+		if (len_tail_bytes % sizeof(SQLWCHAR) != 0) {
+			len_tail_bytes -= 1;
+		}
+		size_t len_tail = static_cast<size_t>(len_tail_bytes / sizeof(SQLWCHAR));
+		size_t len_tail_expected = len - head_size;
+		if (len_tail != len_tail_expected) {
+			throw ScannerException(
+			    "'SQLGetData' for VARCHAR failed due to inconsistent tail length reported by the driver, column "
+			    "index: " +
+			    std::to_string(col_idx) + ", query: '" + query + "', return: " + std::to_string(ret_tail) +
+			    ", head length: " + std::to_string(len_tail_expected) + ", actual: " + std::to_string(len_tail));
+		}
+
+		std::string str = WideChar::Narrow(buf.data(), buf.size() - 1);
+		return std::make_pair(std::move(str), false);
 	}
-	size_t len = static_cast<size_t>(len_bytes / sizeof(SQLWCHAR));
 
-	size_t head_size = buf.size() - 1;
-	buf.resize(len + 1);
+	// multiple reads
+	for (size_t i = 1; true; i++) {
+		size_t prev_len = buf.size();
+		size_t prev_written = prev_len - 1;
+		buf.resize(prev_len * 2);
 
-	SQLWCHAR *buf_tail_ptr = buf.data() + head_size;
-	size_t buf_tail_size = buf.size() - head_size;
-	SQLLEN len_tail_bytes = 0;
+		SQLWCHAR *buf_ptr = buf.data() + prev_written;
+		size_t buf_size = buf.size() - prev_written;
+		ret = SQLGetData(hstmt, col_idx, SQL_C_WCHAR, buf_ptr, static_cast<SQLLEN>(buf_size * sizeof(SQLWCHAR)),
+		                 &len_bytes);
 
-	SQLRETURN ret_tail = SQLGetData(hstmt, col_idx, SQL_C_WCHAR, buf_tail_ptr,
-	                                static_cast<SQLLEN>(buf_tail_size * sizeof(SQLWCHAR)), &len_tail_bytes);
-	if (!SQL_SUCCEEDED(ret_tail)) {
-		std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLGetData' for VARCHAR tail failed, column index: " + std::to_string(col_idx) +
-		                       ", query: '" + query + "', return: " + std::to_string(ret_tail) + ", diagnostics: '" +
-		                       diag + "'");
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
+			throw ScannerException("'SQLGetData' for VARCHAR failed, read number: " + std::to_string(i) +
+			                       " column index: " + std::to_string(col_idx) + ", query: '" + query +
+			                       "', return: " + std::to_string(ret) +
+			                       ", prev written: " + std::to_string(prev_written) + ", diagnostics: '" + diag + "'");
+		}
+
+		if (ret == SQL_SUCCESS_WITH_INFO) {
+			diag_code = Diagnostics::ReadCode(hstmt, SQL_HANDLE_STMT);
+		}
+
+		if (ret == SQL_SUCCESS || diag_code != trunc_diag_code) {
+			if (len_bytes % sizeof(SQLWCHAR) != 0) {
+				len_bytes -= 1;
+			}
+
+			size_t buf_size_full = prev_written + (len_bytes / sizeof(SQLWCHAR));
+			std::string str = WideChar::Narrow(buf.data(), buf_size_full);
+			return std::make_pair(std::move(str), false);
+		}
+
+		// invariant: ret = SQL_SUCCESS_WITH_INFO && diag_code == "01004"
 	}
-
-	if (len_tail_bytes % sizeof(SQLWCHAR) != 0) {
-		len_tail_bytes -= 1;
-	}
-	size_t len_tail = static_cast<size_t>(len_tail_bytes / sizeof(SQLWCHAR));
-	size_t len_tail_expected = len - head_size;
-	if (len_tail != len_tail_expected) {
-		throw ScannerException(
-		    "'SQLGetData' for VARCHAR failed due to inconsistent tail length reported by the driver, column index: " +
-		    std::to_string(col_idx) + ", query: '" + query + "', return: " + std::to_string(ret_tail) +
-		    ", head length: " + std::to_string(len_tail_expected) + ", actual: " + std::to_string(len_tail));
-	}
-
-	std::string str = WideChar::Narrow(buf.data(), buf.size() - 1);
-	return std::make_pair(std::move(str), false);
 }
 
 template <>
