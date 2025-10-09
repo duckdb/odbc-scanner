@@ -7,6 +7,7 @@
 
 #include "duckdb_extension.h"
 
+#include "query_context.hpp"
 #include "types.hpp"
 
 namespace odbcscanner {
@@ -27,10 +28,9 @@ struct ResultColumn {
 };
 
 struct Columns {
-	static std::vector<ResultColumn> Collect(const std::string &query, HSTMT hstmt);
+	static std::vector<ResultColumn> Collect(QueryContext &ctx);
 
-	static void CheckSame(const std::string &query, std::vector<ResultColumn> &expected,
-	                      std::vector<ResultColumn> &actual);
+	static void CheckSame(QueryContext &ctx, std::vector<ResultColumn> &expected, std::vector<ResultColumn> &actual);
 
 	static void AddToResults(duckdb_bind_info info, duckdb_type type_id, ResultColumn &col);
 };

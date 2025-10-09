@@ -159,7 +159,7 @@ SELECT * FROM odbc_query(
 	{
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT odbc_bind_params(getvariable('params1'), row(42))
+SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(42))
 )",
 		                               res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st));
@@ -176,7 +176,7 @@ SELECT odbc_bind_params(getvariable('params1'), row(42))
 	{
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT odbc_bind_params(getvariable('params1'), row(43))
+SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(43))
 )",
 		                               res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st));

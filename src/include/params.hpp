@@ -1,5 +1,7 @@
 #pragma once
 
+#include "duckdb_extension.h"
+
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -10,15 +12,37 @@
 #include <sqlext.h>
 
 #include "capi_pointers.hpp"
-#include "duckdb_extension.h"
+#include "query_context.hpp"
 #include "widechar.hpp"
 
 namespace odbcscanner {
+
+struct DecimalChars {
+	std::vector<char> characters;
+
+	DecimalChars();
+
+	explicit DecimalChars(duckdb_decimal decimal);
+
+	DecimalChars(DecimalChars &other) = delete;
+	DecimalChars(DecimalChars &&other) = default;
+
+	DecimalChars &operator=(const DecimalChars &other) = delete;
+	DecimalChars &operator=(DecimalChars &&other) = default;
+
+	template <typename INT_TYPE>
+	INT_TYPE size() {
+		return static_cast<INT_TYPE>(characters.size() - 1);
+	}
+
+	char *data();
+};
 
 class ScannerParam {
 	duckdb_type type_id = DUCKDB_TYPE_INVALID;
 	SQLLEN len_bytes = 0;
 	SQLSMALLINT expected_type = SQL_PARAM_TYPE_UNKNOWN;
+	bool decimal_as_chars = false;
 
 	union InternalValue {
 		bool null_val;
@@ -33,6 +57,7 @@ class ScannerParam {
 		float float_val;
 		double double_val;
 		SQL_NUMERIC_STRUCT decimal;
+		DecimalChars decimal_chars;
 		WideString wstr;
 		SQL_DATE_STRUCT date;
 		SQL_TIME_STRUCT time;
@@ -61,6 +86,8 @@ class ScannerParam {
 		InternalValue(double value) : double_val(value) {
 		}
 		InternalValue(SQL_NUMERIC_STRUCT value) : decimal(value) {
+		}
+		InternalValue(DecimalChars value) : decimal_chars(std::move(value)) {
 		}
 		InternalValue(WideString wstr_in) : wstr(std::move(wstr_in)) {
 		}
@@ -92,7 +119,7 @@ public:
 	explicit ScannerParam(uint64_t value);
 	explicit ScannerParam(float value);
 	explicit ScannerParam(double value);
-	explicit ScannerParam(duckdb_decimal value);
+	explicit ScannerParam(duckdb_decimal value, bool decimal_as_chars);
 	explicit ScannerParam(const char *cstr, size_t len);
 	explicit ScannerParam(const char *cstr);
 	explicit ScannerParam(duckdb_date_struct value);
@@ -127,17 +154,16 @@ private:
 };
 
 struct Params {
-	static std::vector<ScannerParam> Extract(duckdb_data_chunk chunk, idx_t col_idx);
+	static std::vector<ScannerParam> Extract(DbmsQuirks &quirks, duckdb_data_chunk chunk, idx_t col_idx);
 
-	static std::vector<ScannerParam> Extract(duckdb_value struct_value);
+	static std::vector<ScannerParam> Extract(DbmsQuirks &quirks, duckdb_value struct_value);
 
-	static std::vector<SQLSMALLINT> CollectTypes(const std::string &query, HSTMT hstmt);
+	static std::vector<SQLSMALLINT> CollectTypes(QueryContext &ctx);
 
-	static void SetExpectedTypes(const std::string &query, const std::vector<SQLSMALLINT> &expected,
+	static void SetExpectedTypes(QueryContext &ctx, const std::vector<SQLSMALLINT> &expected,
 	                             std::vector<ScannerParam> &actual);
 
-	static void BindToOdbc(const std::string &query, const std::string &dbms_name, HSTMT hstmt,
-	                       std::vector<ScannerParam> &params);
+	static void BindToOdbc(QueryContext &ctx, std::vector<ScannerParam> &params);
 };
 
 } // namespace odbcscanner

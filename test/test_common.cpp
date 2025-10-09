@@ -26,9 +26,10 @@ ScannerConn::ScannerConn() {
 	duckdb_state state_conn = duckdb_connect(db, &conn);
 	REQUIRE(state_conn == DuckDBSuccess);
 
+	Result res_load;
 	std::string load_query = "LOAD '" + std::string(ODBC_SCANNER_EXTENSION_FILE_PATH_STR) + "'";
-	duckdb_state state_load = duckdb_query(conn, load_query.c_str(), nullptr);
-	REQUIRE(state_load == DuckDBSuccess);
+	duckdb_state state_load = duckdb_query(conn, load_query.c_str(), res_load.Get());
+	REQUIRE(QuerySuccess(res_load.Get(), state_load));
 
 	char *conn_cstr = std::getenv("ODBC_CONN_STRING");
 	std::string conn_str = conn_cstr != nullptr ? std::string(conn_cstr) : "Driver={DuckDB Driver};threads=1;";
