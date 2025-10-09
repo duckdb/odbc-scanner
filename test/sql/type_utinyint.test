@@ -41,7 +41,7 @@ statement ok
 PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::UTINYINT', params_handle=getvariable('params1'))
 
 statement ok
-PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('params1'), row(?))
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
 
 statement ok
 EXECUTE p1_bind(255::UTINYINT)

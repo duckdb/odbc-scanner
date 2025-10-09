@@ -67,7 +67,7 @@ statement ok
 PREPARE p16 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::DECIMAL(4,3)', params_handle=getvariable('params16'))
 
 statement ok
-PREPARE p16_bind AS SELECT odbc_bind_params(getvariable('params16'), row(?))
+PREPARE p16_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params16'), row(?))
 
 statement ok
 EXECUTE p16_bind('1.234'::DECIMAL(4,3))
@@ -98,7 +98,7 @@ statement ok
 PREPARE p32 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::DECIMAL(9,3)', params_handle=getvariable('params32'))
 
 statement ok
-PREPARE p32_bind AS SELECT odbc_bind_params(getvariable('params32'), row(?))
+PREPARE p32_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params32'), row(?))
 
 statement ok
 EXECUTE p32_bind('123456.789'::DECIMAL(9,3))
@@ -129,7 +129,7 @@ statement ok
 PREPARE p64 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::DECIMAL(18,3)', params_handle=getvariable('params64'))
 
 statement ok
-PREPARE p64_bind AS SELECT odbc_bind_params(getvariable('params64'), row(?))
+PREPARE p64_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params64'), row(?))
 
 statement ok
 EXECUTE p64_bind('123456789012345.123'::DECIMAL(18,3))
@@ -160,7 +160,7 @@ statement ok
 PREPARE p128 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::DECIMAL(38,3)', params_handle=getvariable('params128'))
 
 statement ok
-PREPARE p128_bind AS SELECT odbc_bind_params(getvariable('params128'), row(?))
+PREPARE p128_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params128'), row(?))
 
 statement ok
 EXECUTE p128_bind('12345678901234567890123456789012345.123'::DECIMAL(38,3))

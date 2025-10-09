@@ -40,6 +40,7 @@ set(EXTENSION_SOURCES
     src/capi_odbc_scanner.c
     src/columns.cpp
     src/connection.cpp
+    src/dbms_quirks.cpp
     src/diagnostics.cpp
     src/params.cpp
     src/registries.cpp

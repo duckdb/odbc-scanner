@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "capi_pointers.hpp"
+#include "dbms_quirks.hpp"
 #include "defer.hpp"
 #include "diagnostics.hpp"
 #include "make_unique.hpp"
@@ -23,7 +24,24 @@ namespace odbcscanner {
 static void BindParams(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
 	(void)info;
 
-	auto handle_arg = Types::ExtractFunctionArg<int64_t>(input, 0);
+	auto conn_arg = Types::ExtractFunctionArg<int64_t>(input, 0);
+	if (conn_arg.second) {
+		throw ScannerException("'odbc_bind_params' error: specified ODBC connection must be not NULL");
+	}
+	int64_t conn_id = conn_arg.first;
+	auto conn_ptr = ConnectionsRegistry::Remove(conn_id);
+
+	if (conn_ptr.get() == nullptr) {
+		throw ScannerException("'odbc_bind_params' error: open ODBC connection not found, id: " +
+		                       std::to_string(conn_id));
+	}
+
+	// Return the connection to registry at the end of the block
+	auto deferred_conn = Defer([&conn_ptr] { ConnectionsRegistry::Add(std::move(conn_ptr)); });
+
+	OdbcConnection &conn = *conn_ptr;
+
+	auto handle_arg = Types::ExtractFunctionArg<int64_t>(input, 1);
 	if (handle_arg.second) {
 		throw ScannerException("'odbc_bind_params' error: specified parameters handle argument must be not NULL");
 	}
@@ -33,10 +51,11 @@ static void BindParams(duckdb_function_info info, duckdb_data_chunk input, duckd
 		throw ScannerException("'odbc_bind_params' error: specified parameters handle not found, ID: " +
 		                       std::to_string(params_handle));
 	}
-	auto deferred = Defer([&params_ptr] { ParamsRegistry::Add(std::move(params_ptr)); });
+	auto deferred_params = Defer([&params_ptr] { ParamsRegistry::Add(std::move(params_ptr)); });
 	params_ptr->clear();
 
-	std::vector<ScannerParam> params = Params::Extract(input, 1);
+	DbmsQuirks quirks(conn);
+	std::vector<ScannerParam> params = Params::Extract(quirks, input, 2);
 
 	for (ScannerParam &p : params) {
 		params_ptr->emplace_back(std::move(p));
@@ -53,6 +72,7 @@ static duckdb_state Register(duckdb_connection conn) {
 	// parameters and return
 	auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
 	auto any_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_ANY), LogicalTypeDeleter);
+	duckdb_scalar_function_add_parameter(fun.get(), bigint_type.get());
 	duckdb_scalar_function_add_parameter(fun.get(), bigint_type.get());
 	duckdb_scalar_function_add_parameter(fun.get(), any_type.get());
 	duckdb_scalar_function_set_return_type(fun.get(), bigint_type.get());

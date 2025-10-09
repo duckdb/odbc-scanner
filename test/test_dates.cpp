@@ -64,7 +64,7 @@ SELECT * FROM odbc_query(
 
 	Result res_bind_params;
 	duckdb_state st_bind_params = duckdb_query(sc.conn, R"(
-SELECT odbc_bind_params(getvariable('params1'), row('2020-12-31'::DATE))
+SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row('2020-12-31'::DATE))
 )",
 	                                           res_bind_params.Get());
 	REQUIRE(QuerySuccess(res_bind_params.Get(), st_bind_params));
