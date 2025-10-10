@@ -1,8 +1,10 @@
-# name: test/sql/type_uinteger.test
-# description: test for UINTEGER type
-# group: [sql_type_uinteger]
+# name: test/sql/duckdb/duckdb_uinteger.test
+# description: test for DuckDB UINTEGER type
+# group: [sql_duckdb_uinteger]
 
 require odbc_scanner
+
+require-env DUCKDB_AVAILABLE
 
 statement ok
 SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')

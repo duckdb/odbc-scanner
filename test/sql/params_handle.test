@@ -25,7 +25,7 @@ SELECT odbc_bind_params(42, NULL, row(42))
 Invalid Input Error: 'odbc_bind_params' error: open ODBC connection not found, id: 42
 
 statement ok
-SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 statement error
 SELECT odbc_bind_params(getvariable('conn'), NULL, row(42))
@@ -47,7 +47,7 @@ SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), NULL)
 Invalid Input Error: Cannot extract parameters from STRUCT: specified STRUCT is NULL, column: 2, columns count: 3
 
 statement ok
-PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INT', params_handle=getvariable('params1'))
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS INT)', params_handle=getvariable('params1'))
 
 statement ok
 SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(42))
@@ -63,7 +63,7 @@ SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row('foo'))
 statement error
 EXECUTE p1
 ----
-Invalid Input Error: 'SQLExecute' failed, query: 'SELECT ?::INT'
+Invalid Input Error: 'SQLExecute' failed, query: 'SELECT CAST(? AS INT)'
 
 statement ok
 SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(42, 43))
@@ -71,7 +71,7 @@ SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(42, 43)
 statement error
 EXECUTE p1
 ----
-Invalid Input Error: Incorrect number of parameters specified, query: 'SELECT ?::INT', expected: 1, actual: 2
+Invalid Input Error: Incorrect number of parameters specified, query: 'SELECT CAST(? AS INT)', expected: 1, actual: 2
 
 statement ok
 SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(43))
@@ -85,7 +85,7 @@ statement ok
 DEALLOCATE p1
 
 statement error
-PREPARE p2 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::VARCHAR', params_handle=getvariable('params1'))
+PREPARE p2 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS INT)', params_handle=getvariable('params1'))
 ----
 <REGEX>:.*Binder Error: 'odbc_query' error: specified parameters handle not found.*
 
@@ -98,18 +98,26 @@ statement ok
 SET VARIABLE params2 = odbc_create_params()
 
 statement ok
-PREPARE p2 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::VARCHAR', params_handle=getvariable('params2'))
+PREPARE p2 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS INT), CAST(? AS VARCHAR)', params_handle=getvariable('params2'))
 
 statement ok
-PREPARE p2_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params2'), row(?))
+PREPARE p2_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params2'), row(?, ?))
 
 statement ok
-EXECUTE p2_bind('🌌')
+EXECUTE p2_bind(42, 'foo')
 
-query I
+query II
 EXECUTE p2
 ----
-🌌
+42	foo
+
+statement ok
+EXECUTE p2_bind(43, 'bar')
+
+query II
+EXECUTE p2
+----
+43	bar
 
 statement ok
 DEALLOCATE p2_bind

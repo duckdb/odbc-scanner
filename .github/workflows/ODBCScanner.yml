@@ -14,11 +14,12 @@ jobs:
           python -m pip install --user clang_format==11.0.1
           python ./resources/scripts/format.py --check 
 
-  linux-amd64:
-    name: Linux (amd64)
+  duckdb-linux-amd64:
+    name: DuckDB Linux (amd64)
     runs-on: ubuntu-latest
     needs: format-check
     env:
+      DUCKDB_AVAILABLE: 1
       GEN: ninja
       DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.so
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
@@ -70,11 +71,12 @@ jobs:
         run: |
           make test
 
-  osx-universal:
-    name: MacOS (aarch64)
+  duckdb-osx-aarch64:
+    name: DuckDB MacOS (aarch64)
     runs-on: macos-latest
-    needs: linux-amd64
+    needs: duckdb-linux-amd64
     env:
+      DUCKDB_AVAILABLE: 1
       GEN: ninja
       DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.dylib
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.dylib
@@ -129,11 +131,11 @@ jobs:
   mssql-linux-amd64:
     name: MSSQL Linux (amd64)
     runs-on: ubuntu-latest
-    needs: linux-amd64
+    needs: duckdb-linux-amd64
     env:
+      MSSQL_AVAILABLE: 1
       GEN: ninja
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
-      MSSQL_AVAILABLE: 1
       ODBC_CONN_STRING_NODB: Driver={MSSQL Driver};Server=tcp:127.0.0.1,1433;UID=sa;PWD=P@ssword2;TrustServerCertificate=yes;
       ODBC_CONN_STRING: Driver={MSSQL Driver};Server=tcp:127.0.0.1,1433;UID=sa;PWD=P@ssword2;TrustServerCertificate=yes;Database=odbcscanner_test_db;
       MSSQL_ODBC_LIB_PATH: /opt/microsoft/msodbcsql18/lib64/libmsodbcsql-18.5.so.1.1
@@ -191,8 +193,4 @@ jobs:
 
       - name: SQL Tests
         run: |
-          ./configure/venv/bin/python \
-            -m duckdb_sqllogictest \
-            --external-extension ./build/release/odbc_scanner.duckdb_extension \
-            --test-dir ./test/sql/mssql \
-            --file-path test/sql/mssql/mssql_version.test
+          make test

@@ -1,28 +1,30 @@
-# name: test/sql/type_timestamp.test
-# description: test for TIMESTAMP type
-# group: [sql_type_timestamp]
+# name: test/sql/duckdb/duckdb_timestamp.test
+# description: test for DuckDB TIMESTAMP type
+# group: [sql_duckdb_timestamp]
 
 require odbc_scanner
+
+require-env DUCKDB_AVAILABLE
 
 statement ok
 SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''2020-12-31 23:59:59''::TIMESTAMP')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''2020-12-31 23:58:59''::TIMESTAMP')
 ----
-2020-12-31 23:59:59
+2020-12-31 23:58:59
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''2020-12-31 23:59:59''::TIMESTAMP')
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''2020-12-31 23:58:59''::TIMESTAMP')
 )
 ----
 TIMESTAMP
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TIMESTAMP', params=row('2020-12-31 23:59:59'::TIMESTAMP))
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TIMESTAMP', params=row('2020-12-31 23:58:59'::TIMESTAMP))
 ----
-2020-12-31 23:59:59
+2020-12-31 23:58:59
 
 statement ok
 SET VARIABLE params1 = odbc_create_params()
@@ -34,12 +36,12 @@ statement ok
 PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
 
 statement ok
-EXECUTE p1_bind('2020-12-31 23:59:59.123456789'::TIMESTAMP)
+EXECUTE p1_bind('2020-12-31 23:58:59.123456789'::TIMESTAMP)
 
 query I
 EXECUTE p1
 ----
-2020-12-31 23:59:59
+2020-12-31 23:58:59
 
 statement ok
 EXECUTE p1_bind('1970-01-01 00:00:00'::TIMESTAMP)

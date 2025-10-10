@@ -5,37 +5,37 @@
 require odbc_scanner
 
 statement ok
-SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::SMALLINT')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS SMALLINT)')
 ----
 42
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::SMALLINT')
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS SMALLINT)')
 )
 ----
 SMALLINT
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::SMALLINT', params=row(42::SMALLINT))
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLINT)', params=row(42::SMALLINT))
 ----
 42
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::SMALLINT', params=row(0::SMALLINT))
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLINT)', params=row(0::SMALLINT))
 ----
 0
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::SMALLINT', params=row(32767::SMALLINT))
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLINT)', params=row(32767::SMALLINT))
 ----
 32767
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::SMALLINT', params=row(-32767::SMALLINT))
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLINT)', params=row(-32767::SMALLINT))
 ----
 -32767
 
@@ -43,7 +43,7 @@ statement ok
 SET VARIABLE params1 = odbc_create_params()
 
 statement ok
-PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::SMALLINT', params_handle=getvariable('params1'))
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLINT)', params_handle=getvariable('params1'))
 
 statement ok
 PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
