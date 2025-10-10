@@ -13,6 +13,13 @@
 
 namespace odbcscanner {
 
+struct SQL_SS_TIME2_STRUCT {
+	SQLUSMALLINT hour;
+	SQLUSMALLINT minute;
+	SQLUSMALLINT second;
+	SQLUINTEGER fraction;
+};
+
 struct ResultColumn;
 
 struct OdbcType {
@@ -42,6 +49,8 @@ struct OdbcType {
 };
 
 struct Types {
+
+	static const SQLSMALLINT SQL_SS_TIME2 = -154;
 
 	// Type-dispatched functions
 

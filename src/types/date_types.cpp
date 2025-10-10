@@ -110,9 +110,8 @@ void TypeSpecific::FetchAndSetResult<duckdb_date_struct>(QueryContext &ctx, Odbc
 	data[row_idx] = dt;
 }
 
-template <>
-void TypeSpecific::FetchAndSetResult<duckdb_time_struct>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
-                                                         duckdb_vector vec, idx_t row_idx) {
+static void FetchAndSetResultTime(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
+                                  idx_t row_idx) {
 	SQL_TIME_STRUCT fetched;
 	std::memset(&fetched, '\0', sizeof(fetched));
 	SQLLEN ind;
@@ -140,6 +139,54 @@ void TypeSpecific::FetchAndSetResult<duckdb_time_struct>(QueryContext &ctx, Odbc
 
 	duckdb_time *data = reinterpret_cast<duckdb_time *>(duckdb_vector_get_data(vec));
 	data[row_idx] = tm;
+}
+
+static void FetchAndSetResultSSTime2(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
+                                     idx_t row_idx) {
+	SQL_SS_TIME2_STRUCT fetched;
+	std::memset(&fetched, '\0', sizeof(fetched));
+	SQLLEN ind;
+	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_BINARY, &fetched, sizeof(fetched), &ind);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(Types::SQL_SS_TIME2) +
+		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
+		                       ",  query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
+		                       diag + "'");
+	}
+
+	if (ind == SQL_NULL_DATA) {
+		Types::SetNullValueToResult(vec, row_idx);
+		return;
+	}
+
+	duckdb_time_struct tms;
+	std::memset(&tms, '\0', sizeof(tms));
+	tms.hour = static_cast<int8_t>(fetched.hour);
+	tms.min = static_cast<int8_t>(fetched.minute);
+	tms.sec = static_cast<int8_t>(fetched.second);
+	tms.micros = static_cast<int32_t>(fetched.fraction / 1000);
+
+	duckdb_time tm = duckdb_to_time(tms);
+
+	duckdb_time *data = reinterpret_cast<duckdb_time *>(duckdb_vector_get_data(vec));
+	data[row_idx] = tm;
+}
+
+template <>
+void TypeSpecific::FetchAndSetResult<duckdb_time_struct>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
+                                                         duckdb_vector vec, idx_t row_idx) {
+	switch (odbc_type.desc_type) {
+	case SQL_TYPE_TIME:
+		FetchAndSetResultTime(ctx, odbc_type, col_idx, vec, row_idx);
+		break;
+	case Types::SQL_SS_TIME2:
+		FetchAndSetResultSSTime2(ctx, odbc_type, col_idx, vec, row_idx);
+		break;
+	default:
+		throw ScannerException("Unsupported ODBC TIME fetch type: " + odbc_type.ToString() + ", query: '" + ctx.query +
+		                       "', column idx: " + std::to_string(col_idx));
+	}
 }
 
 template <>

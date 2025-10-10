@@ -12,6 +12,7 @@ struct DbmsQuirks {
 	size_t varchar_max_size_bytes = 0;
 	bool decimal_precision_through_ard = false;
 	bool decimal_params_as_chars = false;
+	uint8_t float_width_bytes = 4;
 
 	DbmsQuirks();
 

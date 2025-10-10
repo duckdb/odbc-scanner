@@ -30,7 +30,7 @@ SELECT * FROM odbc_query(42, 'SELECT 42')
 Binder Error: 'odbc_query' error: open ODBC connection not found, id: 42
 
 statement ok
-SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 statement error
 SELECT * FROM odbc_query(getvariable('conn'), NULL)
@@ -40,7 +40,7 @@ Binder Error: 'odbc_query' error: specified SQL query must be not NULL
 statement error
 SELECT * FROM odbc_query(getvariable('conn'), 'FAIL')
 ----
-<REGEX>:.*Binder Error: 'SQLPrepare' failed.*Parser Error: syntax error at or near "FAIL".*
+<REGEX>:.*Binder Error:.*FAIL.*
 
 query II
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42, ''foo'' UNION ALL SELECT 43, ''bar''')
@@ -57,17 +57,12 @@ col1	INTEGER
 col2	VARCHAR
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ''🌌''')
-----
-🌌
-
-query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT NULL')
 ----
 NULL
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT NULL::INTEGER')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS INTEGER)')
 ----
 NULL
 

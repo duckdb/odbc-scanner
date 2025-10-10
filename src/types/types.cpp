@@ -13,7 +13,7 @@ DUCKDB_EXTENSION_EXTERN
 namespace odbcscanner {
 
 std::string OdbcType::ToString() {
-	return "type: " + std::to_string(desc_type) + ", concise type: " + std::to_string(desc_concise_type) +
+	return "code: " + std::to_string(desc_type) + ", concise type: " + std::to_string(desc_concise_type) +
 	       ", type name: '" + desc_type_name + "', unsigned: " + std::to_string(is_unsigned) +
 	       ", precision: " + std::to_string(decimal_precision) + ", scale: " + std::to_string(decimal_scale);
 }
@@ -189,11 +189,18 @@ void Types::FetchAndSetResultOfType(QueryContext &ctx, OdbcType &odbc_type, SQLS
 			TypeSpecific::FetchAndSetResult<int64_t>(ctx, odbc_type, col_idx, vec, row_idx);
 		}
 		break;
-	case SQL_FLOAT:
+	case SQL_REAL:
 		TypeSpecific::FetchAndSetResult<float>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	case SQL_DOUBLE:
 		TypeSpecific::FetchAndSetResult<double>(ctx, odbc_type, col_idx, vec, row_idx);
+		break;
+	case SQL_FLOAT:
+		if (ctx.quirks.float_width_bytes <= sizeof(float)) {
+			TypeSpecific::FetchAndSetResult<float>(ctx, odbc_type, col_idx, vec, row_idx);
+		} else {
+			TypeSpecific::FetchAndSetResult<double>(ctx, odbc_type, col_idx, vec, row_idx);
+		}
 		break;
 	case SQL_DECIMAL:
 	case SQL_NUMERIC:
@@ -216,9 +223,15 @@ void Types::FetchAndSetResultOfType(QueryContext &ctx, OdbcType &odbc_type, SQLS
 	case SQL_TYPE_TIMESTAMP:
 		TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
+	case Types::SQL_SS_TIME2:
+		if (odbc_type.decimal_precision <= 6) {
+			TypeSpecific::FetchAndSetResult<duckdb_time_struct>(ctx, odbc_type, col_idx, vec, row_idx);
+			break;
+		}
+		// fall through
 	default:
-		throw ScannerException("Unsupported ODBC fetch type: " + std::to_string(odbc_type.desc_concise_type) +
-		                       ", name: '" + odbc_type.desc_type_name + "'");
+		throw ScannerException("Unsupported ODBC fetch type: " + odbc_type.ToString() + ", query: '" + ctx.query +
+		                       "', column idx: " + std::to_string(col_idx));
 	}
 }
 
@@ -248,10 +261,17 @@ duckdb_type Types::ResolveColumnType(QueryContext &ctx, ResultColumn &column) {
 		} else {
 			return TypeSpecific::ResolveColumnType<int64_t>(ctx, column);
 		}
-	case SQL_FLOAT:
+	case SQL_REAL:
 		return TypeSpecific::ResolveColumnType<float>(ctx, column);
 	case SQL_DOUBLE:
 		return TypeSpecific::ResolveColumnType<double>(ctx, column);
+	case SQL_FLOAT:
+		if (ctx.quirks.float_width_bytes <= sizeof(float)) {
+			return TypeSpecific::ResolveColumnType<float>(ctx, column);
+		} else {
+			return TypeSpecific::ResolveColumnType<double>(ctx, column);
+		}
+		break;
 	case SQL_DECIMAL:
 	case SQL_NUMERIC:
 		return TypeSpecific::ResolveColumnType<duckdb_decimal>(ctx, column);
@@ -265,12 +285,13 @@ duckdb_type Types::ResolveColumnType(QueryContext &ctx, ResultColumn &column) {
 	case SQL_TYPE_DATE:
 		return TypeSpecific::ResolveColumnType<duckdb_date_struct>(ctx, column);
 	case SQL_TYPE_TIME:
+	case Types::SQL_SS_TIME2:
 		return TypeSpecific::ResolveColumnType<duckdb_time_struct>(ctx, column);
 	case SQL_TYPE_TIMESTAMP:
 		return TypeSpecific::ResolveColumnType<duckdb_timestamp_struct>(ctx, column);
 	default:
-		throw ScannerException("Unsupported ODBC column type: " + column.odbc_type.ToString() + ", column name: '" +
-		                       column.name + "'");
+		throw ScannerException("Unsupported ODBC column type: " + column.odbc_type.ToString() + ", query: '" +
+		                       ctx.query + "', column name: '" + column.name + "'");
 	}
 }
 
