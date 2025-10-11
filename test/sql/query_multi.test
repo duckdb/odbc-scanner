@@ -8,9 +8,9 @@ statement ok
 SET VARIABLE conn1 = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 query II
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 42, ''foo''')
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 42 AS "num", ''foo'' AS "str"')
 UNION ALL
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 43, ''bar''')
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 43 AS "num", ''bar'' AS "str"')
 ----
 42	foo
 43	bar
@@ -19,17 +19,17 @@ statement ok
 SET VARIABLE conn2 = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 query II
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 42, ''foo''')
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 42 AS "num", ''foo'' AS "str"')
 UNION ALL
-SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT 43, ''bar''')
+SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT 43 AS "num", ''bar'' AS "str"')
 ----
 42	foo
 43	bar
 
 query II
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT CAST(? AS INT), CAST(? AS VARCHAR)', params=row(42, 'foo'))
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT CAST(? AS INT) AS "num", CAST(? AS VARCHAR) AS "str"', params=row(42, 'foo'))
 UNION ALL
-SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT CAST(? AS INT), CAST(? AS VARCHAR)', params=row(43, 'bar'))
+SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT CAST(? AS INT) aS "num", CAST(? AS VARCHAR) AS "str"', params=row(43, 'bar'))
 ----
 42	foo
 43	bar

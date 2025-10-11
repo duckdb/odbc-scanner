@@ -19,8 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: format-check
     env:
-      DUCKDB_AVAILABLE: 1
       GEN: ninja
+      DUCKDB_AVAILABLE: 1
       DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.so
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
     steps:
@@ -76,8 +76,8 @@ jobs:
     runs-on: macos-latest
     needs: duckdb-linux-amd64
     env:
-      DUCKDB_AVAILABLE: 1
       GEN: ninja
+      DUCKDB_AVAILABLE: 1
       DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.dylib
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.dylib
     steps:
@@ -133,8 +133,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: duckdb-linux-amd64
     env:
-      MSSQL_AVAILABLE: 1
       GEN: ninja
+      MSSQL_AVAILABLE: 1
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       ODBC_CONN_STRING_NODB: Driver={MSSQL Driver};Server=tcp:127.0.0.1,1433;UID=sa;PWD=P@ssword2;TrustServerCertificate=yes;
       ODBC_CONN_STRING: Driver={MSSQL Driver};Server=tcp:127.0.0.1,1433;UID=sa;PWD=P@ssword2;TrustServerCertificate=yes;Database=odbcscanner_test_db;
@@ -171,7 +171,65 @@ jobs:
 
       - name: Prepare DB
         run: |
-          python3 ./resources/scripts/mssql_prepare_test_db.py "${ODBC_CONN_STRING_NODB}"
+          python3 ./resources/scripts/prepare_test_db.py --dbms MSSQL --conn-str "${ODBC_CONN_STRING_NODB}"
+
+      - name: CAPI Shared Lib
+        run: |
+          mkdir libduckdb
+          pushd libduckdb
+          curl --no-progress-meter -LO https://github.com/duckdb/duckdb/releases/latest/download/libduckdb-linux-amd64.zip
+          unzip -q libduckdb-linux-amd64.zip
+          ls -laR
+          popd
+
+      - name: Build
+        run: |
+          make configure
+          make release
+
+      - name: C API Tests
+        run: |
+          make test_c_api
+
+      - name: SQL Tests
+        run: |
+          make test
+
+  postgres-linux-amd64:
+    name: PostgreSQL Linux (amd64)
+    runs-on: ubuntu-latest
+    needs: duckdb-linux-amd64
+    env:
+      GEN: ninja
+      POSTGRES_AVAILABLE: 1
+      DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
+      ODBC_CONN_STRING_NODB: Driver={PostgreSQL Driver};Server=127.0.0.1;Port:1433;Username=postgres;Password=postgres;
+      ODBC_CONN_STRING: Driver={PostgreSQL Driver};Server=127.0.0.1;Port:1433;Username=postgres;Password=postgres;Database=odbcscanner_test_db;
+      POSTGRES_ODBC_LIB_PATH: /usr/lib/x86_64-linux-gnu/odbc/psqlodbcw.so
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      - name: Install
+        run: |
+          sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
+          sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            odbc-postgresql \
+            ninja-build \
+            python3-pyodbc \
+            unixodbc-dev
+          sudo systemctl start postgresql
+          sudo systemctl status postgresql
+          sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD 'postgres'"
+          cat /etc/odbcinst.ini
+          ./resources/scripts/write_odbcinst_ini.sh PostgreSQL "${POSTGRES_ODBC_LIB_PATH}"
+
+      - name: Prepare DB
+        run: |
+          python3 ./resources/scripts/prepare_test_db.py --dbms PostgreSQL --conn-str "${ODBC_CONN_STRING_NODB}"
 
       - name: CAPI Shared Lib
         run: |

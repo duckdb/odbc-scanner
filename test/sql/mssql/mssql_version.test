@@ -10,7 +10,7 @@ statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 statement ok
-CALL odbc_query(getvariable('conn'), 'SELECT CAST(@@version AS VARCHAR(max))')
+CALL odbc_query(getvariable('conn'), 'SELECT @@version')
 
 statement ok
 SELECT odbc_close(getvariable('conn'))

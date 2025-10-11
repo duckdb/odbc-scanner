@@ -25,17 +25,23 @@ ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_decimal>(DbmsQuirks &quirk
 	switch (type_id) {
 	case DUCKDB_TYPE_SMALLINT: {
 		int16_t *data = reinterpret_cast<int16_t *>(duckdb_vector_get_data(vec));
-		dec.value.lower = static_cast<uint64_t>(data[0]);
+		int16_t val = data[0];
+		dec.value.lower = static_cast<uint64_t>(val);
+		dec.value.upper = val >= 0 ? 0 : -1;
 		break;
 	}
 	case DUCKDB_TYPE_INTEGER: {
 		int32_t *data = reinterpret_cast<int32_t *>(duckdb_vector_get_data(vec));
-		dec.value.lower = static_cast<uint64_t>(data[0]);
+		int32_t val = data[0];
+		dec.value.lower = static_cast<uint64_t>(val);
+		dec.value.upper = val >= 0 ? 0 : -1;
 		break;
 	}
 	case DUCKDB_TYPE_BIGINT: {
 		int64_t *data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
-		dec.value.lower = static_cast<uint64_t>(data[0]);
+		int64_t val = data[0];
+		dec.value.lower = static_cast<uint64_t>(val);
+		dec.value.upper = val >= 0 ? 0 : -1;
 		break;
 	}
 	case DUCKDB_TYPE_HUGEINT: {

@@ -43,7 +43,7 @@ SELECT * FROM odbc_query(getvariable('conn'), 'FAIL')
 <REGEX>:.*Binder Error:.*FAIL.*
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42, ''foo'' UNION ALL SELECT 43, ''bar''')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42 AS "num", ''foo'' AS "str" UNION ALL SELECT 43 AS "num", ''bar'' AS "str"')
 ----
 42	foo
 43	bar
