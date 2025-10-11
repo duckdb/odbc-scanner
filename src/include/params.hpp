@@ -17,6 +17,9 @@
 
 namespace odbcscanner {
 
+// duckdb_type with additional values
+using param_type = int;
+
 struct DecimalChars {
 	std::vector<char> characters;
 
@@ -39,10 +42,9 @@ struct DecimalChars {
 };
 
 class ScannerParam {
-	duckdb_type type_id = DUCKDB_TYPE_INVALID;
+	param_type type_id = DUCKDB_TYPE_INVALID;
 	SQLLEN len_bytes = 0;
 	SQLSMALLINT expected_type = SQL_PARAM_TYPE_UNKNOWN;
-	bool decimal_as_chars = false;
 
 	union InternalValue {
 		bool null_val;
@@ -136,7 +138,9 @@ public:
 
 	std::string ToUtf8String(size_t max_len = std::numeric_limits<size_t>::max());
 
-	duckdb_type TypeId();
+	param_type ParamType();
+
+	duckdb_type DuckType();
 
 	SQLLEN &LengthBytes();
 
@@ -148,12 +152,14 @@ public:
 	T &Value();
 
 private:
-	void CheckType(duckdb_type expected);
+	void CheckType(param_type expected);
 
-	static void AssignByType(duckdb_type type_id, InternalValue &val, ScannerParam &other);
+	static void AssignByType(param_type type_id, InternalValue &val, ScannerParam &other);
 };
 
 struct Params {
+	static const param_type TYPE_DECIMAL_AS_CHARS = DUCKDB_TYPE_DECIMAL + 1000;
+
 	static std::vector<ScannerParam> Extract(DbmsQuirks &quirks, duckdb_data_chunk chunk, idx_t col_idx);
 
 	static std::vector<ScannerParam> Extract(DbmsQuirks &quirks, duckdb_value struct_value);

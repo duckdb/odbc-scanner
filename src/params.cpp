@@ -98,20 +98,12 @@ double &ScannerParam::Value<double>() {
 template <>
 SQL_NUMERIC_STRUCT &ScannerParam::Value<SQL_NUMERIC_STRUCT>() {
 	CheckType(DUCKDB_TYPE_DECIMAL);
-	if (decimal_as_chars) {
-		throw ScannerException(
-		    "Invalid DECIMAL parameter type, expected: 'SQL_NUMERIC_STRUCT', actual: 'DecimalChars'");
-	}
 	return val.decimal;
 }
 
 template <>
 DecimalChars &ScannerParam::Value<DecimalChars>() {
-	CheckType(DUCKDB_TYPE_DECIMAL);
-	if (!decimal_as_chars) {
-		throw ScannerException(
-		    "Invalid DECIMAL parameter type, expected: 'DecimalChars', actual: 'SQL_NUMERIC_STRUCT'");
-	}
+	CheckType(Params::TYPE_DECIMAL_AS_CHARS);
 	return val.decimal_chars;
 }
 
@@ -172,12 +164,14 @@ ScannerParam::ScannerParam(float value) : type_id(DUCKDB_TYPE_FLOAT), len_bytes(
 ScannerParam::ScannerParam(double value) : type_id(DUCKDB_TYPE_DOUBLE), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerParam::ScannerParam(duckdb_decimal value, bool decimal_as_chars) : type_id(DUCKDB_TYPE_DECIMAL) {
+ScannerParam::ScannerParam(duckdb_decimal value, bool decimal_as_chars) {
 	if (decimal_as_chars) {
+		this->type_id = Params::TYPE_DECIMAL_AS_CHARS;
 		new (&this->val.decimal_chars) DecimalChars;
 		this->val.decimal_chars = DecimalChars(value);
 		this->len_bytes = val.decimal_chars.size<SQLLEN>();
 	} else {
+		this->type_id = DUCKDB_TYPE_DECIMAL;
 		SQL_NUMERIC_STRUCT ns;
 		std::memset(&ns, '\0', sizeof(ns));
 		ns.precision = value.width;
@@ -196,7 +190,6 @@ ScannerParam::ScannerParam(duckdb_decimal value, bool decimal_as_chars) : type_i
 		this->val.decimal = ns;
 		this->len_bytes = sizeof(ns);
 	}
-	this->decimal_as_chars = decimal_as_chars;
 }
 
 ScannerParam::ScannerParam(const char *cstr, size_t len) : type_id(DUCKDB_TYPE_VARCHAR) {
@@ -243,7 +236,7 @@ ScannerParam::ScannerParam(duckdb_timestamp_struct value) : type_id(DUCKDB_TYPE_
 	this->len_bytes = sizeof(ts);
 }
 
-void ScannerParam::AssignByType(duckdb_type type_id, InternalValue &val, ScannerParam &other) {
+void ScannerParam::AssignByType(param_type type_id, InternalValue &val, ScannerParam &other) {
 	switch (type_id) {
 	case DUCKDB_TYPE_SQLNULL:
 		break;
@@ -278,12 +271,11 @@ void ScannerParam::AssignByType(duckdb_type type_id, InternalValue &val, Scanner
 		val.double_val = other.Value<double>();
 		break;
 	case DUCKDB_TYPE_DECIMAL:
-		if (other.decimal_as_chars) {
-			new (&val.decimal_chars) DecimalChars;
-			val.decimal_chars = std::move(other.Value<DecimalChars>());
-		} else {
-			val.decimal = other.Value<SQL_NUMERIC_STRUCT>();
-		}
+		val.decimal = other.Value<SQL_NUMERIC_STRUCT>();
+		break;
+	case Params::TYPE_DECIMAL_AS_CHARS:
+		new (&val.decimal_chars) DecimalChars;
+		val.decimal_chars = std::move(other.Value<DecimalChars>());
 		break;
 	case DUCKDB_TYPE_VARCHAR:
 		new (&val.wstr) WideString;
@@ -304,8 +296,7 @@ void ScannerParam::AssignByType(duckdb_type type_id, InternalValue &val, Scanner
 }
 
 ScannerParam::ScannerParam(ScannerParam &&other)
-    : type_id(other.type_id), len_bytes(other.len_bytes), expected_type(other.expected_type),
-      decimal_as_chars(other.decimal_as_chars) {
+    : type_id(other.type_id), len_bytes(other.len_bytes), expected_type(other.expected_type) {
 	AssignByType(type_id, this->val, other);
 }
 
@@ -313,7 +304,6 @@ ScannerParam &ScannerParam::operator=(ScannerParam &&other) {
 	this->type_id = other.type_id;
 	this->len_bytes = other.len_bytes;
 	this->expected_type = other.expected_type;
-	this->decimal_as_chars = other.decimal_as_chars;
 	AssignByType(type_id, this->val, other);
 	return *this;
 }
@@ -335,8 +325,15 @@ std::string ScannerParam::ToUtf8String(size_t max_len) {
 	return WideChar::Narrow(wstr.data(), len);
 }
 
-duckdb_type ScannerParam::TypeId() {
+param_type ScannerParam::ParamType() {
 	return type_id;
+}
+
+duckdb_type ScannerParam::DuckType() {
+	if (Params::TYPE_DECIMAL_AS_CHARS == type_id) {
+		return DUCKDB_TYPE_DECIMAL;
+	}
+	return static_cast<duckdb_type>(type_id);
 }
 
 SQLLEN &ScannerParam::LengthBytes() {
@@ -354,7 +351,7 @@ void ScannerParam::SetExpectedType(SQLSMALLINT expected_type_in) {
 	this->expected_type = expected_type_in;
 }
 
-void ScannerParam::CheckType(duckdb_type expected) {
+void ScannerParam::CheckType(param_type expected) {
 	if (type_id != expected) {
 		throw ScannerException("Invalid parameter type, expected: " + std::to_string(expected) +
 		                       ", actual: " + std::to_string(type_id));

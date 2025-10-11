@@ -104,7 +104,7 @@ ScannerParam Types::ExtractNotNullParamFromValue(DbmsQuirks &quirks, duckdb_valu
 }
 
 void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
-	switch (param.TypeId()) {
+	switch (param.ParamType()) {
 	case DUCKDB_TYPE_SQLNULL:
 		TypeSpecific::BindOdbcParam<std::nullptr_t>(ctx, param, param_idx);
 		break;
@@ -139,7 +139,10 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 		TypeSpecific::BindOdbcParam<double>(ctx, param, param_idx);
 		break;
 	case DUCKDB_TYPE_DECIMAL:
-		TypeSpecific::BindOdbcParam<duckdb_decimal>(ctx, param, param_idx);
+		TypeSpecific::BindOdbcParam<SQL_NUMERIC_STRUCT>(ctx, param, param_idx);
+		break;
+	case Params::TYPE_DECIMAL_AS_CHARS:
+		TypeSpecific::BindOdbcParam<DecimalChars>(ctx, param, param_idx);
 		break;
 	case DUCKDB_TYPE_VARCHAR:
 		TypeSpecific::BindOdbcParam<std::string>(ctx, param, param_idx);
@@ -154,7 +157,7 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 		TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(ctx, param, param_idx);
 		break;
 	default:
-		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(param.TypeId()));
+		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(param.ParamType()));
 	}
 }
 

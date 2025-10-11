@@ -57,19 +57,27 @@ ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_decimal>(DbmsQuirks &quirk
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<duckdb_decimal>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<SQL_NUMERIC_STRUCT>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_NUMERIC;
-	SQLRETURN ret = SQL_ERROR;
-	if (ctx.quirks.decimal_params_as_chars) {
-		DecimalChars &dc = param.Value<DecimalChars>();
-		ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, param.LengthBytes(), 0,
-		                       reinterpret_cast<SQLPOINTER>(dc.data()), param.LengthBytes(), &param.LengthBytes());
-	} else {
-		SQL_NUMERIC_STRUCT &ns = param.Value<SQL_NUMERIC_STRUCT>();
-		ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_NUMERIC, sqltype,
-		                       static_cast<SQLULEN>(ns.precision), static_cast<SQLSMALLINT>(ns.scale),
-		                       reinterpret_cast<SQLPOINTER>(&ns), param.LengthBytes(), &param.LengthBytes());
+	SQL_NUMERIC_STRUCT &ns = param.Value<SQL_NUMERIC_STRUCT>();
+	SQLRETURN ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_NUMERIC, sqltype,
+	                                 static_cast<SQLULEN>(ns.precision), static_cast<SQLSMALLINT>(ns.scale),
+	                                 reinterpret_cast<SQLPOINTER>(&ns), param.LengthBytes(), &param.LengthBytes());
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
+		                       ", index: " + std::to_string(param_idx) + ", query: '" + ctx.query +
+		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
+}
+
+template <>
+void TypeSpecific::BindOdbcParam<DecimalChars>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_NUMERIC;
+	DecimalChars &dc = param.Value<DecimalChars>();
+	SQLRETURN ret =
+	    SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, param.LengthBytes(), 0,
+	                     reinterpret_cast<SQLPOINTER>(dc.data()), param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
