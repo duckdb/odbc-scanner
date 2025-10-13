@@ -176,7 +176,7 @@ static void FetchAndSetResultSSTime2(QueryContext &ctx, OdbcType &odbc_type, SQL
 template <>
 void TypeSpecific::FetchAndSetResult<duckdb_time_struct>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
                                                          duckdb_vector vec, idx_t row_idx) {
-	switch (odbc_type.desc_type) {
+	switch (odbc_type.desc_concise_type) {
 	case SQL_TYPE_TIME:
 		FetchAndSetResultTime(ctx, odbc_type, col_idx, vec, row_idx);
 		break;

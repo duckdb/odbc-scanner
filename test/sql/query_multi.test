@@ -27,18 +27,18 @@ SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT 43 AS "num", ''bar'' AS "
 43	bar
 
 query II
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT CAST(? AS INT) AS "num", CAST(? AS VARCHAR) AS "str"', params=row(42, 'foo'))
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT CAST(? AS INTEGER) AS "num", CAST(? AS VARCHAR(16)) AS "str"', params=row(42, 'foo'))
 UNION ALL
-SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT CAST(? AS INT) aS "num", CAST(? AS VARCHAR) AS "str"', params=row(43, 'bar'))
+SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT CAST(? AS INTEGER) aS "num", CAST(? AS VARCHAR(16)) AS "str"', params=row(43, 'bar'))
 ----
 42	foo
 43	bar
 
 statement ok
 PREPARE p1 AS 
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT CAST(? AS INT), CAST(? AS VARCHAR)', params=row(?, ?))
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT CAST(? AS INTEGER), CAST(? AS VARCHAR(16))', params=row(?, ?))
 UNION ALL
-SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT CAST(? AS INT), CAST(? AS VARCHAR)', params=row(?, ?))
+SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT CAST(? AS INTEGER), CAST(? AS VARCHAR(16))', params=row(?, ?))
 
 query II
 EXECUTE p1(42, 'foo', 43, 'bar')

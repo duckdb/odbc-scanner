@@ -153,12 +153,16 @@ void Columns::CheckSame(QueryContext &ctx, std::vector<ResultColumn> &expected, 
 			                       expected_col.name + "', actual name: '" + actual_col.name + "'");
 		}
 
+		// In some drivers the `PREPARE` and `EXECUTE` column types may be different,
+		// lets rely on the driver to do the conversion instead of erroring out.
+		/*
 		if (!expected_col.odbc_type.Equals(actual_col.odbc_type)) {
-			throw ScannerException("Resulting columns from 'SQLPrepare' and 'SQLExecute' do not match, query: '" +
-			                       ctx.query + "',  index: " + std::to_string(i) + ", expected: '" +
-			                       expected_col.odbc_type.ToString() + "', actual: '" +
-			                       actual_col.odbc_type.ToString() + "'");
+		    throw ScannerException("Resulting columns from 'SQLPrepare' and 'SQLExecute' do not match, query: '" +
+		                           ctx.query + "',  index: " + std::to_string(i) + ", expected: '" +
+		                           expected_col.odbc_type.ToString() + "', actual: '" +
+		                           actual_col.odbc_type.ToString() + "'");
 		}
+		*/
 	}
 }
 

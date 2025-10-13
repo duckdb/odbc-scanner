@@ -28,6 +28,13 @@ def run_postgres():
   exec_sql(cur, "DROP DATABASE IF EXISTS odbcscanner_test_db")
   exec_sql(cur, "CREATE DATABASE odbcscanner_test_db")
 
+def run_mysql():
+  conn = pyodbc.connect(args.conn_str)
+  cur = conn.cursor()
+  exec_sql(cur, "SELECT version()")
+  print(cur.fetchone()[0])
+  exec_sql(cur, "DROP DATABASE IF EXISTS odbcscanner_test_db")
+  exec_sql(cur, "CREATE DATABASE odbcscanner_test_db")
 
 parser = ArgumentParser()
 parser.add_argument("--dbms", required=True)
@@ -41,5 +48,7 @@ if __name__ == "__main__":
     run_mssql()
   elif "PostgreSQL" == args.dbms:
     run_postgres()
+  elif "MySQL" == args.dbms or "MariaDB" == args.dbms:
+    run_mysql()
   else:
     raise Exception("Unsupported DBMS: " + args.dbms)

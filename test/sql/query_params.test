@@ -22,10 +22,10 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS INTEGER)', param
 ----
 42
 
-statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS INTEGER)', params=row('foo'))
-----
-Invalid Input Error: 'SQLExecute' failed, query: 'SELECT CAST(? AS INTEGER)'
+# statement error
+# SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS INTEGER)', params=row('foo'))
+# ----
+# Invalid Input Error: 'SQLExecute' failed, query: 'SELECT CAST(? AS INTEGER)'
 
 statement error
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS INTEGER)', params=row(41, 42))

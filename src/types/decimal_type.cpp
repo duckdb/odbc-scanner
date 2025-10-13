@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <cstring>
+#include <algorithm>
+#include <limits>
 
 #include "capi_pointers.hpp"
 #include "connection.hpp"
@@ -135,11 +137,94 @@ static void SetDescriptorFields(QueryContext &ctx, OdbcType &odbc_type, SQLSMALL
 	}
 }
 
-template <>
-void TypeSpecific::FetchAndSetResult<duckdb_decimal>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
-                                                     duckdb_vector vec, idx_t row_idx) {
+static void Negate(duckdb_hugeint &hi) {
+	hi.lower = ~hi.lower + 1;
+	hi.upper = ~hi.upper;
+	if (hi.lower == 0) {
+		hi.upper += 1; // carry from low to high
+	}
+}
+
+static duckdb_hugeint Zero() {
+	duckdb_hugeint zero;
+	zero.lower = 0;
+	zero.upper = 0;
+	return zero;
+}
+
+/*
+uint64_t multiply_with_carry(uint64_t value, uint64_t *carry) {
+    // First split the number into high and low 32-bit parts
+    uint64_t low = value & 0xFFFFFFFF;
+    uint64_t high = value >> 32;
+
+    // Multiply each part by 10
+    uint64_t low_result = low * 10;
+    uint64_t high_result = high * 10;
+
+    // Add the cross product
+    uint64_t cross = (low_result >> 32) + (high_result & 0xFFFFFFFF);
+
+    // Compute final values
+    uint64_t result = ((cross & 0xFFFFFFFF) << 32) | (low_result & 0xFFFFFFFF);
+    *carry = (high_result >> 32) + (cross >> 32);
+
+    return result;
+}
+*/
+
+// The implementation can be more robust, but we expect the decimal strings from
+// drivers to be well-formed.
+static duckdb_hugeint ParseHugeInt(const std::string &str) {
+	duckdb_hugeint hi;
+	hi.lower = 0;
+	hi.upper = 0;
+
+	for (char ch : str) {
+		if (ch < '0' || ch > '9') {
+			return Zero();
+		}
+
+		uint64_t digit = ch - '0';
+
+		hi.upper *= 10;
+
+		// check overflow
+		if (hi.lower > (std::numeric_limits<uint64_t>::max() / 10)) {
+			uint64_t carry = hi.lower / (std::numeric_limits<uint64_t>::max() / 10);
+			hi.upper += carry;
+		}
+
+		hi.lower *= 10;
+		hi.lower += digit;
+	}
+
+	return hi;
+}
+
+static void SetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx,
+                      duckdb_hugeint hi) {
+	if (odbc_type.decimal_precision <= 4) {
+		int16_t *data = reinterpret_cast<int16_t *>(duckdb_vector_get_data(vec));
+		data[row_idx] = static_cast<int16_t>(hi.lower);
+	} else if (odbc_type.decimal_precision <= 9) {
+		int32_t *data = reinterpret_cast<int32_t *>(duckdb_vector_get_data(vec));
+		data[row_idx] = static_cast<int32_t>(hi.lower);
+	} else if (odbc_type.decimal_precision <= 18) {
+		int64_t *data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
+		data[row_idx] = static_cast<int64_t>(hi.lower);
+	} else if (odbc_type.decimal_precision <= 38) {
+		duckdb_hugeint *data = reinterpret_cast<duckdb_hugeint *>(duckdb_vector_get_data(vec));
+		data[row_idx] = hi;
+	} else
+		throw ScannerException("Invalid unsupported DECIMAL precision: " + std::to_string(odbc_type.decimal_precision) +
+		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
+		                       ",  query: '" + ctx.query);
+}
+
+static std::pair<duckdb_hugeint, bool> FetchDecimal(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
 	SQLSMALLINT ctype = SQL_C_NUMERIC;
-	if (ctx.quirks.decimal_precision_through_ard) {
+	if (ctx.quirks.decimal_columns_precision_through_ard) {
 		SetDescriptorFields(ctx, odbc_type, col_idx);
 		ctype = SQL_ARD_TYPE;
 	}
@@ -156,43 +241,75 @@ void TypeSpecific::FetchAndSetResult<duckdb_decimal>(QueryContext &ctx, OdbcType
 	}
 
 	if (ind == SQL_NULL_DATA) {
-		Types::SetNullValueToResult(vec, row_idx);
-		return;
+		return std::make_pair(Zero(), true);
 	}
 
 	duckdb_hugeint hi;
 	std::memcpy(&hi.lower, fetched.val, sizeof(hi.lower));
 	std::memcpy(&hi.upper, fetched.val + sizeof(hi.lower), sizeof(hi.upper));
 
-	// only used for <= 64 bit
-	int64_t signed_lower = static_cast<int64_t>(hi.lower);
-
 	if (fetched.sign == 0) {
-		signed_lower = -static_cast<int64_t>(hi.lower);
-		// negate
-		hi.lower = ~hi.lower + 1;
-		hi.upper = ~hi.upper;
-		if (hi.lower == 0) {
-			hi.upper += 1; // carry from low to high
-		}
+		Negate(hi);
 	}
 
-	if (odbc_type.decimal_precision <= 4) {
-		int16_t *data = reinterpret_cast<int16_t *>(duckdb_vector_get_data(vec));
-		data[row_idx] = static_cast<int16_t>(signed_lower);
-	} else if (odbc_type.decimal_precision <= 9) {
-		int32_t *data = reinterpret_cast<int32_t *>(duckdb_vector_get_data(vec));
-		data[row_idx] = static_cast<int32_t>(signed_lower);
-	} else if (odbc_type.decimal_precision <= 18) {
-		int64_t *data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
-		data[row_idx] = static_cast<int64_t>(signed_lower);
-	} else if (odbc_type.decimal_precision <= 38) {
-		duckdb_hugeint *data = reinterpret_cast<duckdb_hugeint *>(duckdb_vector_get_data(vec));
-		data[row_idx] = hi;
-	} else
-		throw ScannerException("Invalid unsupported DECIMAL precision: " + std::to_string(odbc_type.decimal_precision) +
-		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
-		                       ",  query: '" + ctx.query);
+	return std::make_pair(hi, false);
+}
+
+static std::pair<duckdb_hugeint, bool> FetchVarchar(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	std::vector<char> buf;
+	buf.resize(128);
+	SQLLEN len_bytes = 0;
+	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_CHAR, buf.data(), static_cast<SQLLEN>(buf.size()), &len_bytes);
+
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		throw ScannerException("'SQLGetData' for DECIMAL VARCHAR failed, column index: " + std::to_string(col_idx) +
+		                       ", query: '" + ctx.query + "', column type: " + odbc_type.ToString() +
+		                       ",  return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+	}
+
+	if (len_bytes == SQL_NULL_DATA) {
+		return std::make_pair(Zero(), true);
+	}
+
+	std::string str(buf.data(), len_bytes);
+
+	// we rely on column metadata for scale
+	str.erase(std::remove(str.begin(), str.end(), '.'), str.end());
+	str.erase(std::remove(str.begin(), str.end(), ','), str.end());
+
+	if (str.empty()) {
+		return std::make_pair(Zero(), false);
+	}
+
+	bool negative = false;
+	if ('-' == str[0]) {
+		str.erase(str.begin());
+		negative = true;
+	}
+
+	duckdb_hugeint parsed = ParseHugeInt(str);
+	if (negative) {
+		Negate(parsed);
+	}
+
+	return std::make_pair(parsed, false);
+}
+
+template <>
+void TypeSpecific::FetchAndSetResult<duckdb_decimal>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
+                                                     duckdb_vector vec, idx_t row_idx) {
+	std::pair<duckdb_hugeint, bool> fetched;
+	if (ctx.quirks.decimal_columns_as_chars) {
+		fetched = FetchVarchar(ctx, odbc_type, col_idx);
+	} else {
+		fetched = FetchDecimal(ctx, odbc_type, col_idx);
+	}
+	if (fetched.second) {
+		Types::SetNullValueToResult(vec, row_idx);
+	} else {
+		SetResult(ctx, odbc_type, col_idx, vec, row_idx, fetched.first);
+	}
 }
 
 template <>
