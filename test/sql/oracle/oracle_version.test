@@ -1,0 +1,16 @@
+# name: test/sql/oracle/oracle_version.test
+# description: test for Oracle version
+# group: [sql_oracle_version]
+
+require odbc_scanner
+
+require-env ORACLE_AVAILABLE
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement ok
+CALL odbc_query(getvariable('conn'), 'SELECT * FROM PRODUCT_COMPONENT_VERSION')
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

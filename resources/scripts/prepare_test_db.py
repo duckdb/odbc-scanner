@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from argparse import ArgumentParser
+import time
 import pyodbc
 
 def exec_sql(cur, sql):
@@ -36,6 +37,21 @@ def run_mysql():
   exec_sql(cur, "DROP DATABASE IF EXISTS odbcscanner_test_db")
   exec_sql(cur, "CREATE DATABASE odbcscanner_test_db")
 
+def run_oracle():
+  # waiting for DB startup
+  for i in range(32):
+    try:
+      conn = pyodbc.connect(args.conn_str)
+      break
+    except Exception as e:
+      print(e)
+      time.sleep(5)
+
+  cur = conn.cursor()
+  exec_sql(cur, "SELECT * FROM PRODUCT_COMPONENT_VERSION")
+  print(cur.fetchone())
+  # todo: database
+
 parser = ArgumentParser()
 parser.add_argument("--dbms", required=True)
 parser.add_argument("--conn-str", required=True)
@@ -50,5 +66,7 @@ if __name__ == "__main__":
     run_postgres()
   elif "MySQL" == args.dbms or "MariaDB" == args.dbms:
     run_mysql()
+  elif "Oracle" == args.dbms:
+    run_oracle()
   else:
     raise Exception("Unsupported DBMS: " + args.dbms)
