@@ -15,9 +15,18 @@ static std::string GenStr(size_t len) {
 }
 
 TEST_CASE("Long string query", group_name) {
-	std::string typmod = "20000";
+	std::string cast = "NOT_SUPPORTED";
+	if (DBMSConfigured("DuckDB")) {
+		cast = "CAST(? AS VARCHAR)";
+	}
 	if (DBMSConfigured("MSSQL")) {
-		typmod = "max";
+		cast = "CAST(? AS VARCHAR(max))";
+	}
+	if (DBMSConfigured("PostgreSQL")) {
+		cast = "CAST(? AS TEXT)";
+	}
+	if (DBMSConfigured("MySQL") || DBMSConfigured("MariaDB")) {
+		cast = "CAST(? AS CHAR(20000))";
 	}
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;
@@ -26,7 +35,7 @@ TEST_CASE("Long string query", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS VARCHAR()" + typmod + R"())
+    SELECT )" + cast + R"(
   ', 
   params=row(?::VARCHAR))
 )")

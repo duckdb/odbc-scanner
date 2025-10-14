@@ -59,3 +59,5 @@ bool DBMSConfigured(const std::string dbms_name);
 bool QuerySuccess(duckdb_result *res, duckdb_state st);
 
 bool PreparedSuccess(duckdb_prepared_statement ps, duckdb_state st);
+
+std::string CastAsBigintSQL(const std::string& value);

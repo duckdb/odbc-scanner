@@ -1,0 +1,190 @@
+# name: test/sql/mysql/decimal.test
+# description: test for MySQL DECIMAL type
+# group: [sql_mysql_decimal]
+
+require odbc_scanner
+
+require-env MYSQL_AVAILABLE
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS DECIMAL(4,3))')
+----
+1.234
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS DECIMAL(4,3))')
+)
+----
+DECIMAL(4,3)
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456.789'' AS DECIMAL(9,3))')
+----
+123456.789
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456.789'' AS DECIMAL(9,3))')
+)
+----
+DECIMAL(9,3)
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456789012345.123'' AS DECIMAL(18,3))')
+----
+123456789012345.123
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456789012345.123'' AS DECIMAL(18,3))')
+)
+----
+DECIMAL(18,3)
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''12345678901234567890123456789012345.123'' AS DECIMAL(38,3))')
+----
+12345678901234567890123456789012345.123
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''12345678901234567890123456789012345.123'' AS DECIMAL(38,3))')
+)
+----
+DECIMAL(38,3)
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DECIMAL(38,3))', params=row('12345678901234567890123456789012345.123'::DECIMAL(38,3)))
+----
+12345678901234567890123456789012345.123
+
+statement ok
+SET VARIABLE params16 = odbc_create_params()
+
+statement ok
+PREPARE p16 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DECIMAL(4,3))', params_handle=getvariable('params16'))
+
+statement ok
+PREPARE p16_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params16'), row(?))
+
+statement ok
+EXECUTE p16_bind('1.234'::DECIMAL(4,3))
+
+query I
+EXECUTE p16
+----
+1.234
+
+statement ok
+EXECUTE p16_bind('-1.234'::DECIMAL(4,3))
+
+query I
+EXECUTE p16
+----
+-1.234
+
+statement ok
+DEALLOCATE p16_bind
+
+statement ok
+DEALLOCATE p16
+
+statement ok
+SET VARIABLE params32 = odbc_create_params()
+
+statement ok
+PREPARE p32 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DECIMAL(9,3))', params_handle=getvariable('params32'))
+
+statement ok
+PREPARE p32_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params32'), row(?))
+
+statement ok
+EXECUTE p32_bind('123456.789'::DECIMAL(9,3))
+
+query I
+EXECUTE p32
+----
+123456.789
+
+statement ok
+EXECUTE p32_bind('-123456.789'::DECIMAL(9,3))
+
+query I
+EXECUTE p32
+----
+-123456.789
+
+statement ok
+DEALLOCATE p32_bind
+
+statement ok
+DEALLOCATE p32
+
+statement ok
+SET VARIABLE params64 = odbc_create_params()
+
+statement ok
+PREPARE p64 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DECIMAL(18,3))', params_handle=getvariable('params64'))
+
+statement ok
+PREPARE p64_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params64'), row(?))
+
+statement ok
+EXECUTE p64_bind('123456789012345.123'::DECIMAL(18,3))
+
+query I
+EXECUTE p64
+----
+123456789012345.123
+
+statement ok
+EXECUTE p64_bind('-123456789012345.123'::DECIMAL(18,3))
+
+query I
+EXECUTE p64
+----
+-123456789012345.123
+
+statement ok
+DEALLOCATE p64_bind
+
+statement ok
+DEALLOCATE p64
+
+statement ok
+SET VARIABLE params128 = odbc_create_params()
+
+statement ok
+PREPARE p128 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DECIMAL(38,3))', params_handle=getvariable('params128'))
+
+statement ok
+PREPARE p128_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params128'), row(?))
+
+statement ok
+EXECUTE p128_bind('12345678901234567890123456789012345.123'::DECIMAL(38,3))
+
+query I
+EXECUTE p128
+----
+12345678901234567890123456789012345.123
+
+statement ok
+EXECUTE p128_bind('-12345678901234567890123456789012345.123'::DECIMAL(38,3))
+
+query I
+EXECUTE p128
+----
+-12345678901234567890123456789012345.123
+
+statement ok
+DEALLOCATE p128_bind
+
+statement ok
+DEALLOCATE p128
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

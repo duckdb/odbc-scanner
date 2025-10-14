@@ -123,6 +123,19 @@ static CTYPE *NotNullData(duckdb_type expected_type_id, duckdb_data_chunk chunk,
 	return reinterpret_cast<CTYPE *>(duckdb_vector_get_data(vec));
 }
 
+static duckdb_type ColumnType(duckdb_data_chunk chunk, idx_t col_idx) {
+	REQUIRE(chunk != nullptr);
+
+	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
+	REQUIRE(col_idx < col_count);
+
+	duckdb_vector vec = duckdb_data_chunk_get_vector(chunk, col_idx);
+	REQUIRE(vec != nullptr);
+
+	auto ltype = LogicalTypePtr(duckdb_vector_get_column_type(vec), LogicalTypeDeleter);
+	return duckdb_get_type_id(ltype.get());
+}
+
 template <>
 uint8_t Result::Value<uint8_t>(idx_t col_idx, idx_t row_idx) {
 	uint8_t *data = NotNullData<uint8_t>(DUCKDB_TYPE_UTINYINT, chunk, cur_row_idx, col_idx, row_idx);
@@ -143,6 +156,10 @@ int32_t Result::Value<int32_t>(idx_t col_idx, idx_t row_idx) {
 
 template <>
 int64_t Result::Value<int64_t>(idx_t col_idx, idx_t row_idx) {
+	if (DBMSConfigured("MariaDB") && DUCKDB_TYPE_INTEGER == ColumnType(chunk, col_idx)) {
+		int32_t *data = NotNullData<int32_t>(DUCKDB_TYPE_INTEGER, chunk, cur_row_idx, col_idx, row_idx);
+		return data[row_idx];
+	}
 	int64_t *data = NotNullData<int64_t>(DUCKDB_TYPE_BIGINT, chunk, cur_row_idx, col_idx, row_idx);
 	return data[row_idx];
 }
@@ -215,4 +232,12 @@ bool PreparedSuccess(duckdb_prepared_statement ps, duckdb_state st) {
 		return false;
 	}
 	return true;
+}
+
+std::string CastAsBigintSQL(const std::string &value) {
+	std::string type_name = "BIGINT";
+	if (DBMSConfigured("MySQL") || DBMSConfigured("MariaDB")) {
+		type_name = "SIGNED";
+	}
+	return "CAST(" + value + " AS " + type_name + ")";
 }

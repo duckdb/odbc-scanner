@@ -5,31 +5,40 @@ static const std::string group_name = "[capi_params]";
 TEST_CASE("Params query with a single param literal", group_name) {
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	duckdb_state st = duckdb_query(sc.conn,
+	                               (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS INTEGER)
+    SELECT )" + CastAsBigintSQL("?") +
+	                                R"(
   ', 
   params=row(42))
-)",
+)")
+	                                   .c_str(),
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
-	REQUIRE(res.Value<int32_t>(0, 0) == 42);
+	REQUIRE(res.Value<int64_t>(0, 0) == 42);
 }
 
 TEST_CASE("Params query with a varchar param literal", group_name) {
+	std::string cast = "CAST(? AS VARCHAR(16))";
+	if (DBMSConfigured("MySQL")) {
+		cast = "CAST(? AS CHAR(16))";
+	}
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	duckdb_state st = duckdb_query(sc.conn,
+	                               (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS VARCHAR(16))
+    SELECT )" + cast + R"(
   ', 
   params=row('foo'))
-)",
+)")
+	                                   .c_str(),
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
@@ -57,17 +66,20 @@ SELECT * FROM odbc_query(
 	REQUIRE(res.Value<uint8_t>(0, 0) == 255);
 }
 
-TEST_CASE("Params query NULL INTEGER parameter", group_name) {
+TEST_CASE("Params query NULL BIGINT parameter", group_name) {
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	duckdb_state st = duckdb_query(sc.conn,
+	                               (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS INTEGER)
+    SELECT )" + CastAsBigintSQL("?") +
+	                                R"(
   ', 
   params=row(NULL))
-)",
+)")
+	                                   .c_str(),
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
@@ -77,31 +89,36 @@ SELECT * FROM odbc_query(
 TEST_CASE("Params query with multiple params including NULL", group_name) {
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	duckdb_state st = duckdb_query(sc.conn,
+	                               (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT coalesce(CAST(? AS INTEGER), CAST(? AS INTEGER))
+    SELECT coalesce()" + CastAsBigintSQL("?") +
+	                                ", " + CastAsBigintSQL("?") + R"()
   ', 
   params=row(NULL, 42))
-)",
+)")
+	                                   .c_str(),
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
-	REQUIRE(res.Value<int32_t>(0, 0) == 42);
+	REQUIRE(res.Value<int64_t>(0, 0) == 42);
 }
 
 TEST_CASE("Params query with rebinding", group_name) {
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;
-	duckdb_state st_prepare = duckdb_prepare(sc.conn, R"(
+	duckdb_state st_prepare = duckdb_prepare(sc.conn,
+	                                         (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS INTEGER)
+    SELECT )" + CastAsBigintSQL("?") + R"(
   ', 
   params=row(?))
-)",
+)")
+	                                             .c_str(),
 	                                         &ps_ptr);
 	REQUIRE(PreparedSuccess(ps_ptr, st_prepare));
 	auto ps = PreparedStatementPtr(ps_ptr, PreparedStatementDeleter);
@@ -115,7 +132,7 @@ SELECT * FROM odbc_query(
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st_exec));
 		REQUIRE(res.NextChunk());
-		REQUIRE(res.Value<int32_t>(0, 0) == 42);
+		REQUIRE(res.Value<int64_t>(0, 0) == 42);
 	}
 
 	{
@@ -127,13 +144,7 @@ SELECT * FROM odbc_query(
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st_exec));
 		REQUIRE(res.NextChunk());
-		// MySQL changes column type from INT to BIGINT on `SQLExecute`
-		if (DBMSConfigured("MySQL") || DBMSConfigured("MariaDB")) {
-			// seems to be inconsistent between versions
-			// REQUIRE(res.Value<int64_t>(0, 0) == 43);
-		} else {
-			REQUIRE(res.Value<int32_t>(0, 0) == 43);
-		}
+		REQUIRE(res.Value<int64_t>(0, 0) == 43);
 	}
 }
 
@@ -150,14 +161,16 @@ SET VARIABLE params1 = odbc_create_params()
 	}
 
 	duckdb_prepared_statement ps_ptr = nullptr;
-	duckdb_state st_prepare = duckdb_prepare(sc.conn, R"(
+	duckdb_state st_prepare = duckdb_prepare(sc.conn,
+	                                         (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS INTEGER)
+    SELECT )" + CastAsBigintSQL("?") + R"(
   ', 
   params_handle=getvariable('params1'))
-)",
+)")
+	                                             .c_str(),
 	                                         &ps_ptr);
 	REQUIRE(PreparedSuccess(ps_ptr, st_prepare));
 	auto ps = PreparedStatementPtr(ps_ptr, PreparedStatementDeleter);
@@ -176,7 +189,7 @@ SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(42))
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st_exec));
 		REQUIRE(res.NextChunk());
-		REQUIRE(res.Value<int32_t>(0, 0) == 42);
+		REQUIRE(res.Value<int64_t>(0, 0) == 42);
 	}
 
 	{
@@ -193,6 +206,6 @@ SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(43))
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st_exec));
 		REQUIRE(res.NextChunk());
-		REQUIRE(res.Value<int32_t>(0, 0) == 43);
+		REQUIRE(res.Value<int64_t>(0, 0) == 43);
 	}
 }

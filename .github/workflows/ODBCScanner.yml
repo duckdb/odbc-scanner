@@ -21,7 +21,6 @@ jobs:
     env:
       GEN: ninja
       DUCKDB_AVAILABLE: 1
-      INT_CAST_AVAILABLE: 1
       DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.so
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
     steps:
@@ -79,7 +78,6 @@ jobs:
     env:
       GEN: ninja
       DUCKDB_AVAILABLE: 1
-      INT_CAST_AVAILABLE: 1
       DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.dylib
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.dylib
     steps:
@@ -137,7 +135,6 @@ jobs:
     env:
       GEN: ninja
       MSSQL_AVAILABLE: 1
-      INT_CAST_AVAILABLE: 1
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       ODBC_CONN_STRING_NODB: Driver={MSSQL Driver};Server=tcp:127.0.0.1,1433;UID=sa;PWD=P@ssword2;TrustServerCertificate=yes;
       ODBC_CONN_STRING: Driver={MSSQL Driver};Server=tcp:127.0.0.1,1433;UID=sa;PWD=P@ssword2;TrustServerCertificate=yes;Database=odbcscanner_test_db;
@@ -205,7 +202,6 @@ jobs:
     env:
       GEN: ninja
       POSTGRES_AVAILABLE: 1
-      INT_CAST_AVAILABLE: 1
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       ODBC_CONN_STRING_NODB: Driver={PostgreSQL Driver};Server=127.0.0.1;Port:1433;Username=postgres;Password=postgres;
       ODBC_CONN_STRING: Driver={PostgreSQL Driver};Server=127.0.0.1;Port:1433;Username=postgres;Password=postgres;Database=odbcscanner_test_db;
@@ -287,7 +283,7 @@ jobs:
             unixodbc-dev
           sudo systemctl start mariadb
           sudo systemctl status mariadb
-          sudo mysql -u root -e "SET PASSWORD FOR 'root'@'localhost' = PASSWORD('root'); FLUSH PRIVILEGES;"
+          sudo mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'root';"
           cat /etc/odbcinst.ini
           ./resources/scripts/write_odbcinst_ini.sh MariaDB "${MARIADB_ODBC_LIB_PATH}"
 
@@ -315,9 +311,11 @@ jobs:
 
       - name: SQL Tests
         run: |
-          make test
+          ./configure/venv/bin/python \
+            -m duckdb_sqllogictest \
+            --external-extension ./build/release/odbc_scanner.duckdb_extension \
+            --test-dir ./test/sql/mysql
 
-  # currently using MySQL ODBC driver with MariaDB server
   mysql-linux-amd64:
     name: MySQL Linux (amd64)
     runs-on: ubuntu-latest
@@ -328,7 +326,7 @@ jobs:
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       ODBC_CONN_STRING_NODB: Driver={MySQL Driver};SERVER=127.0.0.1;PORT=3306;USER=root;PASSWORD=root;
       ODBC_CONN_STRING: Driver={MySQL Driver};SERVER=127.0.0.1;PORT=3306;USER=root;PASSWORD=root;DATABASE=odbcscanner_test_db;
-      MYSQL_ODBC_LIB_PATH: /usr/lib/x86_64-linux-gnu/odbc/libmyodbc9w.so
+      MYSQL_ODBC_LIB_PATH: ${{ github.workspace }}/mysql-connector-odbc/build/lib/libmyodbc9w.so
       DEBIAN_FRONTEND: noninteractive
     steps:
       - name: Checkout
@@ -340,19 +338,24 @@ jobs:
       - name: Install
         run: |
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
-          curl -LO https://dev.mysql.com/get/mysql-apt-config_0.8.34-1_all.deb
-          sudo -E apt install -y -q -o=Dpkg::Use-Pty=0 ./mysql-apt-config_0.8.34-1_all.deb
-          sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
-            mysql-connector-odbc \
-            mariadb-server \
+            libmysqlclient-dev \
             ninja-build \
             python3-pyodbc \
             unixodbc-dev
-          sudo systemctl start mariadb
-          sudo systemctl status mariadb
-          sudo mysql -u root -e "SET PASSWORD FOR 'root'@'localhost' = PASSWORD('root'); FLUSH PRIVILEGES;"
-          cat /etc/odbcinst.ini
+          sudo systemctl start mysql
+          sudo systemctl status mysql
+          
+      - name: Build MySQL ODBC
+        run: |
+          git clone -q -c advice.detachedHead=false --branch 9.4.0 https://github.com/mysql/mysql-connector-odbc.git
+          pushd mysql-connector-odbc
+          mkdir build
+          pushd build
+          cmake .. -G "Ninja" -DWITH_UNIXODBC=1 -DDISABLE_GUI=1
+          ninja
+          popd
+          popd
           ./resources/scripts/write_odbcinst_ini.sh MySQL "${MYSQL_ODBC_LIB_PATH}"
 
       - name: Prepare DB
@@ -377,7 +380,9 @@ jobs:
         run: |
           make test_c_api
 
-      # todo
-      # - name: SQL Tests
-      #  run: |
-      #    make test
+      - name: SQL Tests
+        run: |
+          ./configure/venv/bin/python \
+            -m duckdb_sqllogictest \
+            --external-extension ./build/release/odbc_scanner.duckdb_extension \
+            --test-dir ./test/sql/mysql

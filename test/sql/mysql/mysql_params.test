@@ -1,0 +1,59 @@
+# name: test/sql/mysql/params.test
+# description: test MySQL for calls of odbc_query() function with params argument
+# group: [sql_mysql_params]
+
+require odbc_scanner
+
+require-env MYSQL_AVAILABLE
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SIGNED)', params=NULL)
+----
+Binder Error: Cannot extract parameters from STRUCT: specified STRUCT is NULL
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SIGNED)', params=42)
+----
+Binder Error: Cannot extract parameters from STRUCT: specified value is not STRUCT
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SIGNED)', params=row(42))
+----
+42
+
+# statement error
+# SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SIGNED)', params=row('foo'))
+# ----
+# Invalid Input Error: 'SQLExecute' failed, query: 'SELECT CAST(? AS SIGNED)'
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SIGNED)', params=row(41, 42))
+----
+Binder Error: Incorrect number of parameters specified, query: 'SELECT CAST(? AS SIGNED)', expected: 1, actual: 2
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SIGNED)', params=row(NULL))
+----
+NULL
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SIGNED)', params=row(?))
+
+query I
+EXECUTE p1(42)
+----
+42
+
+query I
+EXECUTE p1(43)
+----
+43
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
