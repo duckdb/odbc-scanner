@@ -10,9 +10,7 @@ def exec_sql(cur, sql):
   cur.execute(sql)
 
 def run_mssql():
-  conn = pyodbc.connect(args.conn_str)
-  # https://github.com/mkleehammer/pyodbc/issues/503
-  conn.autocommit = True
+  conn = pyodbc.connect(args.conn_str, autocommit=True)
   cur = conn.cursor()
   exec_sql(cur, "SELECT @@version")
   print(cur.fetchone()[0])
@@ -20,9 +18,7 @@ def run_mssql():
   exec_sql(cur, "CREATE DATABASE odbcscanner_test_db")
 
 def run_postgres():
-  conn = pyodbc.connect(args.conn_str)
-  # https://github.com/mkleehammer/pyodbc/issues/503
-  conn.autocommit = True
+  conn = pyodbc.connect(args.conn_str, autocommit=True)
   cur = conn.cursor()
   exec_sql(cur, "SELECT version()")
   print(cur.fetchone()[0])
@@ -39,7 +35,7 @@ def run_mysql():
 
 def run_oracle():
   # waiting for DB startup
-  for i in range(32):
+  for i in range(16):
     try:
       conn = pyodbc.connect(args.conn_str)
       break
@@ -53,7 +49,7 @@ def run_oracle():
 
 def run_db2():
   # waiting for DB startup
-  for i in range(32):
+  for i in range(16):
     try:
       conn = pyodbc.connect(args.conn_str)
       break
@@ -70,6 +66,20 @@ def run_clickhouse():
   cur = conn.cursor()
   exec_sql(cur, "SELECT version()")
   print(cur.fetchone()[0])
+
+def run_spark():
+  # waiting for DB startup
+  for i in range(32):
+    try:
+      conn = pyodbc.connect(args.conn_str, autocommit=True)
+      break
+    except Exception as e:
+      print(e)
+      time.sleep(5)
+
+  cur = conn.cursor()
+  exec_sql(cur, "SELECT version()")
+  print(cur.fetchone())
 
 parser = ArgumentParser()
 parser.add_argument("--dbms", required=True)
@@ -91,5 +101,7 @@ if __name__ == "__main__":
     run_db2()
   elif "ClickHouse" == args.dbms:
     run_clickhouse()
+  elif "Spark" == args.dbms:
+    run_spark()
   else:
     raise Exception("Unsupported DBMS: " + args.dbms)
