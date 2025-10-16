@@ -65,6 +65,12 @@ def run_db2():
   exec_sql(cur, "SELECT * FROM SYSIBMADM.ENV_INST_INFO")
   print(cur.fetchone())
 
+def run_clickhouse():
+  conn = pyodbc.connect(args.conn_str)
+  cur = conn.cursor()
+  exec_sql(cur, "SELECT version()")
+  print(cur.fetchone()[0])
+
 parser = ArgumentParser()
 parser.add_argument("--dbms", required=True)
 parser.add_argument("--conn-str", required=True)
@@ -83,5 +89,7 @@ if __name__ == "__main__":
     run_oracle()
   elif "DB2" == args.dbms:
     run_db2()
+  elif "ClickHouse" == args.dbms:
+    run_clickhouse()
   else:
     raise Exception("Unsupported DBMS: " + args.dbms)

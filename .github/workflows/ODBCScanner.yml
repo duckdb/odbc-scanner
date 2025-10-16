@@ -523,3 +523,70 @@ jobs:
             -m duckdb_sqllogictest \
             --external-extension ./build/release/odbc_scanner.duckdb_extension \
             --test-dir ./test/sql/db2
+
+  clickhouse-linux-amd64:
+    name: ClickHouse Linux (amd64)
+    runs-on: ubuntu-latest
+    needs: duckdb-linux-amd64
+    env:
+      GEN: ninja
+      CLICKHOUSE_AVAILABLE: 1
+      DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
+      ODBC_CONN_STRING: Driver={ClickHouse Driver};Server=127.0.0.1;Port=8123;
+      CLICKHOUSE_ODBC_LIB_PATH: ${{ github.workspace }}/clickhouse-odbc-1.4.3-Linux/lib/libclickhouseodbcw.so
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      - name: Install
+        run: |
+          curl --no-progress-meter -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | sudo gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
+          ARCH=$(dpkg --print-architecture)
+          echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=${ARCH}] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
+          sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
+          sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            clickhouse-server \
+            ninja-build \
+            python3-pyodbc \
+            unixodbc-dev
+          sudo systemctl start clickhouse-server
+          sudo systemctl status clickhouse-server
+          
+      - name: Set up ClickHouse ODBC
+        run: |
+          curl --no-progress-meter -LO https://github.com/ClickHouse/clickhouse-odbc/releases/download/1.4.3.20250807/clickhouse-odbc-linux-Clang-UnixODBC-Release.zip
+          unzip clickhouse-odbc-linux-Clang-UnixODBC-Release.zip
+          tar xJvf clickhouse-odbc-1.4.3-Linux.tar.xz
+          ./resources/scripts/write_odbcinst_ini.sh ClickHouse "${CLICKHOUSE_ODBC_LIB_PATH}"
+
+      - name: Prepare DB
+        run: |
+          python3 ./resources/scripts/prepare_test_db.py --dbms ClickHouse --conn-str "${ODBC_CONN_STRING}"
+
+      - name: CAPI Shared Lib
+        run: |
+          mkdir libduckdb
+          pushd libduckdb
+          curl --no-progress-meter -LO https://github.com/duckdb/duckdb/releases/latest/download/libduckdb-linux-amd64.zip
+          unzip -q libduckdb-linux-amd64.zip
+          ls -laR
+          popd
+
+      - name: Build
+        run: |
+          make configure
+          make release
+
+      - name: C API Tests
+        run: |
+          ./cmake_build/release/test/test_odbc_scanner [capi_version]
+
+      - name: SQL Tests
+        run: |
+          ./configure/venv/bin/python \
+            -m duckdb_sqllogictest \
+            --external-extension ./build/release/odbc_scanner.duckdb_extension \
+            --test-dir ./test/sql/clickhouse

@@ -1,0 +1,16 @@
+# name: test/sql/clickhouse/clickhouse_version.test
+# description: test for ClickHouse version
+# group: [sql_clickhouse_version]
+
+require odbc_scanner
+
+require-env CLICKHOUSE_AVAILABLE
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement ok
+CALL odbc_query(getvariable('conn'), 'SELECT version()')
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
