@@ -459,3 +459,73 @@ jobs:
             -m duckdb_sqllogictest \
             --external-extension ./build/release/odbc_scanner.duckdb_extension \
             --test-dir ./test/sql/oracle
+
+  db2-linux-amd64:
+    name: DB2 Linux (amd64)
+    runs-on: ubuntu-latest
+    needs: duckdb-linux-amd64
+    env:
+      GEN: ninja
+      DB2_AVAILABLE: 1
+      DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
+      ODBC_CONN_STRING: Driver={DB2 Driver};HostName=127.0.0.1;Port=50000;Database=testdb;UID=db2inst1;PWD=testpwd;
+      DB2_ODBC_LIB_PATH: ${{ github.workspace }}/odbc_cli/clidriver/lib/libdb2o.so
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      - name: Install
+        run: |
+          sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
+          sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ninja-build \
+            python3-pyodbc \
+            unixodbc-dev
+          curl --no-progress-meter -LO https://github.com/staticlibs/odbclibs_tmp/releases/download/tmp1/v12.1.2_linuxx64_odbc_cli.tar.gz
+          tar xzvf v12.1.2_linuxx64_odbc_cli.tar.gz
+          ./resources/scripts/write_odbcinst_ini.sh DB2 "${DB2_ODBC_LIB_PATH}"
+
+      - name: Docker
+        run: |
+          mkdir db2_data
+          docker run -id                                 \
+          --privileged=true                              \
+          --name db2                                     \
+          -p 50000:50000                                 \
+          -e LICENSE=accept                              \
+          -e DB2INST1_PASSWORD=testpwd                   \
+          -e DBNAME=testdb                               \
+          -v ${{ github.workspace }}/db2_data/:/database \
+           icr.io/db2_community/db2
+
+      - name: Prepare DB
+        run: |
+          python3 ./resources/scripts/prepare_test_db.py --dbms DB2 --conn-str "${ODBC_CONN_STRING}"
+
+      - name: CAPI Shared Lib
+        run: |
+          mkdir libduckdb
+          pushd libduckdb
+          curl --no-progress-meter -LO https://github.com/duckdb/duckdb/releases/latest/download/libduckdb-linux-amd64.zip
+          unzip -q libduckdb-linux-amd64.zip
+          ls -laR
+          popd
+
+      - name: Build
+        run: |
+          make configure
+          make release
+
+      - name: C API Tests
+        run: |
+          ./cmake_build/release/test/test_odbc_scanner [capi_version]
+
+      - name: SQL Tests
+        run: |
+          ./configure/venv/bin/python \
+            -m duckdb_sqllogictest \
+            --external-extension ./build/release/odbc_scanner.duckdb_extension \
+            --test-dir ./test/sql/db2
