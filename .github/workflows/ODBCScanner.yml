@@ -326,7 +326,7 @@ jobs:
       DUCKDB_SHARED_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       ODBC_CONN_STRING_NODB: Driver={MySQL Driver};SERVER=127.0.0.1;PORT=3306;USER=root;PASSWORD=root;
       ODBC_CONN_STRING: Driver={MySQL Driver};SERVER=127.0.0.1;PORT=3306;USER=root;PASSWORD=root;DATABASE=odbcscanner_test_db;
-      MYSQL_ODBC_LIB_PATH: ${{ github.workspace }}/mysql-connector-odbc/build/lib/libmyodbc9w.so
+      MYSQL_ODBC_LIB_PATH: ${{ github.workspace }}/mysql_odbc_9.4.0_ubuntu_24.04_amd64/lib/libmyodbc9w.so
       DEBIAN_FRONTEND: noninteractive
     steps:
       - name: Checkout
@@ -346,16 +346,10 @@ jobs:
           sudo systemctl start mysql
           sudo systemctl status mysql
           
-      - name: Build MySQL ODBC
+      - name: Set up MySQL ODBC
         run: |
-          git clone -q -c advice.detachedHead=false --branch 9.4.0 https://github.com/mysql/mysql-connector-odbc.git
-          pushd mysql-connector-odbc
-          mkdir build
-          pushd build
-          cmake .. -G "Ninja" -DWITH_UNIXODBC=1 -DDISABLE_GUI=1
-          ninja
-          popd
-          popd
+          curl --no-progress-meter -LO https://github.com/staticlibs/odbclibs_tmp/releases/download/tmp1/mysql_odbc_9.4.0_ubuntu_24.04_amd64.tar.xz
+          tar xJvf mysql_odbc_9.4.0_ubuntu_24.04_amd64.tar.xz
           ./resources/scripts/write_odbcinst_ini.sh MySQL "${MYSQL_ODBC_LIB_PATH}"
 
       - name: Prepare DB
