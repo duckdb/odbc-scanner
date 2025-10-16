@@ -104,3 +104,23 @@ SELECT * FROM odbc_query(
 	std::cout << res.Value<std::string>(2, 0) << std::endl;
 	std::cout << res.Value<std::string>(3, 0) << std::endl;
 }
+
+TEST_CASE("DB2 version query", group_name) {
+	if (!(DBMSConfigured("DB2"))) {
+		return;
+	}
+	ScannerConn sc;
+	Result res;
+	duckdb_state st = duckdb_query(sc.conn, R"(
+SELECT * FROM odbc_query(
+	getvariable('conn'), 
+	'
+		SELECT SERVICE_LEVEL FROM SYSIBMADM.ENV_INST_INFO
+	'
+	)
+)",
+	                               res.Get());
+	REQUIRE(QuerySuccess(res.Get(), st));
+	REQUIRE(res.NextChunk());
+	std::cout << res.Value<std::string>(0, 0) << std::endl;
+}
