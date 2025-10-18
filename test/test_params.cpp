@@ -13,7 +13,7 @@ SELECT * FROM odbc_query(
     SELECT )" + CastAsBigintSQL("?") +
 	                                R"(
   ', 
-  params=row(42))
+  params=row(42::BIGINT))
 )")
 	                                   .c_str(),
 	                               res.Get());
@@ -94,8 +94,8 @@ TEST_CASE("Params query with multiple params including NULL", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT coalesce()" + CastAsBigintSQL("?") +
-	                                ", " + CastAsBigintSQL("?") + R"()
+    SELECT )" + CastAsBigintSQL("?") +
+	                                " AS c1, " + CastAsBigintSQL("?") + R"(  AS c2
   ', 
   params=row(NULL, 42))
 )")
@@ -103,7 +103,8 @@ SELECT * FROM odbc_query(
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
-	REQUIRE(res.Value<int64_t>(0, 0) == 42);
+	REQUIRE(res.IsNull(0, 0));
+	REQUIRE(res.Value<int64_t>(1, 0) == 42);
 }
 
 TEST_CASE("Params query with rebinding", group_name) {

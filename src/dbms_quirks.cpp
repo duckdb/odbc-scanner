@@ -6,6 +6,7 @@ namespace odbcscanner {
 const std::string DbmsQuirks::MSSQL_DBMS_NAME = "Microsoft SQL Server";
 const std::string DbmsQuirks::MARIADB_DBMS_NAME = "MariaDB";
 const std::string DbmsQuirks::MYSQL_DBMS_NAME = "MySQL";
+const std::string DbmsQuirks::SPARK_DBMS_NAME = "Spark SQL";
 
 DbmsQuirks::DbmsQuirks() {
 }
@@ -17,6 +18,9 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn) {
 		this->decimal_params_as_chars = true;
 		this->float_width_bytes = 8;
 	} else if (conn.dbms_name == MARIADB_DBMS_NAME || conn.dbms_name == MYSQL_DBMS_NAME) {
+		this->decimal_params_as_chars = true;
+		this->decimal_columns_as_chars = true;
+	} else if (conn.dbms_name == SPARK_DBMS_NAME) {
 		this->decimal_params_as_chars = true;
 		this->decimal_columns_as_chars = true;
 	}

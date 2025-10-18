@@ -114,51 +114,63 @@ static void BindOdbcParamInternal(QueryContext &ctx, SQLSMALLINT ctype, SQLSMALL
 	}
 }
 
+static SQLSMALLINT IntegralSQLType(ScannerParam &param, SQLSMALLINT def_sqltype) {
+	SQLSMALLINT expected = param.ExpectedType();
+	switch (expected) {
+	case SQL_TINYINT:
+	case SQL_SMALLINT:
+	case SQL_INTEGER:
+	case SQL_BIGINT:
+		return expected;
+	}
+	return def_sqltype;
+}
+
 template <>
 void TypeSpecific::BindOdbcParam<int8_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
-	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_TINYINT;
+	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_TINYINT);
 	BindOdbcParamInternal<int8_t>(ctx, SQL_C_STINYINT, sqltype, param, param_idx);
 }
 
 template <>
 void TypeSpecific::BindOdbcParam<uint8_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
-	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_TINYINT;
+	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_TINYINT);
 	BindOdbcParamInternal<uint8_t>(ctx, SQL_C_UTINYINT, sqltype, param, param_idx);
 }
 
 template <>
 void TypeSpecific::BindOdbcParam<int16_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
-	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_SMALLINT;
+	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_SMALLINT);
 	BindOdbcParamInternal<int16_t>(ctx, SQL_C_SSHORT, sqltype, param, param_idx);
 }
 
 template <>
 void TypeSpecific::BindOdbcParam<uint16_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
-	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_SMALLINT;
+	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_SMALLINT);
 	BindOdbcParamInternal<uint16_t>(ctx, SQL_C_USHORT, sqltype, param, param_idx);
 }
 
 template <>
 void TypeSpecific::BindOdbcParam<int32_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
-	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_INTEGER;
+	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_INTEGER);
 	BindOdbcParamInternal<int32_t>(ctx, SQL_C_SLONG, sqltype, param, param_idx);
 }
 
 template <>
 void TypeSpecific::BindOdbcParam<uint32_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
-	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_INTEGER;
+	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_INTEGER);
 	BindOdbcParamInternal<uint32_t>(ctx, SQL_C_ULONG, sqltype, param, param_idx);
 }
 
 template <>
 void TypeSpecific::BindOdbcParam<int64_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
-	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_BIGINT;
+	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_BIGINT);
 	BindOdbcParamInternal<int64_t>(ctx, SQL_C_SBIGINT, sqltype, param, param_idx);
 }
 
 template <>
 void TypeSpecific::BindOdbcParam<uint64_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
-	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_BIGINT;
+	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_BIGINT);
 	BindOdbcParamInternal<uint64_t>(ctx, SQL_C_UBIGINT, sqltype, param, param_idx);
 }
 

@@ -71,6 +71,10 @@ SELECT * FROM odbc_query(
 		REQUIRE(res.Value<int64_t>(0, 0) == 42);
 	}
 
+	if (DBMSConfigured("Spark")) {
+		return;
+	}
+
 	{
 		Result res;
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());

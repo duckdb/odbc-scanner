@@ -28,6 +28,9 @@ TEST_CASE("Long string query", group_name) {
 	if (DBMSConfigured("MySQL") || DBMSConfigured("MariaDB")) {
 		cast = "CAST(? AS CHAR(20000))";
 	}
+	if (DBMSConfigured("Spark")) {
+		cast = "CAST(? AS STRING)";
+	}
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn,

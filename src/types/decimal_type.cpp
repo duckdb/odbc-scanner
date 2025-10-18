@@ -152,27 +152,6 @@ static duckdb_hugeint Zero() {
 	return zero;
 }
 
-/*
-uint64_t multiply_with_carry(uint64_t value, uint64_t *carry) {
-    // First split the number into high and low 32-bit parts
-    uint64_t low = value & 0xFFFFFFFF;
-    uint64_t high = value >> 32;
-
-    // Multiply each part by 10
-    uint64_t low_result = low * 10;
-    uint64_t high_result = high * 10;
-
-    // Add the cross product
-    uint64_t cross = (low_result >> 32) + (high_result & 0xFFFFFFFF);
-
-    // Compute final values
-    uint64_t result = ((cross & 0xFFFFFFFF) << 32) | (low_result & 0xFFFFFFFF);
-    *carry = (high_result >> 32) + (cross >> 32);
-
-    return result;
-}
-*/
-
 // The implementation can be more robust, but we expect the decimal strings from
 // drivers to be well-formed.
 static duckdb_hugeint ParseHugeInt(const std::string &str) {
