@@ -30,11 +30,16 @@ TEST_CASE("Basic query with multiple rows and columns", group_name) {
 SELECT * FROM odbc_query(
 	getvariable('conn'),
 	'
-		SELECT ''foo'', )" + CastAsBigintSQL("41") +
-	                                R"(
-		UNION ALL
-		SELECT ''bar'', )" + CastAsBigintSQL("42") +
-	                                R"(
+		SELECT a.col1, a.col2 FROM (
+			SELECT ''foo'' AS col1, )" +
+	                                CastAsBigintSQL("41") +
+	                                R"( AS col2
+			UNION ALL
+			SELECT ''bar'' AS col1, )" +
+	                                CastAsBigintSQL("42") +
+	                                R"( AS col2
+		) AS a
+		ORDER BY a.col2
 	')
 )")
 	                                   .c_str(),

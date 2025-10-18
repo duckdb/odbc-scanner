@@ -7,6 +7,7 @@ const std::string DbmsQuirks::MSSQL_DBMS_NAME = "Microsoft SQL Server";
 const std::string DbmsQuirks::MARIADB_DBMS_NAME = "MariaDB";
 const std::string DbmsQuirks::MYSQL_DBMS_NAME = "MySQL";
 const std::string DbmsQuirks::SPARK_DBMS_NAME = "Spark SQL";
+const std::string DbmsQuirks::CLICKHOUSE_DBMS_NAME = "ClickHouse";
 
 DbmsQuirks::DbmsQuirks() {
 }
@@ -23,6 +24,9 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn) {
 	} else if (conn.dbms_name == SPARK_DBMS_NAME) {
 		this->decimal_params_as_chars = true;
 		this->decimal_columns_as_chars = true;
+	} else if (conn.dbms_name == CLICKHOUSE_DBMS_NAME) {
+		this->reset_stmt_before_execute = true;
+		this->var_len_data_single_part = true;
 	}
 }
 

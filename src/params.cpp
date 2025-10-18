@@ -464,7 +464,10 @@ std::vector<SQLSMALLINT> Params::CollectTypes(QueryContext &ctx) {
 		SQLSMALLINT param_idx = i + 1;
 
 		SQLSMALLINT ptype = -1;
-		SQLRETURN ret = SQLDescribeParam(ctx.hstmt, param_idx, &ptype, nullptr, nullptr, nullptr);
+		SQLULEN size_out = 0;
+		SQLSMALLINT dec_digits_out = 0;
+		SQLSMALLINT nullable_out = 0;
+		SQLRETURN ret = SQLDescribeParam(ctx.hstmt, param_idx, &ptype, &size_out, &dec_digits_out, &nullable_out);
 		if (!SQL_SUCCEEDED(ret)) { // SQLDescribeParam may or may not be supported
 			ptype = SQL_TYPE_NULL;
 		}

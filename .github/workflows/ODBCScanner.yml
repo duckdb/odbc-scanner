@@ -582,7 +582,8 @@ jobs:
 
       - name: C API Tests
         run: |
-          ./cmake_build/release/test/test_odbc_scanner [capi_version]
+          ./cmake_build/release/test/test_odbc_scanner \
+            [capi_basic],[capi_long_strings],[capi_version]
 
       - name: SQL Tests
         run: |

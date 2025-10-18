@@ -31,6 +31,9 @@ TEST_CASE("Long string query", group_name) {
 	if (DBMSConfigured("Spark")) {
 		cast = "CAST(? AS STRING)";
 	}
+	if (DBMSConfigured("ClickHouse")) {
+		cast = "CAST(? AS Nullable(VARCHAR))";
+	}
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn,
@@ -38,7 +41,7 @@ TEST_CASE("Long string query", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + cast + R"(
+    SELECT )" + cast + R"( AS col1
   ', 
   params=row(?::VARCHAR))
 )")

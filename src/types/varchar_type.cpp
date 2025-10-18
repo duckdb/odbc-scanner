@@ -76,6 +76,118 @@ void TypeSpecific::BindOdbcParam<std::string>(QueryContext &ctx, ScannerParam &p
 	}
 }
 
+static std::pair<std::string, bool> FetchTail(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLWCHAR> &buf,
+                                              SQLLEN len_bytes) {
+	if (len_bytes % sizeof(SQLWCHAR) != 0) {
+		len_bytes -= 1;
+	}
+	size_t len = static_cast<size_t>(len_bytes / sizeof(SQLWCHAR));
+
+	size_t head_size = buf.size() - 1;
+	buf.resize(len + 1);
+
+	SQLWCHAR *buf_tail_ptr = buf.data() + head_size;
+	size_t buf_tail_size = buf.size() - head_size;
+	SQLLEN len_tail_bytes = 0;
+
+	SQLRETURN ret_tail = SQLGetData(ctx.hstmt, col_idx, SQL_C_WCHAR, buf_tail_ptr,
+	                                static_cast<SQLLEN>(buf_tail_size * sizeof(SQLWCHAR)), &len_tail_bytes);
+	if (!SQL_SUCCEEDED(ret_tail)) {
+		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		throw ScannerException("'SQLGetData' tail for VARCHAR failed, column index: " + std::to_string(col_idx) +
+		                       ", query: '" + ctx.query + "', return: " + std::to_string(ret_tail) +
+		                       ", diagnostics: '" + diag + "'");
+	}
+
+	if (len_tail_bytes % sizeof(SQLWCHAR) != 0) {
+		len_tail_bytes -= 1;
+	}
+	size_t len_tail = static_cast<size_t>(len_tail_bytes / sizeof(SQLWCHAR));
+	size_t len_tail_expected = len - head_size;
+	if (len_tail != len_tail_expected) {
+		throw ScannerException(
+		    "'SQLGetData' for VARCHAR failed due to inconsistent tail length reported by the driver, column "
+		    "index: " +
+		    std::to_string(col_idx) + ", query: '" + ctx.query + "', return: " + std::to_string(ret_tail) +
+		    ", head length: " + std::to_string(len_tail_expected) + ", actual: " + std::to_string(len_tail));
+	}
+
+	std::string str = WideChar::Narrow(buf.data(), buf.size() - 1);
+	return std::make_pair(std::move(str), false);
+}
+
+static std::pair<std::string, bool> FetchMultiReads(QueryContext &ctx, SQLSMALLINT col_idx,
+                                                    std::vector<SQLWCHAR> &buf) {
+	for (size_t i = 1; true; i++) {
+		size_t prev_len = buf.size();
+		size_t prev_written = prev_len - 1;
+		buf.resize(prev_len * 2);
+		SQLLEN len_bytes = 0;
+
+		SQLWCHAR *buf_ptr = buf.data() + prev_written;
+		size_t buf_size = buf.size() - prev_written;
+		SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_WCHAR, buf_ptr,
+		                           static_cast<SQLLEN>(buf_size * sizeof(SQLWCHAR)), &len_bytes);
+
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			throw ScannerException("'SQLGetData' multi for VARCHAR failed, read number: " + std::to_string(i) +
+			                       " column index: " + std::to_string(col_idx) + ", query: '" + ctx.query +
+			                       "', return: " + std::to_string(ret) +
+			                       ", prev written: " + std::to_string(prev_written) + ", diagnostics: '" + diag + "'");
+		}
+
+		std::string diag_code;
+		if (ret == SQL_SUCCESS_WITH_INFO) {
+			diag_code = Diagnostics::ReadCode(ctx.hstmt, SQL_HANDLE_STMT);
+		}
+
+		if (ret == SQL_SUCCESS || diag_code != trunc_diag_code) {
+			if (len_bytes % sizeof(SQLWCHAR) != 0) {
+				len_bytes -= 1;
+			}
+
+			size_t buf_size_full = prev_written + (len_bytes / sizeof(SQLWCHAR));
+			std::string str = WideChar::Narrow(buf.data(), buf_size_full);
+			return std::make_pair(std::move(str), false);
+		}
+	}
+}
+
+static std::pair<std::string, bool> FetchSinglePart(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLWCHAR> &buf,
+                                                    SQLLEN len_bytes) {
+	if (len_bytes % sizeof(SQLWCHAR) != 0) {
+		len_bytes -= 1;
+	}
+	size_t len = static_cast<size_t>(len_bytes / sizeof(SQLWCHAR));
+	buf.resize(len + 1);
+	SQLLEN len_read_bytes = 0;
+
+	SQLRETURN ret_tail = SQLGetData(ctx.hstmt, col_idx, SQL_C_WCHAR, buf.data(),
+	                                static_cast<SQLLEN>(buf.size() * sizeof(SQLWCHAR)), &len_read_bytes);
+	if (!SQL_SUCCEEDED(ret_tail)) {
+		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		throw ScannerException(
+		    "'SQLGetData' single part for VARCHAR tail failed, column index: " + std::to_string(col_idx) +
+		    ", query: '" + ctx.query + "', return: " + std::to_string(ret_tail) + ", diagnostics: '" + diag + "'");
+	}
+
+	if (len_read_bytes % sizeof(SQLWCHAR) != 0) {
+		len_read_bytes -= 1;
+	}
+	if (len_read_bytes != len_bytes) {
+		throw ScannerException(
+		    "'SQLGetData' single part for VARCHAR failed due to inconsistent part length reported by the driver, "
+		    "column "
+		    "index: " +
+		    std::to_string(col_idx) + ", query: '" + ctx.query + "', return: " + std::to_string(ret_tail) +
+		    ", first read length: " + std::to_string(len_bytes) + ", actual: " + std::to_string(len_read_bytes));
+	}
+
+	std::string str = WideChar::Narrow(buf.data(), buf.size() - 1);
+	return std::make_pair(std::move(str), false);
+}
+
 static std::pair<std::string, bool> FetchInternal(QueryContext &ctx, SQLSMALLINT col_idx) {
 	std::vector<SQLWCHAR> buf;
 	buf.resize(4096);
@@ -113,81 +225,15 @@ static std::pair<std::string, bool> FetchInternal(QueryContext &ctx, SQLSMALLINT
 
 	// invariant: ret = SQL_SUCCESS_WITH_INFO && diag_code == "01004"
 
-	// head + tail reads
+	if (ctx.quirks.var_len_data_single_part) {
+		return FetchSinglePart(ctx, col_idx, buf, len_bytes);
+	}
+
 	if (len_bytes != SQL_NO_TOTAL) {
-		if (len_bytes % sizeof(SQLWCHAR) != 0) {
-			len_bytes -= 1;
-		}
-		size_t len = static_cast<size_t>(len_bytes / sizeof(SQLWCHAR));
-
-		size_t head_size = buf.size() - 1;
-		buf.resize(len + 1);
-
-		SQLWCHAR *buf_tail_ptr = buf.data() + head_size;
-		size_t buf_tail_size = buf.size() - head_size;
-		SQLLEN len_tail_bytes = 0;
-
-		SQLRETURN ret_tail = SQLGetData(ctx.hstmt, col_idx, SQL_C_WCHAR, buf_tail_ptr,
-		                                static_cast<SQLLEN>(buf_tail_size * sizeof(SQLWCHAR)), &len_tail_bytes);
-		if (!SQL_SUCCEEDED(ret_tail)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
-			throw ScannerException("'SQLGetData' for VARCHAR tail failed, column index: " + std::to_string(col_idx) +
-			                       ", query: '" + ctx.query + "', return: " + std::to_string(ret_tail) +
-			                       ", diagnostics: '" + diag + "'");
-		}
-
-		if (len_tail_bytes % sizeof(SQLWCHAR) != 0) {
-			len_tail_bytes -= 1;
-		}
-		size_t len_tail = static_cast<size_t>(len_tail_bytes / sizeof(SQLWCHAR));
-		size_t len_tail_expected = len - head_size;
-		if (len_tail != len_tail_expected) {
-			throw ScannerException(
-			    "'SQLGetData' for VARCHAR failed due to inconsistent tail length reported by the driver, column "
-			    "index: " +
-			    std::to_string(col_idx) + ", query: '" + ctx.query + "', return: " + std::to_string(ret_tail) +
-			    ", head length: " + std::to_string(len_tail_expected) + ", actual: " + std::to_string(len_tail));
-		}
-
-		std::string str = WideChar::Narrow(buf.data(), buf.size() - 1);
-		return std::make_pair(std::move(str), false);
+		return FetchTail(ctx, col_idx, buf, len_bytes);
 	}
 
-	// multiple reads
-	for (size_t i = 1; true; i++) {
-		size_t prev_len = buf.size();
-		size_t prev_written = prev_len - 1;
-		buf.resize(prev_len * 2);
-
-		SQLWCHAR *buf_ptr = buf.data() + prev_written;
-		size_t buf_size = buf.size() - prev_written;
-		ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_WCHAR, buf_ptr, static_cast<SQLLEN>(buf_size * sizeof(SQLWCHAR)),
-		                 &len_bytes);
-
-		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
-			throw ScannerException("'SQLGetData' for VARCHAR failed, read number: " + std::to_string(i) +
-			                       " column index: " + std::to_string(col_idx) + ", query: '" + ctx.query +
-			                       "', return: " + std::to_string(ret) +
-			                       ", prev written: " + std::to_string(prev_written) + ", diagnostics: '" + diag + "'");
-		}
-
-		if (ret == SQL_SUCCESS_WITH_INFO) {
-			diag_code = Diagnostics::ReadCode(ctx.hstmt, SQL_HANDLE_STMT);
-		}
-
-		if (ret == SQL_SUCCESS || diag_code != trunc_diag_code) {
-			if (len_bytes % sizeof(SQLWCHAR) != 0) {
-				len_bytes -= 1;
-			}
-
-			size_t buf_size_full = prev_written + (len_bytes / sizeof(SQLWCHAR));
-			std::string str = WideChar::Narrow(buf.data(), buf_size_full);
-			return std::make_pair(std::move(str), false);
-		}
-
-		// invariant: ret = SQL_SUCCESS_WITH_INFO && diag_code == "01004"
-	}
+	return FetchMultiReads(ctx, col_idx, buf);
 }
 
 template <>

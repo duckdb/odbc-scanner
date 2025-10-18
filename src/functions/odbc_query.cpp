@@ -211,6 +211,15 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 		Params::BindToOdbc(ctx, *params_ptr);
 	}
 
+	if (ctx.quirks.reset_stmt_before_execute) {
+		SQLRETURN ret = SQLFreeStmt(ctx.hstmt, SQL_CLOSE);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			throw ScannerException("'SQLFreeStmt' with SQL_CLOSE (reset_stmt_before_execute) failed, query: '" +
+			                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
+	}
+
 	{
 		SQLRETURN ret = SQLExecute(ctx.hstmt);
 		if (!SQL_SUCCEEDED(ret)) {
