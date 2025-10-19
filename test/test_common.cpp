@@ -182,18 +182,30 @@ duckdb_date_struct Result::Value<duckdb_date_struct>(idx_t col_idx, idx_t row_id
 
 template <>
 int16_t Result::DecimalValue<int16_t>(idx_t col_idx, idx_t row_idx) {
+	if (DBMSConfigured("ClickHouse")) {
+		duckdb_hugeint *data = NotNullData<duckdb_hugeint>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
+		return static_cast<int16_t>(data[row_idx].lower);
+	}
 	int16_t *data = NotNullData<int16_t>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
 	return data[row_idx];
 }
 
 template <>
 int32_t Result::DecimalValue<int32_t>(idx_t col_idx, idx_t row_idx) {
+	if (DBMSConfigured("ClickHouse")) {
+		duckdb_hugeint *data = NotNullData<duckdb_hugeint>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
+		return static_cast<int32_t>(data[row_idx].lower);
+	}
 	int32_t *data = NotNullData<int32_t>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
 	return data[row_idx];
 }
 
 template <>
 int64_t Result::DecimalValue<int64_t>(idx_t col_idx, idx_t row_idx) {
+	if (DBMSConfigured("ClickHouse")) {
+		duckdb_hugeint *data = NotNullData<duckdb_hugeint>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
+		return static_cast<int64_t>(data[row_idx].lower);
+	}
 	int64_t *data = NotNullData<int64_t>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
 	return data[row_idx];
 }
@@ -238,6 +250,24 @@ std::string CastAsBigintSQL(const std::string &value) {
 	std::string type_name = "BIGINT";
 	if (DBMSConfigured("MySQL") || DBMSConfigured("MariaDB")) {
 		type_name = "SIGNED";
+	} else if (DBMSConfigured("ClickHouse")) {
+		type_name = "Nullable(" + type_name + ")";
+	}
+	return "CAST(" + value + " AS " + type_name + ")";
+}
+
+std::string CastAsDateSQL(const std::string &value) {
+	std::string type_name = "DATE";
+	if (DBMSConfigured("ClickHouse")) {
+		type_name = "Nullable(" + type_name + ")";
+	}
+	return "CAST(" + value + " AS " + type_name + ")";
+}
+
+std::string CastAsDecimalSQL(const std::string &value, uint8_t precision, uint8_t scale) {
+	std::string type_name = "DECIMAL(" + std::to_string(precision) + ", " + std::to_string(scale) + ")";
+	if (DBMSConfigured("ClickHouse")) {
+		type_name = "Nullable(" + type_name + ")";
 	}
 	return "CAST(" + value + " AS " + type_name + ")";
 }

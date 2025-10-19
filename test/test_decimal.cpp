@@ -154,14 +154,17 @@ SELECT * FROM odbc_query(
 TEST_CASE("Decimal INT16 query with a literal parameter", group_name) {
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	duckdb_state st = duckdb_query(sc.conn,
+	                               (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS DECIMAL(4,3))
+    SELECT )" + CastAsDecimalSQL("?", 4, 3) +
+	                                R"( AS col1
   ',
   params=row('1.234'::DECIMAL(4,3)))
-)",
+)")
+	                                   .c_str(),
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
@@ -171,14 +174,17 @@ SELECT * FROM odbc_query(
 TEST_CASE("Decimal INT16 query with a negative literal parameter", group_name) {
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	duckdb_state st = duckdb_query(sc.conn,
+	                               (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS DECIMAL(4,3))
+    SELECT )" + CastAsDecimalSQL("?", 4, 3) +
+	                                R"( AS col1
   ',
   params=row('-1.234'::DECIMAL(4,3)))
-)",
+)")
+	                                   .c_str(),
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
@@ -188,14 +194,17 @@ SELECT * FROM odbc_query(
 TEST_CASE("Decimal INT128 query with a negative literal parameter", group_name) {
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	duckdb_state st = duckdb_query(sc.conn,
+	                               (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS DECIMAL(38,3))
+    SELECT )" + CastAsDecimalSQL("?", 38, 3) +
+	                                R"( AS col1
   ',
   params=row('-12345678901234567890123456789012345.123'::DECIMAL(38,3)))
-)",
+)")
+	                                   .c_str(),
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
@@ -214,14 +223,16 @@ SET VARIABLE params1 = odbc_create_params()
 	REQUIRE(QuerySuccess(res_create_params.Get(), st_create_params));
 
 	duckdb_prepared_statement ps_ptr = nullptr;
-	duckdb_state st_prepare = duckdb_prepare(sc.conn, R"(
+	duckdb_state st_prepare = duckdb_prepare(sc.conn,
+	                                         (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS DECIMAL(4,3))
+    SELECT )" + CastAsDecimalSQL("?", 4, 3) + R"( AS col1
   ', 
   params_handle=getvariable('params1'))
-)",
+)")
+	                                             .c_str(),
 	                                         &ps_ptr);
 	REQUIRE(PreparedSuccess(ps_ptr, st_prepare));
 	auto ps = PreparedStatementPtr(ps_ptr, PreparedStatementDeleter);
@@ -252,14 +263,16 @@ SET VARIABLE params1 = odbc_create_params()
 	REQUIRE(QuerySuccess(res_create_params.Get(), st_create_params));
 
 	duckdb_prepared_statement ps_ptr = nullptr;
-	duckdb_state st_prepare = duckdb_prepare(sc.conn, R"(
+	duckdb_state st_prepare = duckdb_prepare(sc.conn,
+	                                         (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(? AS DECIMAL(38,3))
+    SELECT )" + CastAsDecimalSQL("?", 38, 3) + R"( AS col1
   ', 
   params_handle=getvariable('params1'))
-)",
+)")
+	                                             .c_str(),
 	                                         &ps_ptr);
 	REQUIRE(PreparedSuccess(ps_ptr, st_prepare));
 	auto ps = PreparedStatementPtr(ps_ptr, PreparedStatementDeleter);

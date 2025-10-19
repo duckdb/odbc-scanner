@@ -201,6 +201,25 @@ static void SetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_id
 		                       ",  query: '" + ctx.query);
 }
 
+static size_t RemoveSeparatorReturnScale(std::string &str) {
+	const char *dot_ptr = std::strchr(str.c_str(), '.');
+	if (dot_ptr != nullptr) {
+		size_t idx = static_cast<size_t>(dot_ptr - str.c_str());
+		str.erase(std::remove(str.begin(), str.end(), '.'), str.end());
+		str.erase(std::remove(str.begin(), str.end(), ','), str.end());
+		return str.length() - idx;
+	} else {
+		const char *comma_ptr = std::strchr(str.c_str(), ',');
+		if (comma_ptr != nullptr) {
+			size_t idx = static_cast<size_t>(comma_ptr - str.c_str());
+			str.erase(std::remove(str.begin(), str.end(), ','), str.end());
+			return str.length() - idx;
+		} else {
+			return 0;
+		}
+	}
+}
+
 static std::pair<duckdb_hugeint, bool> FetchDecimal(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
 	SQLSMALLINT ctype = SQL_C_NUMERIC;
 	if (ctx.quirks.decimal_columns_precision_through_ard) {
@@ -253,18 +272,17 @@ static std::pair<duckdb_hugeint, bool> FetchVarchar(QueryContext &ctx, OdbcType 
 
 	std::string str(buf.data(), len_bytes);
 
-	// we rely on column metadata for scale
-	str.erase(std::remove(str.begin(), str.end(), '.'), str.end());
-	str.erase(std::remove(str.begin(), str.end(), ','), str.end());
-
-	if (str.empty()) {
-		return std::make_pair(Zero(), false);
-	}
-
 	bool negative = false;
 	if ('-' == str[0]) {
 		str.erase(str.begin());
 		negative = true;
+	}
+
+	size_t scale = RemoveSeparatorReturnScale(str);
+	(void)scale;
+
+	if (str.empty()) {
+		return std::make_pair(Zero(), false);
 	}
 
 	duckdb_hugeint parsed = ParseHugeInt(str);

@@ -61,3 +61,7 @@ bool QuerySuccess(duckdb_result *res, duckdb_state st);
 bool PreparedSuccess(duckdb_prepared_statement ps, duckdb_state st);
 
 std::string CastAsBigintSQL(const std::string& value);
+
+std::string CastAsDateSQL(const std::string& value);
+
+std::string CastAsDecimalSQL(const std::string& value, uint8_t precision, uint8_t scale);

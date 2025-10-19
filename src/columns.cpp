@@ -77,7 +77,7 @@ static OdbcType GetTypeAttributes(const std::string &query, SQLSMALLINT cols_cou
 				    ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
 				    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 			}
-			decimal_precision = static_cast<uint8_t>(precision);
+			decimal_precision = static_cast<uint8_t>(precision != 0 ? precision : 38);
 		}
 
 		{

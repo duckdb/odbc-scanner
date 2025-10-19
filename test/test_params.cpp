@@ -11,7 +11,7 @@ SELECT * FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + CastAsBigintSQL("?") +
-	                                R"(
+	                                R"( AS col1
   ', 
   params=row(42::BIGINT))
 )")
@@ -26,6 +26,8 @@ TEST_CASE("Params query with a varchar param literal", group_name) {
 	std::string cast = "CAST(? AS VARCHAR(16))";
 	if (DBMSConfigured("MySQL")) {
 		cast = "CAST(? AS CHAR(16))";
+	} else if (DBMSConfigured("ClickHouse")) {
+		cast = "CAST(? AS Nullable(VARCHAR))";
 	}
 	ScannerConn sc;
 	Result res;
@@ -34,7 +36,7 @@ TEST_CASE("Params query with a varchar param literal", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + cast + R"(
+    SELECT )" + cast + R"( AS col1
   ', 
   params=row('foo'))
 )")
@@ -56,7 +58,7 @@ TEST_CASE("Params query with an unsigned integer param", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT ?::UTINYINT
+    SELECT ?::UTINYINT AS col1
   ', 
   params=row(255::UTINYINT))
 )",
@@ -75,7 +77,7 @@ SELECT * FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + CastAsBigintSQL("?") +
-	                                R"(
+	                                R"( AS col1
   ', 
   params=row(NULL))
 )")
@@ -115,7 +117,7 @@ TEST_CASE("Params query with rebinding", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + CastAsBigintSQL("?") + R"(
+    SELECT )" + CastAsBigintSQL("?") + R"( AS col1
   ', 
   params=row(?))
 )")
@@ -167,7 +169,7 @@ SET VARIABLE params1 = odbc_create_params()
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + CastAsBigintSQL("?") + R"(
+    SELECT )" + CastAsBigintSQL("?") + R"( AS col1
   ', 
   params_handle=getvariable('params1'))
 )")
