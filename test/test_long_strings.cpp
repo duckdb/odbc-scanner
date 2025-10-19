@@ -18,21 +18,18 @@ TEST_CASE("Long string query", group_name) {
 	std::string cast = "NOT_SUPPORTED";
 	if (DBMSConfigured("DuckDB")) {
 		cast = "CAST(? AS VARCHAR)";
-	}
-	if (DBMSConfigured("MSSQL")) {
+	} else if (DBMSConfigured("MSSQL")) {
 		cast = "CAST(? AS VARCHAR(max))";
-	}
-	if (DBMSConfigured("PostgreSQL")) {
+	} else if (DBMSConfigured("PostgreSQL")) {
 		cast = "CAST(? AS TEXT)";
-	}
-	if (DBMSConfigured("MySQL") || DBMSConfigured("MariaDB")) {
+	} else if (DBMSConfigured("MySQL") || DBMSConfigured("MariaDB")) {
 		cast = "CAST(? AS CHAR(20000))";
-	}
-	if (DBMSConfigured("Spark")) {
+	} else if (DBMSConfigured("Spark")) {
 		cast = "CAST(? AS STRING)";
-	}
-	if (DBMSConfigured("ClickHouse")) {
-		cast = "CAST(? AS Nullable(VARCHAR))";
+	} else if (DBMSConfigured("ClickHouse")) {
+		cast = "CAST(? AS Nullable(VARCHAR)) AS col1";
+	} else if (DBMSConfigured("Oracle")) {
+		cast = "CAST(? AS VARCHAR2(4000)) FROM dual";
 	}
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;
@@ -41,7 +38,7 @@ TEST_CASE("Long string query", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + cast + R"( AS col1
+    SELECT )" + cast + R"(
   ', 
   params=row(?::VARCHAR))
 )")
@@ -59,19 +56,21 @@ SELECT * FROM odbc_query(
 		std::string str = GenStr(i);
 		vec.emplace_back(std::move(str));
 	}
-	for (size_t i = (1 << 12) - 4; i < (1 << 12) + 4; i++) {
-		std::string str = GenStr(i);
-		vec.emplace_back(std::move(str));
+	if (!DBMSConfigured("Oracle")) {
+		for (size_t i = (1 << 12) - 4; i < (1 << 12) + 4; i++) {
+			std::string str = GenStr(i);
+			vec.emplace_back(std::move(str));
+		}
+		for (size_t i = (1 << 13) - 4; i < (1 << 13) + 4; i++) {
+			std::string str = GenStr(i);
+			vec.emplace_back(std::move(str));
+		}
+		for (size_t i = (1 << 14) - 4; i < (1 << 14) + 4; i++) {
+			std::string str = GenStr(i);
+			vec.emplace_back(std::move(str));
+		}
+		REQUIRE(vec.size() == 40);
 	}
-	for (size_t i = (1 << 13) - 4; i < (1 << 13) + 4; i++) {
-		std::string str = GenStr(i);
-		vec.emplace_back(std::move(str));
-	}
-	for (size_t i = (1 << 14) - 4; i < (1 << 14) + 4; i++) {
-		std::string str = GenStr(i);
-		vec.emplace_back(std::move(str));
-	}
-	REQUIRE(vec.size() == 40);
 
 	for (std::string &str : vec) {
 		auto param_val = ValuePtr(duckdb_create_varchar_length(str.c_str(), str.length()), ValueDeleter);

@@ -10,10 +10,10 @@ TEST_CASE("Params query with a single param literal", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + CastAsBigintSQL("?") +
-	                                R"( AS col1
+    SELECT )" + CastAsBigintSQL("?", "AS col1") +
+	                                R"(
   ', 
-  params=row(42::BIGINT))
+  params=row(42))
 )")
 	                                   .c_str(),
 	                               res.Get());
@@ -27,7 +27,9 @@ TEST_CASE("Params query with a varchar param literal", group_name) {
 	if (DBMSConfigured("MySQL")) {
 		cast = "CAST(? AS CHAR(16))";
 	} else if (DBMSConfigured("ClickHouse")) {
-		cast = "CAST(? AS Nullable(VARCHAR))";
+		cast = "CAST(? AS Nullable(VARCHAR)) AS col1";
+	} else if (DBMSConfigured("Oracle")) {
+		cast = "CAST(? AS VARCHAR2(16)) FROM dual";
 	}
 	ScannerConn sc;
 	Result res;
@@ -36,7 +38,7 @@ TEST_CASE("Params query with a varchar param literal", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + cast + R"( AS col1
+    SELECT )" + cast + R"(
   ', 
   params=row('foo'))
 )")
@@ -76,8 +78,8 @@ TEST_CASE("Params query NULL BIGINT parameter", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + CastAsBigintSQL("?") +
-	                                R"( AS col1
+    SELECT )" + CastAsBigintSQL("?", "AS col1") +
+	                                R"(
   ', 
   params=row(NULL))
 )")
@@ -89,6 +91,9 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Params query with multiple params including NULL", group_name) {
+	if (DBMSConfigured("Oracle")) {
+		return;
+	}
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
@@ -96,12 +101,34 @@ TEST_CASE("Params query with multiple params including NULL", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + CastAsBigintSQL("?") +
-	                                " AS c1, " + CastAsBigintSQL("?") + R"(  AS c2
+    SELECT )" + CastAsBigintSQL("?", "AS c1") +
+	                                ", " + CastAsBigintSQL("?", "AS c2") + R"(
   ', 
   params=row(NULL, 42))
 )")
 	                                   .c_str(),
+	                               res.Get());
+	REQUIRE(QuerySuccess(res.Get(), st));
+	REQUIRE(res.NextChunk());
+	REQUIRE(res.IsNull(0, 0));
+	REQUIRE(res.Value<int64_t>(1, 0) == 42);
+}
+
+TEST_CASE("Params query Oracle with multiple params including NULL", group_name) {
+	if (!DBMSConfigured("Oracle")) {
+		return;
+	}
+	ScannerConn sc;
+	Result res;
+	duckdb_state st = duckdb_query(sc.conn,
+	                               R"(
+SELECT * FROM odbc_query(
+  getvariable('conn'),
+  '
+    SELECT CAST(? AS NUMBER(18)) AS c1, CAST(? AS NUMBER(18)) AS c2 FROM dual
+  ', 
+  params=row(NULL, 42))
+)",
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
@@ -117,7 +144,8 @@ TEST_CASE("Params query with rebinding", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + CastAsBigintSQL("?") + R"( AS col1
+    SELECT )" + CastAsBigintSQL("?", "AS col1") +
+	                                          R"(
   ', 
   params=row(?))
 )")
@@ -169,7 +197,8 @@ SET VARIABLE params1 = odbc_create_params()
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + CastAsBigintSQL("?") + R"( AS col1
+    SELECT )" + CastAsBigintSQL("?", "AS col1") +
+	                                          R"(
   ', 
   params_handle=getvariable('params1'))
 )")

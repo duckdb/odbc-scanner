@@ -160,6 +160,10 @@ int64_t Result::Value<int64_t>(idx_t col_idx, idx_t row_idx) {
 		int32_t *data = NotNullData<int32_t>(DUCKDB_TYPE_INTEGER, chunk, cur_row_idx, col_idx, row_idx);
 		return data[row_idx];
 	}
+	if (DBMSConfigured("Oracle")) {
+		int64_t *data = NotNullData<int64_t>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
+		return data[row_idx];
+	}
 	int64_t *data = NotNullData<int64_t>(DUCKDB_TYPE_BIGINT, chunk, cur_row_idx, col_idx, row_idx);
 	return data[row_idx];
 }
@@ -175,6 +179,13 @@ std::string Result::Value<std::string>(idx_t col_idx, idx_t row_idx) {
 
 template <>
 duckdb_date_struct Result::Value<duckdb_date_struct>(idx_t col_idx, idx_t row_idx) {
+	if (DBMSConfigured("Oracle")) {
+		duckdb_timestamp *data =
+		    NotNullData<duckdb_timestamp>(DUCKDB_TYPE_TIMESTAMP, chunk, cur_row_idx, col_idx, row_idx);
+		duckdb_timestamp ts = data[row_idx];
+		duckdb_timestamp_struct tss = duckdb_from_timestamp(ts);
+		return tss.date;
+	}
 	duckdb_date *data = NotNullData<duckdb_date>(DUCKDB_TYPE_DATE, chunk, cur_row_idx, col_idx, row_idx);
 	duckdb_date dt = data[row_idx];
 	return duckdb_from_date(dt);
@@ -246,28 +257,42 @@ bool PreparedSuccess(duckdb_prepared_statement ps, duckdb_state st) {
 	return true;
 }
 
-std::string CastAsBigintSQL(const std::string &value) {
+std::string CastAsBigintSQL(const std::string &value, const std::string &alias) {
 	std::string type_name = "BIGINT";
+	std::string postfix = "";
 	if (DBMSConfigured("MySQL") || DBMSConfigured("MariaDB")) {
 		type_name = "SIGNED";
 	} else if (DBMSConfigured("ClickHouse")) {
 		type_name = "Nullable(" + type_name + ")";
+	} else if (DBMSConfigured("Oracle")) {
+		type_name = "NUMBER(18)";
+		postfix = " FROM dual";
 	}
-	return "CAST(" + value + " AS " + type_name + ")";
+	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
 }
 
-std::string CastAsDateSQL(const std::string &value) {
+std::string CastAsDateSQL(const std::string &value_in, const std::string &alias) {
 	std::string type_name = "DATE";
+	std::string postfix = "";
+	std::string value = value_in;
 	if (DBMSConfigured("ClickHouse")) {
 		type_name = "Nullable(" + type_name + ")";
+	} else if (DBMSConfigured("Oracle")) {
+		if (value != "?") {
+			value = "to_date(" + value + ", ''YYYY-MM-DD'')";
+		}
+		postfix = " FROM dual";
 	}
-	return "CAST(" + value + " AS " + type_name + ")";
+	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
 }
 
-std::string CastAsDecimalSQL(const std::string &value, uint8_t precision, uint8_t scale) {
+std::string CastAsDecimalSQL(const std::string &value, uint8_t precision, uint8_t scale, const std::string &alias) {
 	std::string type_name = "DECIMAL(" + std::to_string(precision) + ", " + std::to_string(scale) + ")";
+	std::string postfix = "";
 	if (DBMSConfigured("ClickHouse")) {
 		type_name = "Nullable(" + type_name + ")";
+	} else if (DBMSConfigured("Oracle")) {
+		postfix = " FROM dual";
 	}
-	return "CAST(" + value + " AS " + type_name + ")";
+	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
 }

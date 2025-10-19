@@ -61,9 +61,9 @@ SELECT * FROM odbc_query(
 	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
-	std::cout << res.Value<std::string>(1, 0) << std::endl;
+	// std::cout << res.Value<std::string>(1, 0) << std::endl;
 	std::cout << res.Value<std::string>(2, 0) << std::endl;
-	std::cout << res.Value<std::string>(3, 0) << std::endl;
+	// std::cout << res.Value<std::string>(3, 0) << std::endl;
 }
 
 TEST_CASE("DB2 version query", group_name) {

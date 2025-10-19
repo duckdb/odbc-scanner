@@ -32,13 +32,13 @@ SELECT * FROM odbc_query(
 	'
 		SELECT a.col1, a.col2 FROM (
 			SELECT ''foo'' AS col1, )" +
-	                                CastAsBigintSQL("41") +
-	                                R"( AS col2
+	                                CastAsBigintSQL("41", "AS col2") +
+	                                R"(
 			UNION ALL
 			SELECT ''bar'' AS col1, )" +
-	                                CastAsBigintSQL("42") +
-	                                R"( AS col2
-		) AS a
+	                                CastAsBigintSQL("42", "AS col2") +
+	                                R"(
+		) a
 		ORDER BY a.col2
 	')
 )")

@@ -5,13 +5,16 @@ static const std::string group_name = "[capi_dates]";
 TEST_CASE("Date query with a DATE literal", group_name) {
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	duckdb_state st = duckdb_query(sc.conn,
+	                               (R"(
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT CAST(''2020-12-31'' AS DATE)
+    SELECT )" + CastAsDateSQL("''2020-12-31''") +
+	                                R"(
   ')
-)",
+)")
+	                                   .c_str(),
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));
 	REQUIRE(res.NextChunk());
@@ -28,7 +31,8 @@ TEST_CASE("Date query with a DATE literal parameter", group_name) {
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + CastAsDateSQL("?") + R"( AS col1
+    SELECT )" + CastAsDateSQL("?", "AS col1") +
+	                                R"(
   ',
 	params=row('2020-12-31'::DATE))
 )")
@@ -57,7 +61,8 @@ SET VARIABLE params1 = odbc_create_params()
 SELECT * FROM odbc_query(
   getvariable('conn'),
   '
-    SELECT )" + CastAsDateSQL("?") + R"( AS col1
+    SELECT )" + CastAsDateSQL("?", "AS col1") +
+	                                          R"(
   ', 
   params_handle=getvariable('params1'))
 )")
