@@ -117,6 +117,9 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Decimal INT128 query with a literal", group_name) {
+	if (DBMSConfigured("DB2")) {
+		return;
+	}
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
@@ -156,6 +159,9 @@ SELECT * FROM odbc_query(
 */
 
 TEST_CASE("Decimal INT128 query with a negative literal", group_name) {
+	if (DBMSConfigured("DB2")) {
+		return;
+	}
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
@@ -216,6 +222,9 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Decimal INT128 query with a negative literal parameter", group_name) {
+	if (DBMSConfigured("DB2")) {
+		return;
+	}
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
@@ -278,6 +287,9 @@ SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row('-1.234
 }
 
 TEST_CASE("Decimal INT128 query with a negative parameter", group_name) {
+	if (DBMSConfigured("DB2")) {
+		return;
+	}
 	ScannerConn sc;
 
 	Result res_create_params;

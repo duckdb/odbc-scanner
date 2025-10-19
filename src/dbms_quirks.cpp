@@ -9,6 +9,7 @@ const std::string DbmsQuirks::MYSQL_DBMS_NAME = "MySQL";
 const std::string DbmsQuirks::SPARK_DBMS_NAME = "Spark SQL";
 const std::string DbmsQuirks::CLICKHOUSE_DBMS_NAME = "ClickHouse";
 const std::string DbmsQuirks::ORACLE_DBMS_NAME = "Oracle";
+const std::string DbmsQuirks::DB2_DBMS_NAME_PREFIX = "DB2/";
 
 DbmsQuirks::DbmsQuirks() {
 }
@@ -31,6 +32,9 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn) {
 		this->reset_stmt_before_execute = true;
 		this->var_len_data_single_part = true;
 	} else if (conn.dbms_name == ORACLE_DBMS_NAME) {
+		this->decimal_columns_as_chars = true;
+	} else if (conn.dbms_name.rfind(DB2_DBMS_NAME_PREFIX, 0) == 0) {
+		this->decimal_params_as_chars = true;
 		this->decimal_columns_as_chars = true;
 	}
 }

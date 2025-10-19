@@ -267,6 +267,8 @@ std::string CastAsBigintSQL(const std::string &value, const std::string &alias) 
 	} else if (DBMSConfigured("Oracle")) {
 		type_name = "NUMBER(18)";
 		postfix = " FROM dual";
+	} else if (DBMSConfigured("DB2")) {
+		postfix = " FROM sysibm.sysdummy1";
 	}
 	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
 }
@@ -282,6 +284,8 @@ std::string CastAsDateSQL(const std::string &value_in, const std::string &alias)
 			value = "to_date(" + value + ", ''YYYY-MM-DD'')";
 		}
 		postfix = " FROM dual";
+	} else if (DBMSConfigured("DB2")) {
+		postfix = " FROM sysibm.sysdummy1";
 	}
 	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
 }
@@ -293,6 +297,8 @@ std::string CastAsDecimalSQL(const std::string &value, uint8_t precision, uint8_
 		type_name = "Nullable(" + type_name + ")";
 	} else if (DBMSConfigured("Oracle")) {
 		postfix = " FROM dual";
+	} else if (DBMSConfigured("DB2")) {
+		postfix = " FROM sysibm.sysdummy1";
 	}
 	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
 }
