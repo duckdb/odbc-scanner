@@ -30,6 +30,8 @@ TEST_CASE("Long string query", group_name) {
 		cast = "CAST(? AS Nullable(VARCHAR)) AS col1";
 	} else if (DBMSConfigured("Oracle")) {
 		cast = "CAST(? AS VARCHAR2(4000)) FROM dual";
+	} else if (DBMSConfigured("DB2")) {
+		cast = "CAST(? AS VARCHAR(20000)) FROM sysibm.sysdummy1";
 	}
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;

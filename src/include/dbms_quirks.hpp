@@ -13,6 +13,7 @@ struct DbmsQuirks {
 	static const std::string SPARK_DBMS_NAME;
 	static const std::string CLICKHOUSE_DBMS_NAME;
 	static const std::string ORACLE_DBMS_NAME;
+	static const std::string DB2_DBMS_NAME_PREFIX;
 
 	size_t varchar_max_size_bytes = 0;
 	bool decimal_columns_precision_through_ard = false;

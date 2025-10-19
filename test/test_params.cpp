@@ -30,6 +30,8 @@ TEST_CASE("Params query with a varchar param literal", group_name) {
 		cast = "CAST(? AS Nullable(VARCHAR)) AS col1";
 	} else if (DBMSConfigured("Oracle")) {
 		cast = "CAST(? AS VARCHAR2(16)) FROM dual";
+	} else if (DBMSConfigured("DB2")) {
+		cast = "CAST(? AS VARCHAR(16)) FROM sysibm.sysdummy1";
 	}
 	ScannerConn sc;
 	Result res;
@@ -91,7 +93,7 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Params query with multiple params including NULL", group_name) {
-	if (DBMSConfigured("Oracle")) {
+	if (DBMSConfigured("Oracle") || DBMSConfigured("DB2")) {
 		return;
 	}
 	ScannerConn sc;
@@ -126,6 +128,28 @@ SELECT * FROM odbc_query(
   getvariable('conn'),
   '
     SELECT CAST(? AS NUMBER(18)) AS c1, CAST(? AS NUMBER(18)) AS c2 FROM dual
+  ', 
+  params=row(NULL, 42))
+)",
+	                               res.Get());
+	REQUIRE(QuerySuccess(res.Get(), st));
+	REQUIRE(res.NextChunk());
+	REQUIRE(res.IsNull(0, 0));
+	REQUIRE(res.Value<int64_t>(1, 0) == 42);
+}
+
+TEST_CASE("Params query DB2 with multiple params including NULL", group_name) {
+	if (!DBMSConfigured("DB2")) {
+		return;
+	}
+	ScannerConn sc;
+	Result res;
+	duckdb_state st = duckdb_query(sc.conn,
+	                               R"(
+SELECT * FROM odbc_query(
+  getvariable('conn'),
+  '
+    SELECT CAST(? AS BIGINT) AS c1, CAST(? AS BIGINT) AS c2 FROM sysibm.sysdummy1
   ', 
   params=row(NULL, 42))
 )",
