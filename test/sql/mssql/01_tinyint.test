@@ -1,10 +1,8 @@
-# name: test/sql/mssql/mssql_tinyint.test
+# name: test/sql/mssql/01_tinyint.test
 # description: test for MSSQL TINYINT type
-# group: [sql_mssql_tinyint]
+# group: [mssql_01_tinyint]
 
 require odbc_scanner
-
-require-env MSSQL_AVAILABLE
 
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')

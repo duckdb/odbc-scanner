@@ -1,10 +1,8 @@
-# name: test/sql/mssql/mssql_ntext.test
+# name: test/sql/mssql/23_ntext.test
 # description: test for MSSQL NTEXT type
-# group: [sql_mssql_ntext]
+# group: [mssql_23_ntext]
 
 require odbc_scanner
-
-require-env MSSQL_AVAILABLE
 
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
@@ -22,14 +20,19 @@ SELECT column_type from (
 VARCHAR
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TEXT)', params=row('🌌'::VARCHAR))
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS NTEXT)', params=row('foo'::VARCHAR))
 ----
-??
+foo
 
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS NTEXT)', params=row('🌌'::VARCHAR))
 ----
 🌌
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS NTEXT)', params=row(NULL::VARCHAR))
+----
+NULL
 
 statement ok
 SET VARIABLE params1 = odbc_create_params()

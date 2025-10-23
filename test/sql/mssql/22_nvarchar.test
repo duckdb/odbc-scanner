@@ -1,13 +1,21 @@
-# name: test/sql/mssql/mssql_nvarchar.test
+# name: test/sql/mssql/22_nvarchar.test
 # description: test for MSSQL NVARCHAR type
-# group: [sql_mssql_nvarchar]
+# group: [mssql_22_nvarchar]
 
 require odbc_scanner
 
-require-env MSSQL_AVAILABLE
-
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(3))')
+----
+foo
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(6))')
+----
+foo
 
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(MAX))')
@@ -22,14 +30,19 @@ SELECT column_type from (
 VARCHAR
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARCHAR(MAX))', params=row('🌌'::VARCHAR))
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS NVARCHAR(MAX))', params=row('foo'::VARCHAR))
 ----
-??
+foo
 
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS NVARCHAR(MAX))', params=row('🌌'::VARCHAR))
 ----
 🌌
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS NVARCHAR(MAX))', params=row(NULL::VARCHAR))
+----
+NULL
 
 statement ok
 SET VARIABLE params1 = odbc_create_params()

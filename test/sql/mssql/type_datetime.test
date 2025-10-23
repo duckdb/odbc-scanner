@@ -1,10 +1,8 @@
-# name: test/sql/type_datetime.test
-# description: test for DATETIME type
-# group: [sql_type_datetime]
+# name: test/sql/mssql/type_datetime.test
+# description: test for DATETIME type with MSSQL
+# group: [mssql_type_datetime]
 
 require odbc_scanner
-
-require-env MSSQL_AVAILABLE
 
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')

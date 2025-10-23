@@ -1,0 +1,22 @@
+# name: test/sql/mssql/07_numeric.test
+# description: test for NUMERIC type with MSSQL
+# group: [mssql_07_numeric]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMERIC(4,3))')
+----
+1.234
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMERIC(4,3))')
+)
+----
+DECIMAL(4,3)
+
+# see 06_decimal.test

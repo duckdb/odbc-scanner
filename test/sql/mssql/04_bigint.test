@@ -1,0 +1,66 @@
+# name: test/sql/mssql/04_bigint.test
+# description: test for BIGINT type with MSSQL
+# group: [mssql_04_bigint]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS BIGINT)')
+----
+42
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS BIGINT)')
+)
+----
+BIGINT
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIGINT)', params=row(42::BIGINT))
+----
+42
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIGINT)', params=row(0::BIGINT))
+----
+0
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIGINT)', params=row(9223372036854775807::BIGINT))
+----
+9223372036854775807
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIGINT)', params=row(-9223372036854775807::BIGINT))
+----
+-9223372036854775807
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIGINT)', params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind(9223372036854775807::BIGINT)
+
+query I
+EXECUTE p1
+----
+9223372036854775807
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

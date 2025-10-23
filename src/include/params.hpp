@@ -48,6 +48,7 @@ class ScannerParam {
 
 	union InternalValue {
 		bool null_val;
+		bool bool_val;
 		int8_t int8;
 		uint8_t uint8;
 		int16_t int16;
@@ -66,6 +67,8 @@ class ScannerParam {
 		SQL_TIMESTAMP_STRUCT timestamp;
 
 		InternalValue() : null_val(true) {
+		}
+		InternalValue(bool value) : bool_val(value) {
 		}
 		InternalValue(int8_t value) : int8(value) {
 		}
@@ -111,6 +114,7 @@ class ScannerParam {
 
 public:
 	ScannerParam();
+	explicit ScannerParam(bool value);
 	explicit ScannerParam(int8_t value);
 	explicit ScannerParam(uint8_t value);
 	explicit ScannerParam(int16_t value);

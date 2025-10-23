@@ -36,6 +36,12 @@ char *DecimalChars::data() {
 }
 
 template <>
+bool &ScannerParam::Value<bool>() {
+	CheckType(DUCKDB_TYPE_BOOLEAN);
+	return val.bool_val;
+}
+
+template <>
 int8_t &ScannerParam::Value<int8_t>() {
 	CheckType(DUCKDB_TYPE_TINYINT);
 	return val.int8;
@@ -132,6 +138,9 @@ SQL_TIMESTAMP_STRUCT &ScannerParam::Value<SQL_TIMESTAMP_STRUCT>() {
 }
 
 ScannerParam::ScannerParam() : type_id(DUCKDB_TYPE_SQLNULL), len_bytes(SQL_NULL_DATA) {
+}
+
+ScannerParam::ScannerParam(bool value) : type_id(DUCKDB_TYPE_BOOLEAN), len_bytes(sizeof(value)), val(value) {
 }
 
 ScannerParam::ScannerParam(int8_t value) : type_id(DUCKDB_TYPE_TINYINT), len_bytes(sizeof(value)), val(value) {
@@ -240,6 +249,9 @@ void ScannerParam::AssignByType(param_type type_id, InternalValue &val, ScannerP
 	switch (type_id) {
 	case DUCKDB_TYPE_SQLNULL:
 		break;
+	case DUCKDB_TYPE_BOOLEAN:
+		val.bool_val = other.Value<bool>();
+		break;
 	case DUCKDB_TYPE_TINYINT:
 		val.int8 = other.Value<int8_t>();
 		break;
@@ -312,6 +324,9 @@ ScannerParam::~ScannerParam() {
 	switch (type_id) {
 	case DUCKDB_TYPE_VARCHAR:
 		this->val.wstr.~WideString();
+		break;
+	case Params::TYPE_DECIMAL_AS_CHARS:
+		this->val.decimal_chars.~DecimalChars();
 		break;
 	default: {
 		// no-op

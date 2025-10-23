@@ -98,8 +98,8 @@ struct LocalInitData {
 	}
 
 	static void Destroy(void *ldata_in) noexcept {
-		(void)ldata_in;
-		// no-op
+		auto ldata = reinterpret_cast<LocalInitData *>(ldata_in);
+		delete ldata;
 	}
 };
 

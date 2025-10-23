@@ -30,8 +30,6 @@ executor = SQLLogicTestExecutor(build_dir, sqllogic_tests_dir)
 executor.register_external_extension(ext_path)
 
 file_paths = []
-file_paths.append(path.join(sqllogic_tests_dir, "close.test"))
-file_paths.append(path.join(sqllogic_tests_dir, "connect.test"))
 
 if args.test_file is not None:
   print(f"Running SQLLogic tests from file: '{args.test_file}'")
@@ -43,6 +41,8 @@ elif args.dbms is not None:
       for name in fnames:
           if name.endswith(".test"):
             file_paths.append(path.join(dirpath, name))
+  file_paths.append(path.join(sqllogic_tests_dir, "close.test"))
+  file_paths.append(path.join(sqllogic_tests_dir, "connect.test"))
 else:
   print(f"Running connect/close SQLLogic tests")
 

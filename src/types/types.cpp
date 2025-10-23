@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "capi_pointers.hpp"
 #include "columns.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
@@ -27,6 +28,8 @@ bool OdbcType::Equals(OdbcType &other) {
 ScannerParam Types::ExtractNotNullParamOfType(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec,
                                               idx_t param_idx) {
 	switch (type_id) {
+	case DUCKDB_TYPE_BOOLEAN:
+		return TypeSpecific::ExtractNotNullParam<bool>(quirks, vec);
 	case DUCKDB_TYPE_TINYINT:
 		return TypeSpecific::ExtractNotNullParam<int8_t>(quirks, vec);
 	case DUCKDB_TYPE_UTINYINT:
@@ -67,6 +70,8 @@ ScannerParam Types::ExtractNotNullParamFromValue(DbmsQuirks &quirks, duckdb_valu
 	duckdb_logical_type ltype = duckdb_get_value_type(value);
 	auto type_id = duckdb_get_type_id(ltype);
 	switch (type_id) {
+	case DUCKDB_TYPE_BOOLEAN:
+		return ScannerParam(duckdb_get_bool(value));
 	case DUCKDB_TYPE_TINYINT:
 		return ScannerParam(duckdb_get_int8(value));
 	case DUCKDB_TYPE_UTINYINT:
@@ -89,8 +94,10 @@ ScannerParam Types::ExtractNotNullParamFromValue(DbmsQuirks &quirks, duckdb_valu
 		return ScannerParam(duckdb_get_double(value));
 	case DUCKDB_TYPE_DECIMAL:
 		return ScannerParam(duckdb_get_decimal(value), quirks.decimal_params_as_chars);
-	case DUCKDB_TYPE_VARCHAR:
-		return ScannerParam(duckdb_get_varchar(value));
+	case DUCKDB_TYPE_VARCHAR: {
+		auto str_ptr = VarcharPtr(duckdb_get_varchar(value), VarcharDeleter);
+		return ScannerParam(str_ptr.get());
+	}
 	case DUCKDB_TYPE_DATE:
 		return ScannerParam(duckdb_from_date(duckdb_get_date(value)));
 	case DUCKDB_TYPE_TIME:
@@ -107,6 +114,9 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 	switch (param.ParamType()) {
 	case DUCKDB_TYPE_SQLNULL:
 		TypeSpecific::BindOdbcParam<std::nullptr_t>(ctx, param, param_idx);
+		break;
+	case DUCKDB_TYPE_BOOLEAN:
+		TypeSpecific::BindOdbcParam<bool>(ctx, param, param_idx);
 		break;
 	case DUCKDB_TYPE_TINYINT:
 		TypeSpecific::BindOdbcParam<int8_t>(ctx, param, param_idx);
@@ -164,6 +174,9 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 void Types::FetchAndSetResultOfType(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
                                     idx_t row_idx) {
 	switch (odbc_type.desc_concise_type) {
+	case SQL_BIT:
+		TypeSpecific::FetchAndSetResult<bool>(ctx, odbc_type, col_idx, vec, row_idx);
+		break;
 	case SQL_TINYINT:
 		if (odbc_type.is_unsigned) {
 			TypeSpecific::FetchAndSetResult<uint8_t>(ctx, odbc_type, col_idx, vec, row_idx);
@@ -240,6 +253,8 @@ void Types::FetchAndSetResultOfType(QueryContext &ctx, OdbcType &odbc_type, SQLS
 
 duckdb_type Types::ResolveColumnType(QueryContext &ctx, ResultColumn &column) {
 	switch (column.odbc_type.desc_concise_type) {
+	case SQL_BIT:
+		return TypeSpecific::ResolveColumnType<bool>(ctx, column);
 	case SQL_TINYINT:
 		if (column.odbc_type.is_unsigned) {
 			return TypeSpecific::ResolveColumnType<uint8_t>(ctx, column);

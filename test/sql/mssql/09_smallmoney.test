@@ -1,0 +1,74 @@
+# name: test/sql/mssql/09_smallmoney.test
+# description: test for SMALLMONEY type with MSSQL
+# group: [mssql_09_smallmoney]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.1234 AS SMALLMONEY)')
+----
+42.1234
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(41.1234 AS SMALLMONEY)')
+)
+----
+DECIMAL(10,4)
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(42.1234::DECIMAL(10,4)))
+----
+42.1234
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(0::DECIMAL(10,4)))
+----
+0
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(214748.3647::DECIMAL(10,4)))
+----
+214748.3647
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(-214748.3648::DECIMAL(10,4)))
+----
+-214748.3648
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind(214748.3647::DECIMAL(10,4))
+
+query I
+EXECUTE p1
+----
+214748.3647
+
+statement ok
+EXECUTE p1_bind(-214748.3648::DECIMAL(10,4))
+
+query I
+EXECUTE p1
+----
+-214748.3648
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

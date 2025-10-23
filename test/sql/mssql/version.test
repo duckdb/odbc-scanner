@@ -1,10 +1,8 @@
-# name: test/sql/mssql/mssql_version.test
+# name: test/sql/mssql/version.test
 # description: test for MSSQL version
-# group: [sql_mssql_version]
+# group: [mssql_version]
 
 require odbc_scanner
-
-require-env MSSQL_AVAILABLE
 
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')

@@ -1,0 +1,82 @@
+# name: test/sql/mssql/05_bit.test
+# description: test for BIT type with MSSQL
+# group: [mssql_05_bit]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(1 AS BIT)')
+----
+TRUE
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(0 AS BIT)')
+----
+FALSE
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(1 AS BIT)')
+)
+----
+BOOLEAN
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params=row(TRUE))
+----
+TRUE
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params=row(FALSE))
+----
+FALSE
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params=row(NULL))
+----
+NULL
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind(TRUE)
+
+query I
+EXECUTE p1
+----
+TRUE
+
+statement ok
+EXECUTE p1_bind(FALSE)
+
+query I
+EXECUTE p1
+----
+FALSE
+
+statement ok
+EXECUTE p1_bind(NULL)
+
+query I
+EXECUTE p1
+----
+NULL
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
