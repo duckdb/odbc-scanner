@@ -1,0 +1,57 @@
+# name: test/sql/duckdb/query_multi.test
+# description: test for multiple calls of odbc_query() function with DuckDB
+# group: [duckdb_query_multi]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn1 = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 42, ''foo''')
+UNION ALL
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 43, ''bar''')
+UNION ALL
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 44, ''baz''')
+ORDER BY 1
+----
+'odbc_query' error: ODBC connection not found on global init
+
+statement ok
+SET VARIABLE conn2 = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query II
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 42, ''foo''')
+UNION ALL
+SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT 43, ''bar''')
+ORDER BY 1
+----
+42	foo
+43	bar
+
+query II
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT ?::INTEGER, ?::VARCHAR', params=row(42, 'foo'))
+UNION ALL
+SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT ?::INTEGER, ?::VARCHAR', params=row(43, 'bar'))
+ORDER BY 1
+----
+42	foo
+43	bar
+
+statement ok
+PREPARE p1 AS 
+SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT ?::INTEGER, ?::VARCHAR', params=row(?, ?))
+UNION ALL
+SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT ?::INTEGER, ?::VARCHAR', params=row(?, ?))
+
+query II
+EXECUTE p1(42, 'foo', 43, 'bar')
+----
+42	foo
+43	bar
+
+statement ok
+SELECT odbc_close(getvariable('conn2'))
+
+statement ok
+SELECT odbc_close(getvariable('conn1'))

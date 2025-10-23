@@ -21,5 +21,5 @@ target_compile_definitions(test_${EXTENSION_NAME} PRIVATE
 )
 
 target_link_libraries(test_${EXTENSION_NAME} PRIVATE
-    $ENV{DUCKDB_SHARED_LIB_PATH}
+    $ENV{DUCKDB_CAPI_LIB_PATH}
 )

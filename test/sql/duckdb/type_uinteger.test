@@ -1,13 +1,11 @@
-# name: test/sql/duckdb/duckdb_uinteger.test
+# name: test/sql/duckdb/type_uinteger.test
 # description: test for DuckDB UINTEGER type
-# group: [sql_duckdb_uinteger]
+# group: [duckdb_type_uinteger]
 
 require odbc_scanner
 
-require-env DUCKDB_AVAILABLE
-
 statement ok
-SET VARIABLE conn = odbc_connect('Driver={DuckDB Driver};')
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::UINTEGER')
