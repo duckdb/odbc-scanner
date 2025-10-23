@@ -1,6 +1,6 @@
-# name: test/sql/query_basic.test
-# description: basic test for odbc_query() function
-# group: [sql_query_basic]
+# name: test/sql/duckdb/query_basic.test
+# description: basic test for odbc_query() function with DuckDB
+# group: [duckdb_query_basic]
 
 statement error
 SELECT * FROM odbc_query()
@@ -27,7 +27,7 @@ Binder Error: 'odbc_query' error: specified ODBC connection must be not NULL
 statement error
 SELECT * FROM odbc_query(42, 'SELECT 42')
 ----
-Binder Error: 'odbc_query' error: open ODBC connection not found, id: 42
+Binder Error: 'odbc_query' error: ODBC connection not found on bind, id: 42
 
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
@@ -43,7 +43,7 @@ SELECT * FROM odbc_query(getvariable('conn'), 'FAIL')
 <REGEX>:.*Binder Error:.*FAIL.*
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42 AS "num", ''foo'' AS "str" UNION ALL SELECT 43 AS "num", ''bar'' AS "str"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42, ''foo'' UNION ALL SELECT 43, ''bar'' ORDER BY 1')
 ----
 42	foo
 43	bar
@@ -62,7 +62,7 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT NULL')
 NULL
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS INTEGER)')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT NULL::INTEGER')
 ----
 NULL
 

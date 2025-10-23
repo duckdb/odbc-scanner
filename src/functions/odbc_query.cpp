@@ -67,29 +67,39 @@ struct BindData {
 	}
 };
 
-struct LocalInitData {
+struct GlobalInitData {
+	int64_t conn_id;
 	std::unique_ptr<OdbcConnection> conn_ptr;
-	// todo: enum
-	bool finished = false;
 
-	LocalInitData(std::unique_ptr<OdbcConnection> conn_ptr_in) : conn_ptr(std::move(conn_ptr_in)) {
+	GlobalInitData(int64_t conn_id, std::unique_ptr<OdbcConnection> conn_ptr_in)
+	    : conn_id(conn_id), conn_ptr(std::move(conn_ptr_in)) {
+		if (!conn_ptr) {
+			throw ScannerException("'odbc_query' error: ODBC connection not found on global init, id: " +
+			                       std::to_string(conn_id));
+		}
 	}
 
-	LocalInitData(const LocalInitData &) = delete;
-	LocalInitData(LocalInitData &&) = delete;
-
-	LocalInitData &operator=(const LocalInitData &) = delete;
-	LocalInitData &operator=(LocalInitData &&other);
-
-	~LocalInitData() {
+	~GlobalInitData() {
 		// We are not closing the connection, even in case of error,
 		// so need to return connection to registry
 		ConnectionsRegistry::Add(std::move(conn_ptr));
 	}
 
-	static void Destroy(void *ctx_in) noexcept {
-		auto ctx = reinterpret_cast<LocalInitData *>(ctx_in);
-		delete ctx;
+	static void Destroy(void *gdata_in) noexcept {
+		auto gdata = reinterpret_cast<GlobalInitData *>(gdata_in);
+		delete gdata;
+	}
+};
+
+struct LocalInitData {
+	bool finished = false;
+
+	LocalInitData() {
+	}
+
+	static void Destroy(void *ldata_in) noexcept {
+		(void)ldata_in;
+		// no-op
 	}
 };
 
@@ -102,7 +112,7 @@ static void Bind(duckdb_bind_info info) {
 	auto conn_ptr = ConnectionsRegistry::Remove(conn_id);
 
 	if (conn_ptr.get() == nullptr) {
-		throw ScannerException("'odbc_query' error: open ODBC connection not found, id: " + std::to_string(conn_id));
+		throw ScannerException("'odbc_query' error: ODBC connection not found on bind, id: " + std::to_string(conn_id));
 	}
 
 	// Return the connection to registry at the end of the block
@@ -180,11 +190,17 @@ static void Bind(duckdb_bind_info info) {
 	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
 }
 
-static void LocalInit(duckdb_init_info info) {
+static void GlobalInit(duckdb_init_info info) {
 	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_init_get_bind_data(info));
-	// Keep the connection in local data while the function is running
+	// Keep the connection in global data while the function is running
+	// to not allow other threads operate on it or close it.
 	auto conn_ptr = ConnectionsRegistry::Remove(bdata.conn_id);
-	auto ldata_ptr = std::unique_ptr<LocalInitData>(new LocalInitData(std::move(conn_ptr)));
+	auto gdata_ptr = std::unique_ptr<GlobalInitData>(new GlobalInitData(bdata.conn_id, std::move(conn_ptr)));
+	duckdb_init_set_init_data(info, gdata_ptr.release(), GlobalInitData::Destroy);
+}
+
+static void LocalInit(duckdb_init_info info) {
+	auto ldata_ptr = std::unique_ptr<LocalInitData>(new LocalInitData());
 	duckdb_init_set_init_data(info, ldata_ptr.release(), LocalInitData::Destroy);
 }
 
@@ -337,7 +353,11 @@ static void odbc_query_bind(duckdb_bind_info info) noexcept {
 }
 
 static void odbc_query_init(duckdb_init_info info) noexcept {
-	(void)info;
+	try {
+		odbcscanner::GlobalInit(info);
+	} catch (std::exception &e) {
+		duckdb_init_set_error(info, e.what());
+	}
 }
 
 static void odbc_query_local_init(duckdb_init_info info) noexcept {

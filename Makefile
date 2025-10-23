@@ -16,14 +16,14 @@ TARGET_DUCKDB_VERSION := v1.2.0
 ENABLE_C_API_TESTS := TRUE
 
 # Check if the ODBC library is available
-ifeq ("$(DUCKDB_SHARED_LIB_PATH)","")
+ifeq ("$(DUCKDB_CAPI_LIB_PATH)","")
 	ENABLE_C_API_TESTS := FALSE
 endif
 
 CMAKE_EXTRA_BUILD_FLAGS := -DENABLE_C_API_TESTS=$(ENABLE_C_API_TESTS)
 
-CAPI_RUN_MSG := "Running C API tests using shared lib at $(DUCKDB_SHARED_LIB_PATH)"
-CAPI_ERROR_MSG := "C API test suite is disabled, to enable it specify DuckDB shared library in 'DUCKDB_SHARED_LIB_PATH' environment variable."
+CAPI_RUN_MSG := "Running C API tests using shared lib at $(DUCKDB_CAPI_LIB_PATH)"
+CAPI_ERROR_MSG := "C API test suite is disabled, to enable it specify DuckDB shared library in 'DUCKDB_CAPI_LIB_PATH' environment variable."
 
 all: configure release
 
@@ -38,10 +38,6 @@ debug: build_extension_library_debug build_extension_with_metadata_debug
 #build_extension_with_metadata_release: build_extension_library_release 
 
 release: build_extension_library_release build_extension_with_metadata_release
-
-test: test_extension_release
-
-test_debug: test_extension_debug
 
 test_c_api:
 ifeq ($(ENABLE_C_API_TESTS), TRUE)
@@ -61,9 +57,9 @@ else
 	exit 1
 endif
 
-test_all: test test_c_api
+test: test_c_api
 
-test_all_debug: test_debug test_c_api_debug
+test_debug: test_c_api_debug
 
 clean: clean_build clean_cmake
 
