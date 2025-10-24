@@ -103,6 +103,20 @@ struct LocalInitData {
 	}
 };
 
+static bool ExtractBoolFlag(duckdb_bind_info info, const std::string &name) {
+	auto val = ValuePtr(duckdb_bind_get_named_parameter(info, name.c_str()), ValueDeleter);
+	if (val.get() != nullptr && !duckdb_is_null_value(val.get())) {
+		return duckdb_get_bool(val.get());
+	}
+	return false;
+}
+
+static DbmsQuirks ExtractUserQuirks(duckdb_bind_info info) {
+	DbmsQuirks quirks;
+	quirks.datetime2_columns_as_timestamp_ns = ExtractBoolFlag(info, "datetime2_columns_as_timestamp_ns");
+	return quirks;
+}
+
 static void Bind(duckdb_bind_info info) {
 	auto conn_id_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
 	if (duckdb_is_null_value(conn_id_val.get())) {
@@ -144,7 +158,8 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 
-	DbmsQuirks quirks(conn);
+	DbmsQuirks user_quirks = ExtractUserQuirks(info);
+	DbmsQuirks quirks(conn, user_quirks);
 	QueryContext ctx(query, hstmt, quirks);
 
 	std::vector<ScannerParam> params;
@@ -325,10 +340,13 @@ static duckdb_state Register(duckdb_connection conn) {
 	auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
 	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
 	auto any_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_ANY), LogicalTypeDeleter);
+	auto bool_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN), LogicalTypeDeleter);
 	duckdb_table_function_add_parameter(fun.get(), bigint_type.get());
 	duckdb_table_function_add_parameter(fun.get(), varchar_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "params", any_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "params_handle", bigint_type.get());
+	// quirks
+	duckdb_table_function_add_named_parameter(fun.get(), "datetime2_columns_as_timestamp_ns", bool_type.get());
 
 	// callbacks
 	duckdb_table_function_set_bind(fun.get(), odbc_query_bind);

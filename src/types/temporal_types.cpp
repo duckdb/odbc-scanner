@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 
 #include "capi_pointers.hpp"
 #include "columns.hpp"
@@ -18,7 +19,7 @@ static uint8_t DigitsCount(int64_t num) {
 	if (num == 0) {
 		return static_cast<uint8_t>(0);
 	}
-	return static_cast<uint8_t>(log10(abs(num))) + 1;
+	return static_cast<uint8_t>(std::log10(std::llabs(num))) + 1;
 }
 
 int64_t Pow(int64_t num, int64_t p) {
@@ -289,6 +290,35 @@ void TypeSpecific::FetchAndSetResult<duckdb_time_struct>(QueryContext &ctx, Odbc
 	}
 }
 
+static int64_t MicrosToNanos(duckdb_timestamp ts_no_fraction, SQLUINTEGER fetched_fraction) {
+	uint64_t fraction = static_cast<uint64_t>(fetched_fraction);
+	bool negative = ts_no_fraction.micros < 0;
+	// convert to nanos checking overflow
+	uint64_t umicros = static_cast<uint64_t>(std::llabs(ts_no_fraction.micros));
+	uint64_t unanos = 0;
+	if (umicros > std::numeric_limits<uint64_t>::max() / 1000) {
+		unanos = std::numeric_limits<uint64_t>::max();
+	} else {
+		unanos = umicros * 1000;
+		if (unanos > std::numeric_limits<uint64_t>::max() - fraction) {
+			unanos = std::numeric_limits<uint64_t>::max();
+		} else {
+			unanos += fraction;
+		}
+	}
+	// convert to signed, for negative overflow (min + 1) is returned
+	int64_t nanos = 0;
+	if (unanos > std::numeric_limits<int64_t>::max()) {
+		nanos = std::numeric_limits<int64_t>::max();
+	} else {
+		nanos = static_cast<int64_t>(unanos);
+	}
+	if (negative) {
+		nanos = -nanos;
+	}
+	return nanos;
+}
+
 template <>
 void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(QueryContext &ctx, OdbcType &odbc_type,
                                                               SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
@@ -317,17 +347,16 @@ void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(QueryContext &ctx,
 	tss.time.hour = static_cast<int8_t>(fetched.hour);
 	tss.time.min = static_cast<int8_t>(fetched.minute);
 	tss.time.sec = static_cast<int8_t>(fetched.second);
-	tss.time.micros = static_cast<int32_t>(fetched.fraction / 1000);
-
-	duckdb_timestamp ts = duckdb_to_timestamp(tss);
 
 	if (ctx.quirks.datetime2_columns_as_timestamp_ns && odbc_type.desc_type_name == Types::MSSQL_DATETIME2_TYPE_NAME) {
+		duckdb_timestamp ts_no_fraction = duckdb_to_timestamp(tss);
 		duckdb_timestamp_ns tns;
-		tns.nanos = ts.micros * 1000;
-		tns.nanos += fetched.fraction % 1000;
+		tns.nanos = MicrosToNanos(ts_no_fraction, fetched.fraction);
 		duckdb_timestamp_ns *data = reinterpret_cast<duckdb_timestamp_ns *>(duckdb_vector_get_data(vec));
 		data[row_idx] = tns;
 	} else {
+		tss.time.micros = static_cast<int32_t>(fetched.fraction / 1000);
+		duckdb_timestamp ts = duckdb_to_timestamp(tss);
 		duckdb_timestamp *data = reinterpret_cast<duckdb_timestamp *>(duckdb_vector_get_data(vec));
 		data[row_idx] = ts;
 	}

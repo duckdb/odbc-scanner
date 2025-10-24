@@ -54,7 +54,8 @@ static void BindParams(duckdb_function_info info, duckdb_data_chunk input, duckd
 	auto deferred_params = Defer([&params_ptr] { ParamsRegistry::Add(std::move(params_ptr)); });
 	params_ptr->clear();
 
-	DbmsQuirks quirks(conn);
+	// currently do not support user quirks in 'odbc_bind_params'
+	DbmsQuirks quirks(conn, DbmsQuirks());
 	std::vector<ScannerParam> params = Params::Extract(quirks, input, 2);
 
 	for (ScannerParam &p : params) {

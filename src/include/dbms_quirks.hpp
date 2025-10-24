@@ -24,12 +24,11 @@ struct DbmsQuirks {
 	bool var_len_data_single_part = false;
 	bool time_params_with_nanos = false;
 	uint8_t timestamp_max_fraction_precision = 9;
-	// todo: exposure and test coverage
 	bool datetime2_columns_as_timestamp_ns = false;
 
 	DbmsQuirks();
 
-	explicit DbmsQuirks(OdbcConnection &conn);
+	explicit DbmsQuirks(OdbcConnection &conn, const DbmsQuirks &user_quirks);
 };
 
 } // namespace odbcscanner
