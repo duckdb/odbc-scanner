@@ -132,6 +132,12 @@ SQL_TIME_STRUCT &ScannerParam::Value<SQL_TIME_STRUCT>() {
 }
 
 template <>
+SQL_SS_TIME2_STRUCT &ScannerParam::Value<SQL_SS_TIME2_STRUCT>() {
+	CheckType(Params::TYPE_TIME_WITH_NANOS);
+	return val.time_with_nanos;
+}
+
+template <>
 SQL_TIMESTAMP_STRUCT &ScannerParam::Value<SQL_TIMESTAMP_STRUCT>() {
 	CheckType(DUCKDB_TYPE_TIMESTAMP);
 	return val.timestamp;
@@ -221,26 +227,39 @@ ScannerParam::ScannerParam(duckdb_date_struct value) : type_id(DUCKDB_TYPE_DATE)
 	this->len_bytes = sizeof(dt);
 }
 
-ScannerParam::ScannerParam(duckdb_time_struct value) : type_id(DUCKDB_TYPE_TIME) {
-	SQL_TIME_STRUCT tm;
-	std::memset(&tm, '\0', sizeof(tm));
-	tm.hour = static_cast<SQLUSMALLINT>(value.hour);
-	tm.minute = static_cast<SQLUSMALLINT>(value.min);
-	tm.second = static_cast<SQLUSMALLINT>(value.sec);
-	this->val.time = tm;
-	this->len_bytes = sizeof(tm);
+ScannerParam::ScannerParam(duckdb_time_struct value, bool use_time_with_nanos) {
+	if (use_time_with_nanos) {
+		this->type_id = Params::TYPE_TIME_WITH_NANOS;
+		SQL_SS_TIME2_STRUCT tm;
+		std::memset(&tm, '\0', sizeof(tm));
+		tm.hour = static_cast<SQLUSMALLINT>(value.hour);
+		tm.minute = static_cast<SQLUSMALLINT>(value.min);
+		tm.second = static_cast<SQLUSMALLINT>(value.sec);
+		tm.fraction = static_cast<SQLUINTEGER>(value.micros * 1000);
+		this->val.time_with_nanos = tm;
+		this->len_bytes = sizeof(tm);
+	} else {
+		this->type_id = DUCKDB_TYPE_TIME;
+		SQL_TIME_STRUCT tm;
+		std::memset(&tm, '\0', sizeof(tm));
+		tm.hour = static_cast<SQLUSMALLINT>(value.hour);
+		tm.minute = static_cast<SQLUSMALLINT>(value.min);
+		tm.second = static_cast<SQLUSMALLINT>(value.sec);
+		this->val.time = tm;
+		this->len_bytes = sizeof(tm);
+	}
 }
 
-ScannerParam::ScannerParam(duckdb_timestamp_struct value) : type_id(DUCKDB_TYPE_TIMESTAMP) {
+ScannerParam::ScannerParam(TimestampNsStruct value) : type_id(DUCKDB_TYPE_TIMESTAMP) {
 	SQL_TIMESTAMP_STRUCT ts;
 	std::memset(&ts, '\0', sizeof(ts));
-	ts.day = static_cast<SQLUSMALLINT>(value.date.day);
-	ts.month = static_cast<SQLUSMALLINT>(value.date.month);
-	ts.year = static_cast<SQLSMALLINT>(value.date.year);
-	ts.hour = static_cast<SQLUSMALLINT>(value.time.hour);
-	ts.minute = static_cast<SQLUSMALLINT>(value.time.min);
-	ts.second = static_cast<SQLUSMALLINT>(value.time.sec);
-	ts.fraction = static_cast<SQLUINTEGER>(value.time.micros * 1000);
+	ts.day = static_cast<SQLUSMALLINT>(value.tss_no_micros.date.day);
+	ts.month = static_cast<SQLUSMALLINT>(value.tss_no_micros.date.month);
+	ts.year = static_cast<SQLSMALLINT>(value.tss_no_micros.date.year);
+	ts.hour = static_cast<SQLUSMALLINT>(value.tss_no_micros.time.hour);
+	ts.minute = static_cast<SQLUSMALLINT>(value.tss_no_micros.time.min);
+	ts.second = static_cast<SQLUSMALLINT>(value.tss_no_micros.time.sec);
+	ts.fraction = static_cast<SQLUINTEGER>(value.nanos_fraction);
 	this->val.timestamp = ts;
 	this->len_bytes = sizeof(ts);
 }
@@ -299,11 +318,14 @@ void ScannerParam::AssignByType(param_type type_id, InternalValue &val, ScannerP
 	case DUCKDB_TYPE_TIME:
 		val.time = other.Value<SQL_TIME_STRUCT>();
 		break;
+	case Params::TYPE_TIME_WITH_NANOS:
+		val.time_with_nanos = other.Value<SQL_SS_TIME2_STRUCT>();
+		break;
 	case DUCKDB_TYPE_TIMESTAMP:
 		val.timestamp = other.Value<SQL_TIMESTAMP_STRUCT>();
 		break;
 	default:
-		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(type_id));
+		throw ScannerException("Unsupported assign parameter type, ID: " + std::to_string(type_id));
 	}
 }
 
@@ -430,7 +452,7 @@ std::vector<ScannerParam> Params::Extract(DbmsQuirks &quirks, duckdb_data_chunk 
 
 		auto child_type = LogicalTypePtr(duckdb_struct_type_child_type(struct_type.get(), i), LogicalTypeDeleter);
 		auto child_type_id = duckdb_get_type_id(child_type.get());
-		ScannerParam sp = Types::ExtractNotNullParamOfType(quirks, child_type_id, child_vec, i);
+		ScannerParam sp = Types::ExtractNotNullParam(quirks, child_type_id, child_vec, i);
 		params.emplace_back(std::move(sp));
 	}
 
@@ -456,7 +478,7 @@ std::vector<ScannerParam> Params::Extract(DbmsQuirks &quirks, duckdb_value struc
 			continue;
 		}
 
-		ScannerParam sp = Types::ExtractNotNullParamFromValue(quirks, child_val.get(), i);
+		ScannerParam sp = Types::ExtractNotNullParam(quirks, child_val.get(), i);
 		params.emplace_back(std::move(sp));
 	}
 

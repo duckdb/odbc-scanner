@@ -57,6 +57,12 @@ ScannerParam TypeSpecific::ExtractNotNullParam<std::string>(DbmsQuirks &, duckdb
 }
 
 template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<std::string>(DbmsQuirks &, duckdb_value value) {
+	auto str_ptr = VarcharPtr(duckdb_get_varchar(value), VarcharDeleter);
+	return ScannerParam(str_ptr.get());
+}
+
+template <>
 void TypeSpecific::BindOdbcParam<std::string>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_WVARCHAR;
 	WideString &wstring = param.Value<WideString>();

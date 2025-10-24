@@ -18,6 +18,12 @@ ScannerParam TypeSpecific::ExtractNotNullParam<bool>(DbmsQuirks &, duckdb_vector
 }
 
 template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<bool>(DbmsQuirks &, duckdb_value value) {
+	bool val = duckdb_get_bool(value);
+	return ScannerParam(val);
+}
+
+template <>
 void TypeSpecific::BindOdbcParam<bool>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_BIT;
 	SQLRETURN ret =

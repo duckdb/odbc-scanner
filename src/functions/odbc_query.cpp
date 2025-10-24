@@ -310,7 +310,7 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 			SQLSMALLINT col_idx = static_cast<SQLSMALLINT>(col_idxz + 1);
 			duckdb_vector vec = col_vectors.at(col_idxz);
 
-			Types::FetchAndSetResultOfType(ctx, col.odbc_type, col_idx, vec, row_idx);
+			Types::FetchAndSetResult(ctx, col.odbc_type, col_idx, vec, row_idx);
 		}
 	}
 	duckdb_data_chunk_set_size(output, row_idx);

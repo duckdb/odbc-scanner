@@ -13,13 +13,6 @@
 
 namespace odbcscanner {
 
-struct SQL_SS_TIME2_STRUCT {
-	SQLUSMALLINT hour;
-	SQLUSMALLINT minute;
-	SQLUSMALLINT second;
-	SQLUINTEGER fraction;
-};
-
 struct ResultColumn;
 
 struct OdbcType {
@@ -51,16 +44,19 @@ struct OdbcType {
 struct Types {
 
 	static const SQLSMALLINT SQL_SS_TIME2 = -154;
+	static const std::string MSSQL_DATETIME2_TYPE_NAME;
 
 	// Type-dispatched functions
 
-	static ScannerParam ExtractNotNullParamOfType(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec,
-	                                              idx_t param_idx);
+	static ScannerParam ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec,
+	                                        idx_t param_idx);
+
+	static ScannerParam ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, idx_t param_idx);
 
 	static void BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx);
 
-	static void FetchAndSetResultOfType(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
-	                                    idx_t row_idx);
+	static void FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
+	                              idx_t row_idx);
 
 	static duckdb_type ResolveColumnType(QueryContext &ctx, ResultColumn &column);
 
@@ -68,8 +64,6 @@ struct Types {
 
 	template <typename T>
 	static std::pair<T, bool> ExtractFunctionArg(duckdb_data_chunk chunk, idx_t col_idx);
-
-	static ScannerParam ExtractNotNullParamFromValue(DbmsQuirks &quirks, duckdb_value value, idx_t param_idx);
 
 	static void SetNullValueToResult(duckdb_vector vec, idx_t row_idx);
 };

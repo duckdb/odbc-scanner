@@ -13,6 +13,7 @@
 
 #include "capi_pointers.hpp"
 #include "query_context.hpp"
+#include "temporal.hpp"
 #include "widechar.hpp"
 
 namespace odbcscanner {
@@ -64,6 +65,7 @@ class ScannerParam {
 		WideString wstr;
 		SQL_DATE_STRUCT date;
 		SQL_TIME_STRUCT time;
+		SQL_SS_TIME2_STRUCT time_with_nanos;
 		SQL_TIMESTAMP_STRUCT timestamp;
 
 		InternalValue() : null_val(true) {
@@ -100,6 +102,8 @@ class ScannerParam {
 		}
 		InternalValue(SQL_TIME_STRUCT value) : time(value) {
 		}
+		InternalValue(SQL_SS_TIME2_STRUCT value) : time_with_nanos(value) {
+		}
 		InternalValue(SQL_TIMESTAMP_STRUCT value) : timestamp(value) {
 		}
 
@@ -129,8 +133,8 @@ public:
 	explicit ScannerParam(const char *cstr, size_t len);
 	explicit ScannerParam(const char *cstr);
 	explicit ScannerParam(duckdb_date_struct value);
-	explicit ScannerParam(duckdb_time_struct value);
-	explicit ScannerParam(duckdb_timestamp_struct value);
+	explicit ScannerParam(duckdb_time_struct value, bool use_time_with_nanos);
+	explicit ScannerParam(TimestampNsStruct value);
 
 	ScannerParam(ScannerParam &other) = delete;
 	ScannerParam(ScannerParam &&other);
@@ -163,6 +167,7 @@ private:
 
 struct Params {
 	static const param_type TYPE_DECIMAL_AS_CHARS = DUCKDB_TYPE_DECIMAL + 1000;
+	static const param_type TYPE_TIME_WITH_NANOS = DUCKDB_TYPE_TIME + 1000;
 
 	static std::vector<ScannerParam> Extract(DbmsQuirks &quirks, duckdb_data_chunk chunk, idx_t col_idx);
 

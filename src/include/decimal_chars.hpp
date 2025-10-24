@@ -4,9 +4,6 @@
 
 #include <vector>
 
-#include <sql.h>
-#include <sqlext.h>
-
 namespace odbcscanner {
 
 struct DecimalChars {

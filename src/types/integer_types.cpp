@@ -99,6 +99,54 @@ ScannerParam TypeSpecific::ExtractNotNullParam<uint64_t>(DbmsQuirks &, duckdb_ve
 	return ExtractNotNullParamInternal<uint64_t>(vec);
 }
 
+template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<int8_t>(DbmsQuirks &, duckdb_value value) {
+	int8_t val = duckdb_get_int8(value);
+	return ScannerParam(val);
+}
+
+template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<uint8_t>(DbmsQuirks &, duckdb_value value) {
+	uint8_t val = duckdb_get_uint8(value);
+	return ScannerParam(val);
+}
+
+template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<int16_t>(DbmsQuirks &, duckdb_value value) {
+	int16_t val = duckdb_get_int16(value);
+	return ScannerParam(val);
+}
+
+template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<uint16_t>(DbmsQuirks &, duckdb_value value) {
+	uint16_t val = duckdb_get_uint16(value);
+	return ScannerParam(val);
+}
+
+template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<int32_t>(DbmsQuirks &, duckdb_value value) {
+	int32_t val = duckdb_get_int32(value);
+	return ScannerParam(val);
+}
+
+template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<uint32_t>(DbmsQuirks &, duckdb_value value) {
+	uint32_t val = duckdb_get_uint32(value);
+	return ScannerParam(val);
+}
+
+template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<int64_t>(DbmsQuirks &, duckdb_value value) {
+	int64_t val = duckdb_get_int64(value);
+	return ScannerParam(val);
+}
+
+template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<uint64_t>(DbmsQuirks &, duckdb_value value) {
+	uint64_t val = duckdb_get_uint64(value);
+	return ScannerParam(val);
+}
+
 template <typename INT_TYPE>
 static void BindOdbcParamInternal(QueryContext &ctx, SQLSMALLINT ctype, SQLSMALLINT sqltype, ScannerParam &param,
                                   SQLSMALLINT param_idx) {

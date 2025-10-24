@@ -27,6 +27,18 @@ ScannerParam TypeSpecific::ExtractNotNullParam<double>(DbmsQuirks &, duckdb_vect
 	return ExtractNotNullParamInternal<double>(vec);
 }
 
+template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<float>(DbmsQuirks &, duckdb_value value) {
+	float val = duckdb_get_float(value);
+	return ScannerParam(val);
+}
+
+template <>
+ScannerParam TypeSpecific::ExtractNotNullParam<double>(DbmsQuirks &, duckdb_value value) {
+	double val = duckdb_get_double(value);
+	return ScannerParam(val);
+}
+
 template <typename FLOAT_TYPE>
 static void BindOdbcParamInternal(QueryContext &ctx, SQLSMALLINT ctype, SQLSMALLINT sqltype, ScannerParam &param,
                                   SQLSMALLINT param_idx) {

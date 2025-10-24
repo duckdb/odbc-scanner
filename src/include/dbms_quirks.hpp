@@ -22,6 +22,10 @@ struct DbmsQuirks {
 	uint8_t float_width_bytes = 4;
 	bool reset_stmt_before_execute = false;
 	bool var_len_data_single_part = false;
+	bool time_params_with_nanos = false;
+	uint8_t timestamp_max_fraction_precision = 9;
+	// todo: exposure and test coverage
+	bool datetime2_columns_as_timestamp_ns = false;
 
 	DbmsQuirks();
 

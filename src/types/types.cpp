@@ -3,10 +3,10 @@
 #include <cstdint>
 #include <vector>
 
-#include "capi_pointers.hpp"
 #include "columns.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
+#include "temporal.hpp"
 #include "widechar.hpp"
 
 DUCKDB_EXTENSION_EXTERN
@@ -25,8 +25,9 @@ bool OdbcType::Equals(OdbcType &other) {
 	       decimal_precision == other.decimal_precision && decimal_scale == other.decimal_scale;
 }
 
-ScannerParam Types::ExtractNotNullParamOfType(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec,
-                                              idx_t param_idx) {
+const std::string Types::MSSQL_DATETIME2_TYPE_NAME = "datetime2";
+
+ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec, idx_t param_idx) {
 	switch (type_id) {
 	case DUCKDB_TYPE_BOOLEAN:
 		return TypeSpecific::ExtractNotNullParam<bool>(quirks, vec);
@@ -60,50 +61,52 @@ ScannerParam Types::ExtractNotNullParamOfType(DbmsQuirks &quirks, duckdb_type ty
 		return TypeSpecific::ExtractNotNullParam<duckdb_time_struct>(quirks, vec);
 	case DUCKDB_TYPE_TIMESTAMP:
 		return TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(quirks, vec);
+	case DUCKDB_TYPE_TIMESTAMP_NS:
+		return TypeSpecific::ExtractNotNullParam<TimestampNsStruct>(quirks, vec);
 	default:
 		throw ScannerException("Cannot extract parameters from STRUCT: specified type is not supported, id: " +
 		                       std::to_string(type_id) + ", index: " + std::to_string(param_idx));
 	}
 }
 
-ScannerParam Types::ExtractNotNullParamFromValue(DbmsQuirks &quirks, duckdb_value value, idx_t param_idx) {
+ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, idx_t param_idx) {
 	duckdb_logical_type ltype = duckdb_get_value_type(value);
 	auto type_id = duckdb_get_type_id(ltype);
 	switch (type_id) {
 	case DUCKDB_TYPE_BOOLEAN:
-		return ScannerParam(duckdb_get_bool(value));
+		return TypeSpecific::ExtractNotNullParam<bool>(quirks, value);
 	case DUCKDB_TYPE_TINYINT:
-		return ScannerParam(duckdb_get_int8(value));
+		return TypeSpecific::ExtractNotNullParam<int8_t>(quirks, value);
 	case DUCKDB_TYPE_UTINYINT:
-		return ScannerParam(duckdb_get_uint8(value));
+		return TypeSpecific::ExtractNotNullParam<uint8_t>(quirks, value);
 	case DUCKDB_TYPE_SMALLINT:
-		return ScannerParam(duckdb_get_int16(value));
+		return TypeSpecific::ExtractNotNullParam<int16_t>(quirks, value);
 	case DUCKDB_TYPE_USMALLINT:
-		return ScannerParam(duckdb_get_uint16(value));
+		return TypeSpecific::ExtractNotNullParam<uint16_t>(quirks, value);
 	case DUCKDB_TYPE_INTEGER:
-		return ScannerParam(duckdb_get_int32(value));
+		return TypeSpecific::ExtractNotNullParam<int32_t>(quirks, value);
 	case DUCKDB_TYPE_UINTEGER:
-		return ScannerParam(duckdb_get_uint32(value));
+		return TypeSpecific::ExtractNotNullParam<uint32_t>(quirks, value);
 	case DUCKDB_TYPE_BIGINT:
-		return ScannerParam(duckdb_get_int64(value));
+		return TypeSpecific::ExtractNotNullParam<int64_t>(quirks, value);
 	case DUCKDB_TYPE_UBIGINT:
-		return ScannerParam(duckdb_get_uint64(value));
+		return TypeSpecific::ExtractNotNullParam<uint64_t>(quirks, value);
 	case DUCKDB_TYPE_FLOAT:
-		return ScannerParam(duckdb_get_float(value));
+		return TypeSpecific::ExtractNotNullParam<float>(quirks, value);
 	case DUCKDB_TYPE_DOUBLE:
-		return ScannerParam(duckdb_get_double(value));
+		return TypeSpecific::ExtractNotNullParam<double>(quirks, value);
 	case DUCKDB_TYPE_DECIMAL:
-		return ScannerParam(duckdb_get_decimal(value), quirks.decimal_params_as_chars);
-	case DUCKDB_TYPE_VARCHAR: {
-		auto str_ptr = VarcharPtr(duckdb_get_varchar(value), VarcharDeleter);
-		return ScannerParam(str_ptr.get());
-	}
+		return TypeSpecific::ExtractNotNullParam<duckdb_decimal>(quirks, value);
+	case DUCKDB_TYPE_VARCHAR:
+		return TypeSpecific::ExtractNotNullParam<std::string>(quirks, value);
 	case DUCKDB_TYPE_DATE:
-		return ScannerParam(duckdb_from_date(duckdb_get_date(value)));
+		return TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(quirks, value);
 	case DUCKDB_TYPE_TIME:
-		return ScannerParam(duckdb_from_time(duckdb_get_time(value)));
+		return TypeSpecific::ExtractNotNullParam<duckdb_time_struct>(quirks, value);
 	case DUCKDB_TYPE_TIMESTAMP:
-		return ScannerParam(duckdb_from_timestamp(duckdb_get_timestamp(value)));
+		return TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(quirks, value);
+	case DUCKDB_TYPE_TIMESTAMP_NS:
+		return TypeSpecific::ExtractNotNullParam<TimestampNsStruct>(quirks, value);
 	default:
 		throw ScannerException("Cannot extract parameters from STRUCT value: specified type is not supported, ID: " +
 		                       std::to_string(type_id) + ", index: " + std::to_string(param_idx));
@@ -161,6 +164,7 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 		TypeSpecific::BindOdbcParam<duckdb_date_struct>(ctx, param, param_idx);
 		break;
 	case DUCKDB_TYPE_TIME:
+	case Params::TYPE_TIME_WITH_NANOS:
 		TypeSpecific::BindOdbcParam<duckdb_time_struct>(ctx, param, param_idx);
 		break;
 	case DUCKDB_TYPE_TIMESTAMP:
@@ -171,8 +175,8 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 	}
 }
 
-void Types::FetchAndSetResultOfType(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
-                                    idx_t row_idx) {
+void Types::FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
+                              idx_t row_idx) {
 	switch (odbc_type.desc_concise_type) {
 	case SQL_BIT:
 		TypeSpecific::FetchAndSetResult<bool>(ctx, odbc_type, col_idx, vec, row_idx);
