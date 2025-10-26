@@ -21,4 +21,8 @@ struct ParamsRegistry {
 	static std::unique_ptr<std::vector<ScannerParam>> Remove(int64_t params_id);
 };
 
+struct Registries {
+	static void Initialize();
+};
+
 } // namespace odbcscanner

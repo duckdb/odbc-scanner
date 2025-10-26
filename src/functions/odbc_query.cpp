@@ -1,11 +1,8 @@
-#include "capi_odbc_scanner.h"
+#include "odbc_scanner.hpp"
 
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <sql.h>
-#include <sqlext.h>
 
 #include "capi_pointers.hpp"
 #include "columns.hpp"
@@ -13,6 +10,7 @@
 #include "dbms_quirks.hpp"
 #include "defer.hpp"
 #include "diagnostics.hpp"
+#include "odbc_api.hpp"
 #include "params.hpp"
 #include "query_context.hpp"
 #include "registries.hpp"
@@ -332,7 +330,7 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 	ldata.finished = true;
 }
 
-static duckdb_state Register(duckdb_connection conn) {
+void OdbcQueryFunction::Register(duckdb_connection conn) {
 	auto fun = TableFunctionPtr(duckdb_create_table_function(), TableFunctionDeleter);
 	duckdb_table_function_set_name(fun.get(), "odbc_query");
 
@@ -357,7 +355,9 @@ static duckdb_state Register(duckdb_connection conn) {
 	// register and cleanup
 	duckdb_state state = duckdb_register_table_function(conn, fun.get());
 
-	return state;
+	if (state != DuckDBSuccess) {
+		throw ScannerException("'odbc_query' function registration failed");
+	}
 }
 
 } // namespace odbcscanner
@@ -391,14 +391,5 @@ static void odbc_query_function(duckdb_function_info info, duckdb_data_chunk out
 		odbcscanner::Query(info, output);
 	} catch (std::exception &e) {
 		duckdb_function_set_error(info, e.what());
-	}
-}
-
-duckdb_state odbc_query_register(duckdb_connection conn) /* noexcept */ {
-	try {
-		return odbcscanner::Register(conn);
-	} catch (std::exception &e) {
-		(void)e;
-		return DuckDBError;
 	}
 }

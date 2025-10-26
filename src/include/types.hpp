@@ -2,12 +2,9 @@
 
 #include <string>
 
-#include <sql.h>
-#include <sqlext.h>
-
-#include "duckdb_extension.h"
-
 #include "dbms_quirks.hpp"
+#include "duckdb_extension_api.hpp"
+#include "odbc_api.hpp"
 #include "params.hpp"
 #include "query_context.hpp"
 
@@ -44,6 +41,7 @@ struct OdbcType {
 struct Types {
 
 	static const SQLSMALLINT SQL_SS_TIME2 = -154;
+	static const SQLSMALLINT SQL_SS_TIMESTAMPOFFSET = -155;
 	static const std::string MSSQL_DATETIME2_TYPE_NAME;
 
 	// Type-dispatched functions

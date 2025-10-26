@@ -8,6 +8,7 @@
 #include "capi_pointers.hpp"
 #include "columns.hpp"
 #include "diagnostics.hpp"
+#include "odbc_scanner.hpp"
 #include "scanner_exception.hpp"
 #include "temporal.hpp"
 
@@ -54,7 +55,7 @@ static ScannerParam CreateParamFromDate(duckdb_date dt) {
 
 static ScannerParam CreateParamFromTime(DbmsQuirks &quirks, duckdb_time tm) {
 	duckdb_time_struct tms = duckdb_from_time(tm);
-	return ScannerParam(tms, quirks.time_params_with_nanos);
+	return ScannerParam(tms, quirks.time_params_as_ss_time2);
 }
 
 static ScannerParam CreateParamFromTimestamp(DbmsQuirks &quirks, duckdb_timestamp ts) {
@@ -144,7 +145,7 @@ template <>
 void TypeSpecific::BindOdbcParam<duckdb_time_struct>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_TYPE_NULL;
 	SQLRETURN ret = SQL_ERROR;
-	if (ctx.quirks.time_params_with_nanos) {
+	if (ctx.quirks.time_params_as_ss_time2) {
 		sqltype = Types::SQL_SS_TIME2;
 		ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_BINARY, sqltype, 0, 6,
 		                       reinterpret_cast<SQLPOINTER>(&param.Value<SQL_SS_TIME2_STRUCT>()), param.LengthBytes(),
@@ -319,9 +320,8 @@ static int64_t MicrosToNanos(duckdb_timestamp ts_no_fraction, SQLUINTEGER fetche
 	return nanos;
 }
 
-template <>
-void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(QueryContext &ctx, OdbcType &odbc_type,
-                                                              SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+static void FetchAndSetResultTimestamp(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
+                                       idx_t row_idx) {
 	SQL_TIMESTAMP_STRUCT fetched;
 	std::memset(&fetched, '\0', sizeof(fetched));
 	SQLLEN ind;
@@ -362,6 +362,54 @@ void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(QueryContext &ctx,
 	}
 }
 
+static void FetchAndSetResultTimestampOffset(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
+                                             duckdb_vector vec, idx_t row_idx) {
+	SQL_SS_TIMESTAMPOFFSET_STRUCT fetched;
+	std::memset(&fetched, '\0', sizeof(fetched));
+	SQLLEN ind;
+	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_BINARY, &fetched, sizeof(fetched), &ind);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(SQL_C_BINARY) + ", column index: " +
+		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
+		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+	}
+
+	if (ind == SQL_NULL_DATA) {
+		Types::SetNullValueToResult(vec, row_idx);
+		return;
+	}
+
+	duckdb_timestamp_struct tss;
+	std::memset(&tss, '\0', sizeof(tss));
+	tss.date.year = static_cast<int32_t>(fetched.year);
+	tss.date.month = static_cast<int8_t>(fetched.month);
+	tss.date.day = static_cast<int8_t>(fetched.day);
+	tss.time.hour = static_cast<int8_t>(fetched.hour);
+	tss.time.min = static_cast<int8_t>(fetched.minute);
+	tss.time.sec = static_cast<int8_t>(fetched.second);
+	tss.time.micros = static_cast<int32_t>(fetched.fraction / 1000);
+	duckdb_timestamp ts = duckdb_to_timestamp(tss);
+
+	int32_t fetched_offset_seconds = fetched.timezone_hour * 3600 + fetched.timezone_minute * 60;
+	int64_t offset_seconds = static_cast<int64_t>(fetched_offset_seconds) - OdbcScanner::timezone_offset_seconds;
+	int64_t offset_micros = offset_seconds * 1000 * 1000;
+	ts.micros += offset_micros;
+
+	duckdb_timestamp *data = reinterpret_cast<duckdb_timestamp *>(duckdb_vector_get_data(vec));
+	data[row_idx] = ts;
+}
+
+template <>
+void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(QueryContext &ctx, OdbcType &odbc_type,
+                                                              SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
+	if (odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET) {
+		FetchAndSetResultTimestampOffset(ctx, odbc_type, col_idx, vec, row_idx);
+	} else {
+		FetchAndSetResultTimestamp(ctx, odbc_type, col_idx, vec, row_idx);
+	}
+}
+
 template <>
 duckdb_type TypeSpecific::ResolveColumnType<duckdb_date_struct>(QueryContext &, ResultColumn &) {
 	return DUCKDB_TYPE_DATE;
@@ -377,6 +425,8 @@ duckdb_type TypeSpecific::ResolveColumnType<duckdb_timestamp_struct>(QueryContex
 	if (ctx.quirks.datetime2_columns_as_timestamp_ns &&
 	    col.odbc_type.desc_type_name == Types::MSSQL_DATETIME2_TYPE_NAME) {
 		return DUCKDB_TYPE_TIMESTAMP_NS;
+	} else if (col.odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET) {
+		return DUCKDB_TYPE_TIMESTAMP_TZ;
 	} else {
 		return DUCKDB_TYPE_TIMESTAMP;
 	}

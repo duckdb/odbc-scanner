@@ -1,11 +1,11 @@
 #include "connection.hpp"
 
+#include <cstdint>
+#include <vector>
+
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
 #include "widechar.hpp"
-
-#include <cstdint>
-#include <vector>
 
 namespace odbcscanner {
 

@@ -60,6 +60,7 @@ ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id,
 	case DUCKDB_TYPE_TIME:
 		return TypeSpecific::ExtractNotNullParam<duckdb_time_struct>(quirks, vec);
 	case DUCKDB_TYPE_TIMESTAMP:
+	case DUCKDB_TYPE_TIMESTAMP_TZ:
 		return TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(quirks, vec);
 	case DUCKDB_TYPE_TIMESTAMP_NS:
 		return TypeSpecific::ExtractNotNullParam<TimestampNsStruct>(quirks, vec);
@@ -104,6 +105,7 @@ ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, 
 	case DUCKDB_TYPE_TIME:
 		return TypeSpecific::ExtractNotNullParam<duckdb_time_struct>(quirks, value);
 	case DUCKDB_TYPE_TIMESTAMP:
+	case DUCKDB_TYPE_TIMESTAMP_TZ:
 		return TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(quirks, value);
 	case DUCKDB_TYPE_TIMESTAMP_NS:
 		return TypeSpecific::ExtractNotNullParam<TimestampNsStruct>(quirks, value);
@@ -168,6 +170,7 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 		TypeSpecific::BindOdbcParam<duckdb_time_struct>(ctx, param, param_idx);
 		break;
 	case DUCKDB_TYPE_TIMESTAMP:
+	case DUCKDB_TYPE_TIMESTAMP_TZ:
 		TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(ctx, param, param_idx);
 		break;
 	default:
@@ -241,14 +244,12 @@ void Types::FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLIN
 		TypeSpecific::FetchAndSetResult<duckdb_time_struct>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	case SQL_TYPE_TIMESTAMP:
+	case SQL_SS_TIMESTAMPOFFSET:
 		TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	case Types::SQL_SS_TIME2:
-		if (odbc_type.decimal_precision <= 6) {
-			TypeSpecific::FetchAndSetResult<duckdb_time_struct>(ctx, odbc_type, col_idx, vec, row_idx);
-			break;
-		}
-		// fall through
+		TypeSpecific::FetchAndSetResult<duckdb_time_struct>(ctx, odbc_type, col_idx, vec, row_idx);
+		break;
 	default:
 		throw ScannerException("Unsupported ODBC fetch type: " + odbc_type.ToString() + ", query: '" + ctx.query +
 		                       "', column idx: " + std::to_string(col_idx));
@@ -310,6 +311,7 @@ duckdb_type Types::ResolveColumnType(QueryContext &ctx, ResultColumn &column) {
 	case Types::SQL_SS_TIME2:
 		return TypeSpecific::ResolveColumnType<duckdb_time_struct>(ctx, column);
 	case SQL_TYPE_TIMESTAMP:
+	case Types::SQL_SS_TIMESTAMPOFFSET:
 		return TypeSpecific::ResolveColumnType<duckdb_timestamp_struct>(ctx, column);
 	default:
 		throw ScannerException("Unsupported ODBC column type: " + column.odbc_type.ToString() + ", query: '" +

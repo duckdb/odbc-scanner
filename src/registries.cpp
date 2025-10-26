@@ -1,10 +1,9 @@
 #include "registries.hpp"
 
-#include "capi_odbc_scanner.h"
-#include "scanner_exception.hpp"
-
 #include <mutex>
 #include <set>
+
+#include "scanner_exception.hpp"
 
 namespace odbcscanner {
 
@@ -127,10 +126,10 @@ std::unique_ptr<std::vector<ScannerParam>> ParamsRegistry::Remove(int64_t params
 	return std::unique_ptr<std::vector<ScannerParam>>(params_ptr);
 }
 
-} // namespace odbcscanner
-
-void initialize_registries() /* noexcept */ {
-	odbcscanner::SharedMutex();
-	odbcscanner::SharedConnectionsRegistry();
-	odbcscanner::SharedParamsRegistry();
+void Registries::Initialize() {
+	SharedMutex();
+	SharedConnectionsRegistry();
+	SharedParamsRegistry();
 }
+
+} // namespace odbcscanner
