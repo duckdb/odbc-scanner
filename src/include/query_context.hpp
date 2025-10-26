@@ -2,10 +2,8 @@
 
 #include <string>
 
-#include <sql.h>
-#include <sqlext.h>
-
 #include "dbms_quirks.hpp"
+#include "odbc_api.hpp"
 
 namespace odbcscanner {
 

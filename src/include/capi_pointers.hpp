@@ -1,8 +1,8 @@
 #pragma once
 
-#include "duckdb_extension.h"
-
 #include <memory>
+
+#include "duckdb_extension_api.hpp"
 
 DUCKDB_EXTENSION_EXTERN
 
@@ -36,6 +36,18 @@ using VarcharPtr = std::unique_ptr<char, void (*)(char *)>;
 
 inline void VarcharDeleter(char *val) {
 	duckdb_free(val);
+}
+
+using ResultPtr = std::unique_ptr<duckdb_result, void (*)(duckdb_result *)>;
+
+inline void ResultDeleter(duckdb_result *res) {
+	duckdb_destroy_result(res);
+}
+
+using DataChunkPtr = std::unique_ptr<_duckdb_data_chunk, void (*)(duckdb_data_chunk)>;
+
+inline void DataChunkDeleter(duckdb_data_chunk chunk) {
+	duckdb_destroy_data_chunk(&chunk);
 }
 
 } // namespace odbcscanner

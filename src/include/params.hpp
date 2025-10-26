@@ -1,17 +1,14 @@
 #pragma once
 
-#include "duckdb_extension.h"
-
 #include <cstdint>
 #include <limits>
 #include <memory>
 #include <string>
 #include <vector>
 
-#include <sql.h>
-#include <sqlext.h>
-
 #include "capi_pointers.hpp"
+#include "duckdb_extension_api.hpp"
+#include "odbc_api.hpp"
 #include "query_context.hpp"
 #include "temporal.hpp"
 #include "widechar.hpp"

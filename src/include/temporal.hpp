@@ -1,15 +1,14 @@
 #pragma once
 
-#include "duckdb_extension.h"
-
 #include <cstring>
-
 #include <vector>
 
-#include <sql.h>
-#include <sqlext.h>
+#include "duckdb_extension_api.hpp"
+#include "odbc_api.hpp"
 
 namespace odbcscanner {
+
+// https://learn.microsoft.com/en-us/sql/relational-databases/native-client-odbc-date-time/data-type-support-for-odbc-date-and-time-improvements?view=sql-server-2017
 
 struct SQL_SS_TIME2_STRUCT {
 	SQLUSMALLINT hour;
@@ -17,6 +16,18 @@ struct SQL_SS_TIME2_STRUCT {
 	SQLUSMALLINT second;
 	SQLUINTEGER fraction;
 };
+
+typedef struct tagSS_TIMESTAMPOFFSET_STRUCT {
+	SQLSMALLINT year;
+	SQLUSMALLINT month;
+	SQLUSMALLINT day;
+	SQLUSMALLINT hour;
+	SQLUSMALLINT minute;
+	SQLUSMALLINT second;
+	SQLUINTEGER fraction;
+	SQLSMALLINT timezone_hour;
+	SQLSMALLINT timezone_minute;
+} SQL_SS_TIMESTAMPOFFSET_STRUCT;
 
 struct TimestampNsStruct {
 	duckdb_timestamp_struct tss_no_micros;

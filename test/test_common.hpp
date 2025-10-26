@@ -5,7 +5,10 @@
 #include <string>
 
 #include "catch.hpp"
+
+extern "C" {
 #include "duckdb.h"
+}
 
 using LogicalTypePtr = std::unique_ptr<_duckdb_logical_type, void (*)(duckdb_logical_type)>;
 

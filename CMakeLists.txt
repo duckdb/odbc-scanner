@@ -37,11 +37,12 @@ set(CMAKE_CXX_STANDARD "11" CACHE STRING "C++ standard to enforce")
 
 # Create Extension library
 set(EXTENSION_SOURCES
-    src/capi_odbc_scanner.c
+    src/capi_entry_point.c
     src/columns.cpp
     src/connection.cpp
     src/dbms_quirks.cpp
     src/diagnostics.cpp
+    src/odbc_scanner.cpp
     src/params.cpp
     src/registries.cpp
     src/strings.cpp

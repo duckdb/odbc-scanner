@@ -1,0 +1,33 @@
+#pragma once
+
+#include "capi_entry_point.h"
+
+#include "duckdb_extension_api.hpp"
+
+namespace odbcscanner {
+
+struct OdbcBindParamsFunction {
+	static void Register(duckdb_connection connection);
+};
+
+struct OdbcCloseFunction {
+	static void Register(duckdb_connection connection);
+};
+
+struct OdbcConnectFunction {
+	static void Register(duckdb_connection connection);
+};
+
+struct OdbcCreateParamsFunction {
+	static void Register(duckdb_connection connection);
+};
+
+struct OdbcQueryFunction {
+	static void Register(duckdb_connection connection);
+};
+
+struct OdbcScanner {
+	static int64_t timezone_offset_seconds;
+};
+
+} // namespace odbcscanner

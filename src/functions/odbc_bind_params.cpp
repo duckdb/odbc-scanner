@@ -1,4 +1,4 @@
-#include "capi_odbc_scanner.h"
+#include "odbc_scanner.hpp"
 
 #include <cstdint>
 #include <string>
@@ -66,7 +66,7 @@ static void BindParams(duckdb_function_info info, duckdb_data_chunk input, duckd
 	result_data[0] = params_handle;
 }
 
-static duckdb_state Register(duckdb_connection conn) {
+void OdbcBindParamsFunction::Register(duckdb_connection conn) {
 	auto fun = ScalarFunctionPtr(duckdb_create_scalar_function(), ScalarFunctionDeleter);
 	duckdb_scalar_function_set_name(fun.get(), "odbc_bind_params");
 
@@ -88,7 +88,9 @@ static duckdb_state Register(duckdb_connection conn) {
 	// register and cleanup
 	duckdb_state state = duckdb_register_scalar_function(conn, fun.get());
 
-	return state;
+	if (state != DuckDBSuccess) {
+		throw ScannerException("'odbc_bind_params' function registration failed");
+	}
 }
 
 } // namespace odbcscanner
@@ -99,14 +101,5 @@ static void odbc_bind_params_function(duckdb_function_info info, duckdb_data_chu
 		odbcscanner::BindParams(info, input, output);
 	} catch (std::exception &e) {
 		duckdb_scalar_function_set_error(info, e.what());
-	}
-}
-
-duckdb_state odbc_bind_params_register(duckdb_connection conn) /* noexcept */ {
-	try {
-		return odbcscanner::Register(conn);
-	} catch (std::exception &e) {
-		(void)e;
-		return DuckDBError;
 	}
 }

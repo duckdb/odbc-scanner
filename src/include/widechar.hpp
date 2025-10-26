@@ -4,8 +4,7 @@
 #include <string>
 #include <vector>
 
-#include <sql.h>
-#include <sqlext.h>
+#include "odbc_api.hpp"
 
 namespace odbcscanner {
 

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "duckdb_extension.h"
-
 #include <vector>
+
+#include "duckdb_extension_api.hpp"
 
 namespace odbcscanner {
 

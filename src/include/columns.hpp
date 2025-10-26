@@ -2,11 +2,8 @@
 
 #include <string>
 
-#include <sql.h>
-#include <sqlext.h>
-
-#include "duckdb_extension.h"
-
+#include "duckdb_extension_api.hpp"
+#include "odbc_api.hpp"
 #include "query_context.hpp"
 #include "types.hpp"
 
