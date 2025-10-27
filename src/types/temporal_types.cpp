@@ -391,8 +391,7 @@ static void FetchAndSetResultTimestampOffset(QueryContext &ctx, OdbcType &odbc_t
 	tss.time.micros = static_cast<int32_t>(fetched.fraction / 1000);
 	duckdb_timestamp ts = duckdb_to_timestamp(tss);
 
-	int32_t fetched_offset_seconds = fetched.timezone_hour * 3600 + fetched.timezone_minute * 60;
-	int64_t offset_seconds = static_cast<int64_t>(fetched_offset_seconds) - OdbcScanner::timezone_offset_seconds;
+	int32_t offset_seconds = fetched.timezone_hour * 3600 + fetched.timezone_minute * 60;
 	int64_t offset_micros = offset_seconds * 1000 * 1000;
 	ts.micros += offset_micros;
 

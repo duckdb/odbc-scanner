@@ -8,8 +8,6 @@
 namespace odbcscanner {
 
 struct OdbcConnection {
-	static const std::string MSSQL_DBMS_NAME;
-
 	SQLHANDLE env = nullptr;
 	SQLHANDLE dbc = nullptr;
 	std::string dbms_name;

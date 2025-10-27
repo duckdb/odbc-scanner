@@ -26,8 +26,4 @@ struct OdbcQueryFunction {
 	static void Register(duckdb_connection connection);
 };
 
-struct OdbcScanner {
-	static int64_t timezone_offset_seconds;
-};
-
 } // namespace odbcscanner

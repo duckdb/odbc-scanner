@@ -13,6 +13,8 @@ SELECT timezone(current_timestamp)
 
 require odbc_scanner
 
+require-env TIMEZONE_WIP
+
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
@@ -58,3 +60,6 @@ DEALLOCATE p1
 
 statement ok
 SELECT odbc_close(getvariable('conn'))
+
+statement ok
+set TimeZone = 'UTC'
