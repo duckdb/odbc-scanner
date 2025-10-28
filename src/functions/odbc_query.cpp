@@ -112,6 +112,7 @@ static bool ExtractBoolFlag(duckdb_bind_info info, const std::string &name) {
 static DbmsQuirks ExtractUserQuirks(duckdb_bind_info info) {
 	DbmsQuirks quirks;
 	quirks.datetime2_columns_as_timestamp_ns = ExtractBoolFlag(info, "datetime2_columns_as_timestamp_ns");
+	quirks.timestamp_columns_as_timestamptz = ExtractBoolFlag(info, "timestamp_columns_as_timestamptz");
 	return quirks;
 }
 
@@ -345,6 +346,7 @@ void OdbcQueryFunction::Register(duckdb_connection conn) {
 	duckdb_table_function_add_named_parameter(fun.get(), "params_handle", bigint_type.get());
 	// quirks
 	duckdb_table_function_add_named_parameter(fun.get(), "datetime2_columns_as_timestamp_ns", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "timestamp_columns_as_timestamptz", bool_type.get());
 
 	// callbacks
 	duckdb_table_function_set_bind(fun.get(), odbc_query_bind);

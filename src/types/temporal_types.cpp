@@ -391,9 +391,10 @@ static void FetchAndSetResultTimestampOffset(QueryContext &ctx, OdbcType &odbc_t
 	tss.time.micros = static_cast<int32_t>(fetched.fraction / 1000);
 	duckdb_timestamp ts = duckdb_to_timestamp(tss);
 
-	int32_t offset_seconds = fetched.timezone_hour * 3600 + fetched.timezone_minute * 60;
+	int64_t offset_seconds =
+	    static_cast<int64_t>(fetched.timezone_hour) * 3600 + static_cast<int64_t>(fetched.timezone_minute) * 60;
 	int64_t offset_micros = offset_seconds * 1000 * 1000;
-	ts.micros += offset_micros;
+	ts.micros -= offset_micros;
 
 	duckdb_timestamp *data = reinterpret_cast<duckdb_timestamp *>(duckdb_vector_get_data(vec));
 	data[row_idx] = ts;
@@ -424,7 +425,8 @@ duckdb_type TypeSpecific::ResolveColumnType<duckdb_timestamp_struct>(QueryContex
 	if (ctx.quirks.datetime2_columns_as_timestamp_ns &&
 	    col.odbc_type.desc_type_name == Types::MSSQL_DATETIME2_TYPE_NAME) {
 		return DUCKDB_TYPE_TIMESTAMP_NS;
-	} else if (col.odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET) {
+	} else if (col.odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET ||
+	           ctx.quirks.timestamp_columns_as_timestamptz) {
 		return DUCKDB_TYPE_TIMESTAMP_TZ;
 	} else {
 		return DUCKDB_TYPE_TIMESTAMP;

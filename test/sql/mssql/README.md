@@ -23,7 +23,7 @@ MSSQL Types
  - [x] DATE
  - [x] TIME
  - [x] DATETIME2
- - [ ] DATETIMEOFFSET
+ - [x] DATETIMEOFFSET
  - [x] DATETIME
  - [x] SMALLDATETIME 
 

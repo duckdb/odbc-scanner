@@ -4,6 +4,8 @@
 
 require odbc_scanner
 
+require icu
+
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
@@ -85,6 +87,85 @@ DEALLOCATE p1_bind
 
 statement ok
 DEALLOCATE p1
+
+statement ok
+set TimeZone = 'Australia/Darwin'
+
+query I
+SELECT timezone(current_timestamp)
+----
+34200
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:59.123'' AS DATETIME)',
+  timestamp_columns_as_timestamptz=TRUE)
+----
+2021-01-01 09:28:59.123+09:30
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:59.123'' AS DATETIME)',
+    timestamp_columns_as_timestamptz=TRUE)
+)
+----
+TIMESTAMP WITH TIME ZONE
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATETIME)',
+  timestamp_columns_as_timestamptz=TRUE,
+  params=row('2020-12-31 23:58:59.123'::TIMESTAMP))
+----
+2021-01-01 09:28:59.123+09:30
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATETIME)',
+  timestamp_columns_as_timestamptz=TRUE,
+  params=row('2020-12-31 23:58:59.123+00'::TIMESTAMP WITH TIME ZONE))
+----
+2021-01-01 09:28:59.123+09:30
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATETIME)',
+  timestamp_columns_as_timestamptz=TRUE,
+  params=row('2020-12-31 23:58:59.123-05:00'::TIMESTAMP WITH TIME ZONE))
+----
+2021-01-01 14:28:59.123+09:30
+
+statement ok
+SET VARIABLE params2 = odbc_create_params()
+
+statement ok
+PREPARE p2 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATETIME)',
+  timestamp_columns_as_timestamptz=TRUE,
+  params_handle=getvariable('params2'))
+
+statement ok
+PREPARE p2_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params2'), row(?))
+
+statement ok
+EXECUTE p2_bind('2020-12-31 23:58:59.123'::TIMESTAMP)
+
+query I
+EXECUTE p2
+----
+2021-01-01 09:28:59.123+09:30
+
+statement ok
+EXECUTE p2_bind('2020-12-31 23:58:59.123-05:00'::TIMESTAMP WITH TIME ZONE)
+
+query I
+EXECUTE p2
+----
+2021-01-01 14:28:59.123+09:30
+
+statement ok
+DEALLOCATE p2_bind
+
+statement ok
+DEALLOCATE p2
+
+statement ok
+set TimeZone = 'UTC'
 
 statement ok
 SELECT odbc_close(getvariable('conn'))

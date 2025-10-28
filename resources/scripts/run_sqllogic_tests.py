@@ -10,7 +10,7 @@ project_dir = path.dirname(path.dirname(script_dir))
 venv_sitepackages_path = path.join(project_dir, "configure", "venv", "lib", f"python{sys.version_info.major}.{sys.version_info.minor}", "site-packages")
 sys.path.append(venv_sitepackages_path)
 
-from duckdb_sqllogictest import SQLLogicParser
+from duckdb_sqllogictest import SQLLogicParser, SQLParserException
 from duckdb_sqllogictest.python_runner import SQLLogicTestExecutor
 from duckdb_sqllogictest.result import ExecuteResult
 

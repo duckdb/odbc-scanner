@@ -3,6 +3,10 @@
 # description: test for DATETIMEOFFSET type with MSSQL
 # group: [mssql_15_datetimeoffset]
 
+require odbc_scanner
+
+require icu
+
 statement ok
 set TimeZone = 'Australia/Darwin'
 
@@ -11,17 +15,23 @@ SELECT timezone(current_timestamp)
 ----
 34200
 
-require odbc_scanner
-
-require-env TIMEZONE_WIP
-
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:59.1234567+00:00'' AS DATETIMEOFFSET)')
+----
+2021-01-01 09:28:59.123456+09:30
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:59.1234567+00:01'' AS DATETIMEOFFSET)')
+----
+2021-01-01 09:27:59.123456+09:30
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:59.1234567-05:00'' AS DATETIMEOFFSET)')
 ----
-2021-01-01 04:28:59.123456+09:30
+2021-01-01 14:28:59.123456+09:30
 
 query I
 SELECT column_type from (
@@ -31,7 +41,20 @@ SELECT column_type from (
 TIMESTAMP WITH TIME ZONE
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATETIMEOFFSET)', params=row('2020-12-31 23:58:59.123456-05:00'::TIMESTAMP WITH TIME ZONE))
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATETIMEOFFSET)',
+  params=row('2020-12-31 23:58:59.123456+00:00'::TIMESTAMP WITH TIME ZONE))
+----
+2021-01-01 09:28:59.123456+09:30
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATETIMEOFFSET)',
+  params=row('2020-12-31 23:58:59.123456+00:01'::TIMESTAMP WITH TIME ZONE))
+----
+2021-01-01 09:27:59.123456+09:30
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATETIMEOFFSET)',
+  params=row('2020-12-31 23:58:59.123456-05:00'::TIMESTAMP WITH TIME ZONE))
 ----
 2021-01-01 14:28:59.123456+09:30
 
@@ -43,6 +66,22 @@ PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DA
 
 statement ok
 PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind('2020-12-31 23:58:59.123456+00:00'::TIMESTAMP WITH TIME ZONE)
+
+query I
+EXECUTE p1
+----
+2021-01-01 09:28:59.123456+09:30
+
+statement ok
+EXECUTE p1_bind('2020-12-31 23:58:59.123456+00:01'::TIMESTAMP WITH TIME ZONE)
+
+query I
+EXECUTE p1
+----
+2021-01-01 09:27:59.123456+09:30
 
 statement ok
 EXECUTE p1_bind('2020-12-31 23:58:59.123456-05:00'::TIMESTAMP WITH TIME ZONE)
