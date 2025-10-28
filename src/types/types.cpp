@@ -55,6 +55,8 @@ ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id,
 		return TypeSpecific::ExtractNotNullParam<duckdb_decimal>(quirks, vec);
 	case DUCKDB_TYPE_VARCHAR:
 		return TypeSpecific::ExtractNotNullParam<std::string>(quirks, vec);
+	case DUCKDB_TYPE_BLOB:
+		return TypeSpecific::ExtractNotNullParam<duckdb_blob>(quirks, vec);
 	case DUCKDB_TYPE_DATE:
 		return TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(quirks, vec);
 	case DUCKDB_TYPE_TIME:
@@ -100,6 +102,8 @@ ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, 
 		return TypeSpecific::ExtractNotNullParam<duckdb_decimal>(quirks, value);
 	case DUCKDB_TYPE_VARCHAR:
 		return TypeSpecific::ExtractNotNullParam<std::string>(quirks, value);
+	case DUCKDB_TYPE_BLOB:
+		return TypeSpecific::ExtractNotNullParam<duckdb_blob>(quirks, value);
 	case DUCKDB_TYPE_DATE:
 		return TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(quirks, value);
 	case DUCKDB_TYPE_TIME:
@@ -162,6 +166,9 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 	case DUCKDB_TYPE_VARCHAR:
 		TypeSpecific::BindOdbcParam<std::string>(ctx, param, param_idx);
 		break;
+	case DUCKDB_TYPE_BLOB:
+		TypeSpecific::BindOdbcParam<duckdb_blob>(ctx, param, param_idx);
+		break;
 	case DUCKDB_TYPE_DATE:
 		TypeSpecific::BindOdbcParam<duckdb_date_struct>(ctx, param, param_idx);
 		break;
@@ -174,7 +181,7 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 		TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(ctx, param, param_idx);
 		break;
 	default:
-		throw ScannerException("Unsupported parameter type, ID: " + std::to_string(param.ParamType()));
+		throw ScannerException("Unsupported bind parameter type, ID: " + std::to_string(param.ParamType()));
 	}
 }
 
@@ -236,6 +243,11 @@ void Types::FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLIN
 	case SQL_WVARCHAR:
 	case SQL_WLONGVARCHAR:
 		TypeSpecific::FetchAndSetResult<std::string>(ctx, odbc_type, col_idx, vec, row_idx);
+		break;
+	case SQL_BINARY:
+	case SQL_VARBINARY:
+	case SQL_LONGVARBINARY:
+		TypeSpecific::FetchAndSetResult<duckdb_blob>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	case SQL_TYPE_DATE:
 		TypeSpecific::FetchAndSetResult<duckdb_date_struct>(ctx, odbc_type, col_idx, vec, row_idx);
@@ -305,6 +317,10 @@ duckdb_type Types::ResolveColumnType(QueryContext &ctx, ResultColumn &column) {
 	case SQL_WVARCHAR:
 	case SQL_WLONGVARCHAR:
 		return TypeSpecific::ResolveColumnType<std::string>(ctx, column);
+	case SQL_BINARY:
+	case SQL_VARBINARY:
+	case SQL_LONGVARBINARY:
+		return TypeSpecific::ResolveColumnType<duckdb_blob>(ctx, column);
 	case SQL_TYPE_DATE:
 		return TypeSpecific::ResolveColumnType<duckdb_date_struct>(ctx, column);
 	case SQL_TYPE_TIME:

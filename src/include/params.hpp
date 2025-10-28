@@ -60,6 +60,7 @@ class ScannerParam {
 		SQL_NUMERIC_STRUCT decimal;
 		DecimalChars decimal_chars;
 		WideString wstr;
+		std::vector<char> blob;
 		SQL_DATE_STRUCT date;
 		SQL_TIME_STRUCT time;
 		SQL_SS_TIME2_STRUCT time_with_nanos;
@@ -95,6 +96,8 @@ class ScannerParam {
 		}
 		InternalValue(WideString wstr_in) : wstr(std::move(wstr_in)) {
 		}
+		InternalValue(std::vector<char> blob_in) : blob(std::move(blob_in)) {
+		}
 		InternalValue(SQL_DATE_STRUCT value) : date(value) {
 		}
 		InternalValue(SQL_TIME_STRUCT value) : time(value) {
@@ -129,6 +132,7 @@ public:
 	explicit ScannerParam(duckdb_decimal value, bool decimal_as_chars);
 	explicit ScannerParam(const char *cstr, size_t len);
 	explicit ScannerParam(const char *cstr);
+	explicit ScannerParam(std::vector<char> value);
 	explicit ScannerParam(duckdb_date_struct value);
 	explicit ScannerParam(duckdb_time_struct value, bool use_time_with_nanos);
 	explicit ScannerParam(TimestampNsStruct value);

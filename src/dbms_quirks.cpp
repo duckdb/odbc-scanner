@@ -18,7 +18,7 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const DbmsQuirks &user_quirks) {
 	// Quirks assigned based on DBMS name reported by the driver
 
 	if (conn.dbms_name == MSSQL_DBMS_NAME) {
-		this->varchar_max_size_bytes = 8000;
+		this->var_len_max_size_bytes = 8000;
 		this->decimal_columns_precision_through_ard = true;
 		this->decimal_params_as_chars = true;
 		this->float_width_bytes = 8;

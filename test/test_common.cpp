@@ -177,6 +177,14 @@ std::string Result::Value<std::string>(idx_t col_idx, idx_t row_idx) {
 	return std::string(cstr, len);
 }
 
+std::string Result::BinaryValue(idx_t col_idx, idx_t row_idx) {
+	duckdb_string_t *data = NotNullData<duckdb_string_t>(DUCKDB_TYPE_BLOB, chunk, cur_row_idx, col_idx, row_idx);
+	duckdb_string_t dstr = data[row_idx];
+	const char *cstr = duckdb_string_t_data(&dstr);
+	uint32_t len = duckdb_string_t_length(dstr);
+	return std::string(cstr, len);
+}
+
 template <>
 duckdb_date_struct Result::Value<duckdb_date_struct>(idx_t col_idx, idx_t row_idx) {
 	if (DBMSConfigured("Oracle")) {
