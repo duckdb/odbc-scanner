@@ -41,20 +41,20 @@ MSSQL Types
 
 ### Binary strings
 
- - [ ] BINARY
- - [ ] VARBINARY
- - [ ] IMAGE
+ - [x] BINARY
+ - [x] VARBINARY
+ - [x] IMAGE
 
 ### Other data types
 
- - [ ] CURSOR
- - [ ] GEOGRAPHY
- - [ ] GEOMETRY
- - [ ] HIERARCHYID
- - [ ] JSON
- - [ ] VECTOR
- - [ ] ROWVERSION
- - [ ] SQL_VARIANT
- - [ ] TABLE
- - [ ] UNIQUEIDENTIFIER
- - [ ] XML
+ - [ ] **CURSOR**
+ - [ ] **GEOGRAPHY**
+ - [ ] **GEOMETRY**
+ - [ ] **HIERARCHYID**
+ - [ ] **JSON**
+ - [ ] **VECTOR**
+ - [ ] **ROWVERSION**
+ - [ ] **SQL_VARIANT**
+ - [ ] **TABLE**
+ - [ ] **UNIQUEIDENTIFIER**
+ - [ ] **XML**

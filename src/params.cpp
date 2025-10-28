@@ -120,6 +120,12 @@ WideString &ScannerParam::Value<WideString>() {
 }
 
 template <>
+std::vector<char> &ScannerParam::Value<std::vector<char>>() {
+	CheckType(DUCKDB_TYPE_BLOB);
+	return val.blob;
+}
+
+template <>
 SQL_DATE_STRUCT &ScannerParam::Value<SQL_DATE_STRUCT>() {
 	CheckType(DUCKDB_TYPE_DATE);
 	return val.date;
@@ -212,6 +218,12 @@ ScannerParam::ScannerParam(const char *cstr, size_t len) : type_id(DUCKDB_TYPE_V
 	new (&this->val.wstr) WideString;
 	this->val.wstr = std::move(wstr);
 	this->len_bytes = val.wstr.length<SQLLEN>() * sizeof(SQLWCHAR);
+}
+
+ScannerParam::ScannerParam(std::vector<char> blob) : type_id(DUCKDB_TYPE_BLOB) {
+	new (&this->val.blob) std::vector<char>;
+	this->val.blob = std::move(blob);
+	this->len_bytes = val.blob.size();
 }
 
 ScannerParam::ScannerParam(const char *cstr) : ScannerParam(cstr, std::strlen(cstr)) {
@@ -311,6 +323,10 @@ void ScannerParam::AssignByType(param_type type_id, InternalValue &val, ScannerP
 	case DUCKDB_TYPE_VARCHAR:
 		new (&val.wstr) WideString;
 		val.wstr = std::move(other.Value<WideString>());
+		break;
+	case DUCKDB_TYPE_BLOB:
+		new (&val.blob) std::vector<char>;
+		val.blob = std::move(other.Value<std::vector<char>>());
 		break;
 	case DUCKDB_TYPE_DATE:
 		val.date = other.Value<SQL_DATE_STRUCT>();

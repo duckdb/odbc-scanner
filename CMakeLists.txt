@@ -52,6 +52,7 @@ set(EXTENSION_SOURCES
     src/functions/odbc_connect.cpp
     src/functions/odbc_create_params.cpp
     src/functions/odbc_query.cpp
+    src/types/blob_type.cpp
     src/types/bool_type.cpp
     src/types/decimal_type.cpp
     src/types/float_types.cpp

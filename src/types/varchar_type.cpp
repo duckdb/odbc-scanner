@@ -67,7 +67,7 @@ void TypeSpecific::BindOdbcParam<std::string>(QueryContext &ctx, ScannerParam &p
 	SQLSMALLINT sqltype = SQL_WVARCHAR;
 	WideString &wstring = param.Value<WideString>();
 	size_t len_bytes = wstring.length<size_t>() * sizeof(SQLWCHAR);
-	if (ctx.quirks.varchar_max_size_bytes > 0 && len_bytes > ctx.quirks.varchar_max_size_bytes) {
+	if (ctx.quirks.var_len_max_size_bytes > 0 && len_bytes > ctx.quirks.var_len_max_size_bytes) {
 		sqltype = SQL_WLONGVARCHAR;
 	}
 	SQLRETURN ret =
@@ -243,10 +243,8 @@ static std::pair<std::string, bool> FetchInternal(QueryContext &ctx, SQLSMALLINT
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<std::string>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
-                                                  duckdb_vector vec, idx_t row_idx) {
-	(void)odbc_type;
-
+void TypeSpecific::FetchAndSetResult<std::string>(QueryContext &ctx, OdbcType &, SQLSMALLINT col_idx, duckdb_vector vec,
+                                                  idx_t row_idx) {
 	auto fetched = FetchInternal(ctx, col_idx);
 
 	if (fetched.second) {
