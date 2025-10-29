@@ -93,6 +93,8 @@ TEST_CASE("Long binary query", group_name) {
 		cast = "CAST(? AS BLOB)";
 	} else if (DBMSConfigured("MSSQL")) {
 		cast = "CAST(? AS VARBINARY(max))";
+	} else if (DBMSConfigured("Oracle")) {
+		cast = "CAST(? AS RAW(2000)) FROM dual";
 	} else {
 		return;
 	}
@@ -117,11 +119,13 @@ SELECT * FROM odbc_query(
 		std::string str = GenStr(i);
 		vec.emplace_back(std::move(str));
 	}
-	for (size_t i = (1 << 11) - 4; i < (1 << 11) + 4; i++) {
-		std::string str = GenStr(i);
-		vec.emplace_back(std::move(str));
-	}
 	if (!DBMSConfigured("Oracle")) {
+		// Oracle VARCHAR2 and RAW are expected to be fetched in a single
+		// GetData call, second GetData call to RAW skips the first tail byte.
+		for (size_t i = (1 << 11) - 4; i < (1 << 11) + 4; i++) {
+			std::string str = GenStr(i);
+			vec.emplace_back(std::move(str));
+		}
 		for (size_t i = (1 << 12) - 4; i < (1 << 12) + 4; i++) {
 			std::string str = GenStr(i);
 			vec.emplace_back(std::move(str));
