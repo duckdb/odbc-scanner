@@ -1,0 +1,83 @@
+# name: test/sql/oracle/04_float.test
+# description: test for Oracle FLOAT type
+# group: [oracle_10_float]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.123 AS FLOAT(126)) FROM dual')
+----
+42.123
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.123 AS FLOAT) FROM dual')
+)
+----
+DOUBLE
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.123 AS FLOAT(24)) FROM dual')
+----
+42.123
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.123 AS FLOAT(24)) FROM dual')
+)
+----
+DOUBLE
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.123 AS FLOAT) FROM dual')
+----
+42.123
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS FLOAT) FROM dual', params=row(42.123::DOUBLE))
+----
+42.123
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS FLOAT(24)) FROM dual', params=row(42.123::FLOAT))
+----
+42.123
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS FLOAT) FROM dual', params=row(0::DOUBLE))
+----
+0
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS FLOAT) FROM dual', params=row(-42.123::DOUBLE))
+----
+-42.123
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS FLOAT) FROM dual', params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind(42.123::DOUBLE)
+
+query I
+EXECUTE p1
+----
+42.123
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

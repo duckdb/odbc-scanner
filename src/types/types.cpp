@@ -223,14 +223,8 @@ void Types::FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLIN
 		TypeSpecific::FetchAndSetResult<float>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	case SQL_DOUBLE:
-		TypeSpecific::FetchAndSetResult<double>(ctx, odbc_type, col_idx, vec, row_idx);
-		break;
 	case SQL_FLOAT:
-		if (ctx.quirks.float_width_bytes <= sizeof(float)) {
-			TypeSpecific::FetchAndSetResult<float>(ctx, odbc_type, col_idx, vec, row_idx);
-		} else {
-			TypeSpecific::FetchAndSetResult<double>(ctx, odbc_type, col_idx, vec, row_idx);
-		}
+		TypeSpecific::FetchAndSetResult<double>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	case SQL_DECIMAL:
 	case SQL_NUMERIC:
@@ -299,13 +293,8 @@ duckdb_type Types::ResolveColumnType(QueryContext &ctx, ResultColumn &column) {
 	case SQL_REAL:
 		return TypeSpecific::ResolveColumnType<float>(ctx, column);
 	case SQL_DOUBLE:
-		return TypeSpecific::ResolveColumnType<double>(ctx, column);
 	case SQL_FLOAT:
-		if (ctx.quirks.float_width_bytes <= sizeof(float)) {
-			return TypeSpecific::ResolveColumnType<float>(ctx, column);
-		} else {
-			return TypeSpecific::ResolveColumnType<double>(ctx, column);
-		}
+		return TypeSpecific::ResolveColumnType<double>(ctx, column);
 		break;
 	case SQL_DECIMAL:
 	case SQL_NUMERIC:

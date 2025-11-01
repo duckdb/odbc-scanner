@@ -5,12 +5,12 @@ Reference: [link](https://docs.oracle.com/en/database/oracle/oracle-database/19/
 
  - [x] VARCHAR2
  - [x] NVARCHAR2
- - [ ] **NUMBER**
- - [ ] **FLOAT**
+ - [x] NUMBER
+ - [x] FLOAT
  - [ ] **LONG**
  - [ ] **DATE**
- - [ ] **BINARY_FLOAT**
- - [ ] **BINARY_DOUBLE**
+ - [x] BINARY_FLOAT
+ - [x] BINARY_DOUBLE
  - [ ] **TIMESTAMP**
  - [ ] **TIMESTAMP WITH TIME ZONE**
  - [ ] **TIMESTAMP WITH LOCAL TIME ZONE**
