@@ -39,7 +39,7 @@ template <>
 void TypeSpecific::BindOdbcParam<duckdb_blob>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_VARBINARY;
 	std::vector<char> &blob = param.Value<std::vector<char>>();
-	if (ctx.quirks.var_len_max_size_bytes > 0 && blob.size() > ctx.quirks.var_len_max_size_bytes) {
+	if (blob.size() > ctx.quirks.var_len_params_long_threshold_bytes) {
 		sqltype = SQL_LONGVARBINARY;
 	}
 	SQLRETURN ret =

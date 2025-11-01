@@ -16,13 +16,13 @@ Reference: [link](https://docs.oracle.com/en/database/oracle/oracle-database/19/
  - [ ] **TIMESTAMP WITH LOCAL TIME ZONE**
  - [ ] **INTERVAL YEAR TO MONTH**
  - [ ] **INTERVAL DAY TO SECOND**
- - [ ] **RAW**
+ - [x] RAW
  - [ ] **LONG RAW**
  - [ ] **ROWID**
  - [ ] **UROWID**
  - [x] CHAR
  - [x] NCHAR
- - [ ] **CLOB**
- - [ ] **NCLOB**
- - [ ] **BLOB**
+ - [x] CLOB
+ - [x] NCLOB
+ - [x] BLOB
  - [ ] **BFILE**

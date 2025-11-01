@@ -67,7 +67,7 @@ void TypeSpecific::BindOdbcParam<std::string>(QueryContext &ctx, ScannerParam &p
 	SQLSMALLINT sqltype = SQL_WVARCHAR;
 	WideString &wstring = param.Value<WideString>();
 	size_t len_bytes = wstring.length<size_t>() * sizeof(SQLWCHAR);
-	if (ctx.quirks.var_len_max_size_bytes > 0 && len_bytes > ctx.quirks.var_len_max_size_bytes) {
+	if (len_bytes > ctx.quirks.var_len_params_long_threshold_bytes) {
 		sqltype = SQL_WLONGVARCHAR;
 	}
 	SQLRETURN ret =
