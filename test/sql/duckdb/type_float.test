@@ -17,7 +17,7 @@ SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42.123::FLOAT')
 )
 ----
-FLOAT
+DOUBLE
 
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42.123::FLOAT')

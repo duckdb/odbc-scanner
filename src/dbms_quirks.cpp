@@ -21,7 +21,6 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const DbmsQuirks &user_quirks) {
 		this->var_len_max_size_bytes = 8000;
 		this->decimal_columns_precision_through_ard = true;
 		this->decimal_params_as_chars = true;
-		this->float_width_bytes = 8;
 		this->time_params_as_ss_time2 = true;
 		this->timestamp_max_fraction_precision = 7;
 		this->timestamptz_params_as_ss_timestampoffset = true;
