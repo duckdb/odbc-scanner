@@ -1,6 +1,6 @@
-# name: test/sql/mssql/06_decimal.test
-# description: test for DECIMAL type with MSSQL
-# group: [mssql_06_decimal]
+# name: test/sql/oracle/03_number.test
+# description: test for Oracle NUMBER type
+# group: [oracle_03_number]
 
 require odbc_scanner
 
@@ -8,62 +8,87 @@ statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS DECIMAL(4,3))')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMBER(4,3)) FROM dual')
 ----
 1.234
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS DECIMAL(4,3))')
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMBER(4,3)) FROM dual')
 )
 ----
 DECIMAL(4,3)
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMERIC(4,3))')
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMERIC(4,3)) FROM dual')
 )
 ----
 DECIMAL(4,3)
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456.789'' AS DECIMAL(9,3))')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456.789'' AS NUMBER(9,3)) FROM dual')
 ----
 123456.789
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456.789'' AS DECIMAL(9,3))')
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456.789'' AS NUMBER(9,3)) FROM dual')
 )
 ----
 DECIMAL(9,3)
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456789012345.123'' AS DECIMAL(18,3))')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456789012345.123'' AS NUMBER(18,3)) FROM dual')
 ----
 123456789012345.123
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456789012345.123'' AS DECIMAL(18,3))')
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456789012345.123'' AS NUMBER(18,3)) FROM dual')
 )
 ----
 DECIMAL(18,3)
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''12345678901234567890123456789012345.123'' AS DECIMAL(38,3))')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''12345678901234567890123456789012345.123'' AS NUMBER(38,3)) FROM dual')
 ----
 12345678901234567890123456789012345.123
 
+statement error
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(''-9.99999999999999999999999999999999999999E+125'' AS NUMBER(*, -84)) FROM dual')
+----
+Binder Error: Decimal numbers with a negative scale cannot be represented as DuckDB's DECIMALs
+
+query I 
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(CAST(''0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000987654321098765432109876543210987654321'' AS NUMBER(*, 127)) AS VARCHAR(129)) FROM dual')
+----
+.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000987654321098765432109876543210987654321
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(''0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000987654321098765432109876543210987654321'' AS NUMBER(*, 127)) FROM dual')
+----
+[Oracle][ODBC]Numeric value out of range.
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(''0.87654321098765432109876543210987654321'' AS NUMBER(*, 127)) FROM dual')
+----
+0.87654321098765432109876543210987654321
+
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''12345678901234567890123456789012345.123'' AS DECIMAL(38,3))')
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''12345678901234567890123456789012345.123'' AS NUMBER(38,3)) FROM dual')
 )
 ----
 DECIMAL(38,3)
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DECIMAL(38,3))', params=row('12345678901234567890123456789012345.123'::DECIMAL(38,3)))
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS NUMBER(38,3)) FROM dual',
+  params=row('12345678901234567890123456789012345.123'::DECIMAL(38,3)))
 ----
 12345678901234567890123456789012345.123
 
@@ -71,7 +96,8 @@ statement ok
 SET VARIABLE params16 = odbc_create_params()
 
 statement ok
-PREPARE p16 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DECIMAL(4,3))', params_handle=getvariable('params16'))
+PREPARE p16 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS NUMBER(4,3)) FROM dual',
+  params_handle=getvariable('params16'))
 
 statement ok
 PREPARE p16_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params16'), row(?))
@@ -134,7 +160,8 @@ statement ok
 SET VARIABLE params32 = odbc_create_params()
 
 statement ok
-PREPARE p32 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DECIMAL(9,3))', params_handle=getvariable('params32'))
+PREPARE p32 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS NUMBER(9,3)) FROM dual',
+  params_handle=getvariable('params32'))
 
 statement ok
 PREPARE p32_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params32'), row(?))
@@ -197,7 +224,8 @@ statement ok
 SET VARIABLE params64 = odbc_create_params()
 
 statement ok
-PREPARE p64 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DECIMAL(18,3))', params_handle=getvariable('params64'))
+PREPARE p64 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS NUMBER(18,3)) FROM dual',
+  params_handle=getvariable('params64'))
 
 statement ok
 PREPARE p64_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params64'), row(?))
@@ -260,7 +288,8 @@ statement ok
 SET VARIABLE params128 = odbc_create_params()
 
 statement ok
-PREPARE p128 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DECIMAL(38,3))', params_handle=getvariable('params128'))
+PREPARE p128 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS NUMBER(38,3)) FROM dual',
+  params_handle=getvariable('params128'))
 
 statement ok
 PREPARE p128_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params128'), row(?))

@@ -68,7 +68,7 @@ static OdbcType GetTypeAttributes(const std::string &query, SQLSMALLINT cols_cou
 	uint8_t decimal_scale = 0;
 	if (desc_concise_type == SQL_DECIMAL || desc_concise_type == SQL_NUMERIC) {
 		{
-			SQLLEN precision = -1;
+			SQLLEN precision = 0;
 			SQLRETURN ret = SQLColAttributeW(hstmt, col_idx, SQL_DESC_PRECISION, nullptr, 0, nullptr, &precision);
 			if (!SQL_SUCCEEDED(ret)) {
 				std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
@@ -77,7 +77,7 @@ static OdbcType GetTypeAttributes(const std::string &query, SQLSMALLINT cols_cou
 				    ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
 				    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 			}
-			decimal_precision = static_cast<uint8_t>(precision != 0 ? precision : 38);
+			decimal_precision = static_cast<uint8_t>(precision >= 1 && precision <= 38 ? precision : 38);
 		}
 
 		{
@@ -90,7 +90,13 @@ static OdbcType GetTypeAttributes(const std::string &query, SQLSMALLINT cols_cou
 				    ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
 				    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 			}
-			decimal_scale = static_cast<uint8_t>(scale);
+			if (scale < 0) {
+				throw ScannerException(
+				    "Decimal numbers with a negative scale cannot be represented as DuckDB's DECIMALs, scale: " +
+				    std::to_string(scale) + ", column index: " + std::to_string(col_idx) + ", query: '" + query + "'");
+			}
+			SQLLEN precision = static_cast<SQLLEN>(decimal_precision);
+			decimal_scale = static_cast<uint8_t>(scale <= precision ? scale : precision);
 		}
 	}
 

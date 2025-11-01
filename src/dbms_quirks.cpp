@@ -41,7 +41,7 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const DbmsQuirks &user_quirks) {
 		this->var_len_data_single_part = true;
 
 	} else if (conn.dbms_name == ORACLE_DBMS_NAME) {
-		this->decimal_columns_as_chars = true;
+		this->decimal_columns_precision_through_ard = true;
 
 	} else if (conn.dbms_name.rfind(DB2_DBMS_NAME_PREFIX, 0) == 0) {
 		this->decimal_params_as_chars = true;
