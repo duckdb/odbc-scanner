@@ -18,7 +18,7 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const DbmsQuirks &user_quirks) {
 	// Quirks assigned based on DBMS name reported by the driver
 
 	if (conn.dbms_name == MSSQL_DBMS_NAME) {
-		this->var_len_max_size_bytes = 8000;
+		this->var_len_params_long_threshold_bytes = 8000;
 		this->decimal_columns_precision_through_ard = true;
 		this->decimal_params_as_chars = true;
 		this->time_params_as_ss_time2 = true;
@@ -40,6 +40,7 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const DbmsQuirks &user_quirks) {
 		this->var_len_data_single_part = true;
 
 	} else if (conn.dbms_name == ORACLE_DBMS_NAME) {
+		this->var_len_params_long_threshold_bytes = 4000;
 		this->decimal_columns_precision_through_ard = true;
 
 	} else if (conn.dbms_name.rfind(DB2_DBMS_NAME_PREFIX, 0) == 0) {
