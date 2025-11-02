@@ -405,6 +405,10 @@ void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(QueryContext &ctx,
                                                               SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
 	if (odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET) {
 		FetchAndSetResultTimestampOffset(ctx, odbc_type, col_idx, vec, row_idx);
+	} else if (ctx.quirks.timestamp_columns_with_typename_date_as_date && odbc_type.desc_type == SQL_DATE &&
+	           odbc_type.desc_concise_type == SQL_TYPE_TIMESTAMP &&
+	           odbc_type.desc_type_name == Types::SQL_DATE_TYPE_NAME) {
+		FetchAndSetResult<duckdb_date_struct>(ctx, odbc_type, col_idx, vec, row_idx);
 	} else {
 		FetchAndSetResultTimestamp(ctx, odbc_type, col_idx, vec, row_idx);
 	}
@@ -428,6 +432,10 @@ duckdb_type TypeSpecific::ResolveColumnType<duckdb_timestamp_struct>(QueryContex
 	} else if (col.odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET ||
 	           ctx.quirks.timestamp_columns_as_timestamptz) {
 		return DUCKDB_TYPE_TIMESTAMP_TZ;
+	} else if (ctx.quirks.timestamp_columns_with_typename_date_as_date && col.odbc_type.desc_type == SQL_DATE &&
+	           col.odbc_type.desc_concise_type == SQL_TYPE_TIMESTAMP &&
+	           col.odbc_type.desc_type_name == Types::SQL_DATE_TYPE_NAME) {
+		return DUCKDB_TYPE_DATE;
 	} else {
 		return DUCKDB_TYPE_TIMESTAMP;
 	}
