@@ -187,13 +187,6 @@ std::string Result::BinaryValue(idx_t col_idx, idx_t row_idx) {
 
 template <>
 duckdb_date_struct Result::Value<duckdb_date_struct>(idx_t col_idx, idx_t row_idx) {
-	if (DBMSConfigured("Oracle")) {
-		duckdb_timestamp *data =
-		    NotNullData<duckdb_timestamp>(DUCKDB_TYPE_TIMESTAMP, chunk, cur_row_idx, col_idx, row_idx);
-		duckdb_timestamp ts = data[row_idx];
-		duckdb_timestamp_struct tss = duckdb_from_timestamp(ts);
-		return tss.date;
-	}
 	duckdb_date *data = NotNullData<duckdb_date>(DUCKDB_TYPE_DATE, chunk, cur_row_idx, col_idx, row_idx);
 	duckdb_date dt = data[row_idx];
 	return duckdb_from_date(dt);

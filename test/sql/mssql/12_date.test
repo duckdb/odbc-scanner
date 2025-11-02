@@ -58,6 +58,22 @@ EXECUTE p1
 1969-12-31
 
 statement ok
+EXECUTE p1_bind('0001-01-01'::DATE)
+
+query I
+EXECUTE p1
+----
+0001-01-01
+
+statement ok
+EXECUTE p1_bind('9999-12-31'::DATE)
+
+query I
+EXECUTE p1
+----
+9999-12-31
+
+statement ok
 DEALLOCATE p1_bind
 
 statement ok

@@ -26,6 +26,7 @@ bool OdbcType::Equals(OdbcType &other) {
 }
 
 const std::string Types::MSSQL_DATETIME2_TYPE_NAME = "datetime2";
+const std::string Types::SQL_DATE_TYPE_NAME = "DATE";
 
 ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec, idx_t param_idx) {
 	switch (type_id) {

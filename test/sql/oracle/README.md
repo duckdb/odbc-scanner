@@ -8,10 +8,10 @@ Reference: [link](https://docs.oracle.com/en/database/oracle/oracle-database/19/
  - [x] NUMBER
  - [x] FLOAT
  - [ ] **LONG**
- - [ ] **DATE**
+ - [x] DATE
  - [x] BINARY_FLOAT
  - [x] BINARY_DOUBLE
- - [ ] **TIMESTAMP**
+ - [x] TIMESTAMP
  - [ ] **TIMESTAMP WITH TIME ZONE**
  - [ ] **TIMESTAMP WITH LOCAL TIME ZONE**
  - [ ] **INTERVAL YEAR TO MONTH**
