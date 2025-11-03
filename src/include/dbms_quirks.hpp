@@ -23,9 +23,8 @@ struct DbmsQuirks {
 	bool var_len_data_single_part = false;
 	bool time_params_as_ss_time2 = false;
 	uint8_t timestamp_max_fraction_precision = 9;
-	bool datetime2_columns_as_timestamp_ns = false;
+	bool timestamp_columns_as_timestamp_ns = false;
 	bool timestamptz_params_as_ss_timestampoffset = false;
-	bool timestamp_columns_as_timestamptz = false;
 	bool timestamp_columns_with_typename_date_as_date = false;
 
 	DbmsQuirks();

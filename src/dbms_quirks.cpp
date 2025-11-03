@@ -51,11 +51,8 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const DbmsQuirks &user_quirks) {
 
 	// Quirks explicitly requested by user
 
-	if (user_quirks.datetime2_columns_as_timestamp_ns) {
-		this->datetime2_columns_as_timestamp_ns = true;
-	}
-	if (user_quirks.timestamp_columns_as_timestamptz) {
-		this->timestamp_columns_as_timestamptz = true;
+	if (user_quirks.timestamp_columns_as_timestamp_ns) {
+		this->timestamp_columns_as_timestamp_ns = true;
 	}
 }
 

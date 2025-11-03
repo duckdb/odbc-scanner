@@ -348,7 +348,7 @@ static void FetchAndSetResultTimestamp(QueryContext &ctx, OdbcType &odbc_type, S
 	tss.time.min = static_cast<int8_t>(fetched.minute);
 	tss.time.sec = static_cast<int8_t>(fetched.second);
 
-	if (ctx.quirks.datetime2_columns_as_timestamp_ns && odbc_type.desc_type_name == Types::MSSQL_DATETIME2_TYPE_NAME) {
+	if (ctx.quirks.timestamp_columns_as_timestamp_ns) {
 		duckdb_timestamp ts_no_fraction = duckdb_to_timestamp(tss);
 		duckdb_timestamp_ns tns;
 		tns.nanos = MicrosToNanos(ts_no_fraction, fetched.fraction);
@@ -426,16 +426,14 @@ duckdb_type TypeSpecific::ResolveColumnType<duckdb_time_struct>(QueryContext &, 
 
 template <>
 duckdb_type TypeSpecific::ResolveColumnType<duckdb_timestamp_struct>(QueryContext &ctx, ResultColumn &col) {
-	if (ctx.quirks.datetime2_columns_as_timestamp_ns &&
-	    col.odbc_type.desc_type_name == Types::MSSQL_DATETIME2_TYPE_NAME) {
-		return DUCKDB_TYPE_TIMESTAMP_NS;
-	} else if (col.odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET ||
-	           ctx.quirks.timestamp_columns_as_timestamptz) {
+	if (col.odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET) {
 		return DUCKDB_TYPE_TIMESTAMP_TZ;
 	} else if (ctx.quirks.timestamp_columns_with_typename_date_as_date && col.odbc_type.desc_type == SQL_DATE &&
 	           col.odbc_type.desc_concise_type == SQL_TYPE_TIMESTAMP &&
 	           col.odbc_type.desc_type_name == Types::SQL_DATE_TYPE_NAME) {
 		return DUCKDB_TYPE_DATE;
+	} else if (ctx.quirks.timestamp_columns_as_timestamp_ns) {
+		return DUCKDB_TYPE_TIMESTAMP_NS;
 	} else {
 		return DUCKDB_TYPE_TIMESTAMP;
 	}

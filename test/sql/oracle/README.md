@@ -12,8 +12,8 @@ Reference: [link](https://docs.oracle.com/en/database/oracle/oracle-database/19/
  - [x] BINARY_FLOAT
  - [x] BINARY_DOUBLE
  - [x] TIMESTAMP
- - [ ] **TIMESTAMP WITH TIME ZONE**
- - [ ] **TIMESTAMP WITH LOCAL TIME ZONE**
+ - [x] TIMESTAMP WITH TIME ZONE
+ - [x] TIMESTAMP WITH LOCAL TIME ZONE
  - [ ] **INTERVAL YEAR TO MONTH**
  - [ ] **INTERVAL DAY TO SECOND**
  - [x] RAW
