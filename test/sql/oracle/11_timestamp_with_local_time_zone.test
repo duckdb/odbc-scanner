@@ -1,56 +1,59 @@
-# name: test/sql/oracle/09_timestamp.test
-# description: test for TIMESTAMP type with Oracle
-# group: [oracle_09_timestamp]
+# name: test/sql/oracle/11_timestamp_with_local_time_zone.test
+# description: test for Oracle TIMESTAMP WITH LOCAL TYPE ZONE type
+# group: [oracle_11_timestamp_with_local_time_zone]
 
 require odbc_scanner
 
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
+statement ok
+CALL odbc_query(getvariable('conn'), 'ALTER SESSION SET TIME_ZONE = ''-01:01''')
+
 query I
 SELECT * FROM odbc_query(getvariable('conn'),
-  'SELECT to_timestamp(''2020-12-31 12:34:56.123456789'', ''YYYY-MM-DD HH24:MI:SS.FF9'') FROM dual')
+  'SELECT CAST(to_timestamp_tz(''2020-12-31 12:34:56.123456789-05:00'', ''YYYY-MM-DD HH24:MI:SS.FF9TZH:TZM'') AS TIMESTAMP(9) WITH LOCAL TIME ZONE) FROM dual')
 ----
-2020-12-31 12:34:56.123456
+2020-12-31 16:33:56.123456
 
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT to_timestamp(''2020-12-31 12:34:56.123456789'', ''YYYY-MM-DD HH24:MI:SS.FF9'') FROM dual')
+    'SELECT CAST(to_timestamp_tz(''2020-12-31 12:34:56.123456789-05:00'', ''YYYY-MM-DD HH24:MI:SS.FF9TZH:TZM'') AS TIMESTAMP(9) WITH LOCAL TIME ZONE) FROM dual')
 )
 ----
 TIMESTAMP
 
 query I
 SELECT * FROM odbc_query(getvariable('conn'),
-  'SELECT to_timestamp(''2020-12-31 12:34:56.123456789'', ''YYYY-MM-DD HH24:MI:SS.FF9'') FROM dual',
+  'SELECT CAST(to_timestamp_tz(''2020-12-31 12:34:56.123456789-05:00'', ''YYYY-MM-DD HH24:MI:SS.FF9TZH:TZM'') AS TIMESTAMP(9) WITH LOCAL TIME ZONE) FROM dual',
   timestamp_columns_as_timestamp_ns=TRUE)
 ----
-2020-12-31 12:34:56.123456789
+2020-12-31 16:33:56.123456789
 
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT to_timestamp(''2020-12-31 12:34:56.123456789'', ''YYYY-MM-DD HH24:MI:SS.FF9'') FROM dual',
+    'SELECT CAST(to_timestamp_tz(''2020-12-31 12:34:56.123456789-05:00'', ''YYYY-MM-DD HH24:MI:SS.FF9TZH:TZM'') AS TIMESTAMP(9) WITH LOCAL TIME ZONE) FROM dual',
     timestamp_columns_as_timestamp_ns=TRUE)
 )
 ----
 TIMESTAMP_NS
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIMESTAMP(6)) FROM dual',
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIMESTAMP(6) WITH LOCAL TIME ZONE) FROM dual',
   params=row('2020-12-31 23:58:59.123456'::TIMESTAMP))
 ----
 2020-12-31 23:58:59.123456
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIMESTAMP(9)) FROM dual',
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIMESTAMP(9) WITH LOCAL TIME ZONE) FROM dual',
   params=row('2020-12-31 23:58:59.123456'::TIMESTAMP))
 ----
 2020-12-31 23:58:59.123456
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIMESTAMP(3)) FROM dual',
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIMESTAMP(3) WITH LOCAL TIME ZONE) FROM dual',
   params=row('2020-12-31 23:58:59.123456'::TIMESTAMP))
 ----
 2020-12-31 23:58:59.123
@@ -59,7 +62,7 @@ statement ok
 SET VARIABLE params1 = odbc_create_params()
 
 statement ok
-PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIMESTAMP(9)) FROM dual',
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIMESTAMP(9) WITH LOCAL TIME ZONE) FROM dual',
   params_handle=getvariable('params1'))
 
 statement ok
@@ -115,7 +118,7 @@ statement ok
 SET VARIABLE params2 = odbc_create_params()
 
 statement ok
-PREPARE p2 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIMESTAMP(9)) FROM dual',
+PREPARE p2 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIMESTAMP(9) WITH LOCAL TIME ZONE) FROM dual',
   params_handle=getvariable('params2'),
   timestamp_columns_as_timestamp_ns=TRUE)
 

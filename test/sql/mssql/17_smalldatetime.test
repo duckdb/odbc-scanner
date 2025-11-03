@@ -20,6 +20,14 @@ SELECT column_type from (
 TIMESTAMP
 
 query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:00'' AS SMALLDATETIME)',
+    timestamp_columns_as_timestamp_ns=TRUE)
+)
+----
+TIMESTAMP_NS
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)', params=row('2020-12-31 23:58:00'::TIMESTAMP))
 ----
 2020-12-31 23:58:00
@@ -69,6 +77,56 @@ DEALLOCATE p1_bind
 
 statement ok
 DEALLOCATE p1
+
+statement ok
+SET VARIABLE params2 = odbc_create_params()
+
+statement ok
+PREPARE p2 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)',
+  params_handle=getvariable('params2'),
+  timestamp_columns_as_timestamp_ns=TRUE)
+
+statement ok
+PREPARE p2_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params2'), row(?))
+
+statement ok
+EXECUTE p2_bind('2020-12-31 23:58:59.123456'::TIMESTAMP)
+
+query I
+EXECUTE p2
+----
+2020-12-31 23:59:00
+
+statement ok
+EXECUTE p2_bind('2020-12-31 23:58:59.123456789'::TIMESTAMP_NS)
+
+query I
+EXECUTE p2
+----
+2020-12-31 23:59:00
+
+statement ok
+EXECUTE p2_bind('1900-01-01 00:00:00.000000'::TIMESTAMP)
+
+query I
+EXECUTE p2
+----
+1900-01-01 00:00:00
+
+statement ok
+EXECUTE p2_bind('2079-06-06 23:59:00.000000'::TIMESTAMP)
+
+query I
+EXECUTE p2
+----
+2079-06-06 23:59:00
+
+statement ok
+DEALLOCATE p2_bind
+
+statement ok
+DEALLOCATE p2
+
 
 statement ok
 SELECT odbc_close(getvariable('conn'))
