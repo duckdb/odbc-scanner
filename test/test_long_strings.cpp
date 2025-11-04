@@ -16,7 +16,7 @@ static std::string GenStr(size_t len) {
 
 TEST_CASE("Long string query", group_name) {
 	std::string cast = "NOT_SUPPORTED";
-	if (DBMSConfigured("DuckDB")) {
+	if (DBMSConfigured("DuckDB") || DBMSConfigured("Snowflake")) {
 		cast = "CAST(? AS VARCHAR)";
 	} else if (DBMSConfigured("MSSQL")) {
 		cast = "CAST(? AS VARCHAR(max))";
@@ -154,6 +154,8 @@ TEST_CASE("Long binary query", group_name) {
 		cast = "CAST(? AS VARBINARY(max))";
 	} else if (DBMSConfigured("Oracle")) {
 		cast = "to_blob(?) FROM dual";
+	} else if (DBMSConfigured("Snowflake")) {
+		cast = "CAST(? AS VARBINARY)";
 	} else {
 		return;
 	}

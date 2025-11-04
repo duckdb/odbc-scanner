@@ -14,6 +14,7 @@ struct DbmsQuirks {
 	static const std::string CLICKHOUSE_DBMS_NAME;
 	static const std::string ORACLE_DBMS_NAME;
 	static const std::string DB2_DBMS_NAME_PREFIX;
+	static const std::string SNOWFLAKE_DBMS_NAME;
 
 	size_t var_len_params_long_threshold_bytes = 4000;
 	bool decimal_columns_precision_through_ard = false;

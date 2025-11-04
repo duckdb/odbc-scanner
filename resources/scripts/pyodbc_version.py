@@ -48,6 +48,12 @@ def run_db2():
   exec_sql(cur, "SELECT * FROM SYSIBMADM.ENV_INST_INFO")
   print(cur.fetchone())
 
+def run_snowflake():
+  conn = connect_await_db_startup()
+  cur = conn.cursor()
+  exec_sql(cur, "SELECT current_version()")
+  print(cur.fetchone())
+
 if __name__ == "__main__":
   if args.dbms in [
     "DuckDB",
@@ -66,5 +72,7 @@ if __name__ == "__main__":
     run_oracle()
   elif "DB2" == args.dbms:
     run_db2()
+  elif "Snowflake" == args.dbms:
+    run_snowflake()
   else:
     raise Exception("Unsupported DBMS: " + args.dbms)

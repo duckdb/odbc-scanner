@@ -164,6 +164,10 @@ int64_t Result::Value<int64_t>(idx_t col_idx, idx_t row_idx) {
 		int64_t *data = NotNullData<int64_t>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
 		return data[row_idx];
 	}
+	if (DBMSConfigured("Snowflake")) {
+		duckdb_hugeint *data = NotNullData<duckdb_hugeint>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
+		return static_cast<int64_t>(data[row_idx].lower);
+	}
 	int64_t *data = NotNullData<int64_t>(DUCKDB_TYPE_BIGINT, chunk, cur_row_idx, col_idx, row_idx);
 	return data[row_idx];
 }

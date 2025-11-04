@@ -677,3 +677,59 @@ jobs:
       - name: SQL Tests
         run: |
           python ./resources/scripts/run_sqllogic_tests.py --dbms Spark
+
+  snowflake-linux-amd64:
+    name: Snowflake Linux (amd64)
+    runs-on: ubuntu-latest
+    needs: duckdb-linux-amd64
+    env:
+      GEN: ninja
+      ODBC_CONN_STRING: Driver={Snowflake Driver};Server=${{ secrets.SNOWFLAKE_ACCOUNT_ID }}.snowflakecomputing.com;Database=SNOWFLAKE_SAMPLE_DATA;UID=${{ secrets.SNOWFLAKE_USERNAME }};PWD=${{ secrets.SNOWFLAKE_PASSWORD }};
+      DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
+      SNOWFLAKE_ODBC_LIB_URL: https://sfc-repo.snowflakecomputing.com/odbc/linux/3.12.0/snowflake_linux_x8664_odbc-3.12.0.tgz
+      SNOWFLAKE_ODBC_LIB_PATH: ${{ github.workspace }}/snowflake_odbc/lib/libSnowflake.so
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      - name: Dependencies
+        run: |
+          echo "set man-db/auto-update false" | sudo debconf-communicate
+          sudo dpkg-reconfigure man-db
+          sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
+          sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ninja-build \
+            python3-pyodbc \
+            unixodbc-dev
+
+      - name: Snowflake ODBC Lib
+        run: |
+          curl --no-progress-meter -LO "${SNOWFLAKE_ODBC_LIB_URL}"
+          tar xzvf snowflake_linux_x8664_odbc-3.12.0.tgz
+          ldd "${SNOWFLAKE_ODBC_LIB_PATH}"
+          ./resources/scripts/write_odbcinst_ini.sh Snowflake "${SNOWFLAKE_ODBC_LIB_PATH}"
+          python ./resources/scripts/pyodbc_version.py --dbms Snowflake --conn-str "${ODBC_CONN_STRING}"
+
+      - name: DuckDB CAPI Lib
+        run: |
+          mkdir libduckdb
+          cd libduckdb
+          curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
+          unzip -q libduckdb-linux-amd64.zip
+          ls -laR
+
+      - name: Build
+        run: |
+          make configure
+          make release
+
+      - name: C API Tests
+        run: |
+          make test
+
+      - name: SQL Tests
+        run: |
+          python ./resources/scripts/run_sqllogic_tests.py --dbms Snowflake
