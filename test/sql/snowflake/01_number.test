@@ -1,6 +1,6 @@
 # name: test/sql/snowflake/01_number.test
 # description: test for Snowflake NUMBER type
-# group: [mssql_01_number]
+# group: [snowflake_01_number]
 
 require odbc_scanner
 

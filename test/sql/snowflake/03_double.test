@@ -1,0 +1,73 @@
+# name: test/sql/snowflake/03_double.test
+# description: test for Snowflake DOUBLE type
+# group: [snowflake_03_double]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.123 AS DOUBLE)')
+----
+42.123
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.123 AS DOUBLE)')
+)
+----
+DOUBLE
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.123 AS FLOAT4)')
+)
+----
+DOUBLE
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.123 AS DOUBLE)')
+----
+42.123
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DOUBLE)', params=row(42.123::DECIMAL))
+----
+42.123
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DOUBLE)', params=row(0::DECIMAL))
+----
+0
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DOUBLE)', params=row(-42.123::DECIMAL))
+----
+-42.123
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DOUBLE)', params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind(42.123::DECIMAL)
+
+query I
+EXECUTE p1
+----
+42.123
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
