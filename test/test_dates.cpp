@@ -24,6 +24,9 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Date query with a DATE literal parameter", group_name) {
+	if (DBMSConfigured("FlightSQL")) {
+		return;
+	}
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
@@ -46,6 +49,9 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Date query with a DATE parameter", group_name) {
+	if (DBMSConfigured("FlightSQL")) {
+		return;
+	}
 	ScannerConn sc;
 
 	Result res_create_params;
@@ -81,7 +87,7 @@ SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row('2020-1
 	Result res;
 	duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
 
-	REQUIRE(st_exec == DuckDBSuccess);
+	REQUIRE(QuerySuccess(res.Get(), st_exec));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).year == 2020);
 	REQUIRE(res.Value<duckdb_date_struct>(0, 0).month == 12);

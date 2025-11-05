@@ -10,6 +10,7 @@ const std::string DbmsQuirks::CLICKHOUSE_DBMS_NAME = "ClickHouse";
 const std::string DbmsQuirks::ORACLE_DBMS_NAME = "Oracle";
 const std::string DbmsQuirks::DB2_DBMS_NAME_PREFIX = "DB2/";
 const std::string DbmsQuirks::SNOWFLAKE_DBMS_NAME = "Snowflake";
+const std::string DbmsQuirks::FLIGTHSQL_DRIVER_NAME = "Arrow Flight ODBC Driver";
 
 DbmsQuirks::DbmsQuirks() {
 }
@@ -52,6 +53,9 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const DbmsQuirks &user_quirks) {
 	} else if (conn.dbms_name == SNOWFLAKE_DBMS_NAME) {
 		this->decimal_columns_precision_through_ard = true;
 		this->decimal_params_as_chars = true;
+
+	} else if (conn.driver_name == FLIGTHSQL_DRIVER_NAME) {
+		this->decimal_columns_as_chars = true;
 	}
 
 	// Quirks explicitly requested by user

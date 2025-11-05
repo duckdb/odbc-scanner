@@ -11,6 +11,7 @@ struct OdbcConnection {
 	SQLHANDLE env = nullptr;
 	SQLHANDLE dbc = nullptr;
 	std::string dbms_name;
+	std::string driver_name;
 
 	OdbcConnection(const std::string &url);
 	~OdbcConnection() noexcept;

@@ -16,8 +16,8 @@ def exec_sql(cur, sql):
   print(sql)
   cur.execute(sql)
 
-def connect_await_db_startup():
-  for i in range(16):
+def connect_await_db_startup(attempts=16):
+  for i in range(attempts):
     try:
       return pyodbc.connect(args.conn_str, autocommit=True)
     except Exception as e:
@@ -62,6 +62,7 @@ if __name__ == "__main__":
     "MariaDB",
     "ClickHouse",
     "Spark",
+    "FlightSQL",
     ]:
     run_version()
   elif "MSSQL" == args.dbms:

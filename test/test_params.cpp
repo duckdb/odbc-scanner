@@ -3,6 +3,9 @@
 static const std::string group_name = "[capi_params]";
 
 TEST_CASE("Params query with a single param literal", group_name) {
+	if (DBMSConfigured("FlightSQL")) {
+		return;
+	}
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
@@ -32,6 +35,8 @@ TEST_CASE("Params query with a varchar param literal", group_name) {
 		cast = "CAST(? AS VARCHAR2(16)) FROM dual";
 	} else if (DBMSConfigured("DB2")) {
 		cast = "CAST(? AS VARCHAR(16)) FROM sysibm.sysdummy1";
+	} else if (DBMSConfigured("FlightSQL")) {
+		return;
 	}
 	ScannerConn sc;
 	Result res;
@@ -73,6 +78,9 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Params query NULL BIGINT parameter", group_name) {
+	if (DBMSConfigured("FlightSQL")) {
+		return;
+	}
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
@@ -93,7 +101,7 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Params query with multiple params including NULL", group_name) {
-	if (DBMSConfigured("Oracle") || DBMSConfigured("DB2")) {
+	if (DBMSConfigured("Oracle") || DBMSConfigured("DB2") || DBMSConfigured("FlightSQL")) {
 		return;
 	}
 	ScannerConn sc;
@@ -161,6 +169,9 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Params query with rebinding", group_name) {
+	if (DBMSConfigured("FlightSQL")) {
+		return;
+	}
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn,
@@ -204,6 +215,9 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Params query without rebinding", group_name) {
+	if (DBMSConfigured("FlightSQL")) {
+		return;
+	}
 	ScannerConn sc;
 
 	{

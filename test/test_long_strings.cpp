@@ -32,6 +32,8 @@ TEST_CASE("Long string query", group_name) {
 		cast = "to_nclob(?) FROM dual";
 	} else if (DBMSConfigured("DB2")) {
 		cast = "CAST(? AS VARCHAR(20000)) FROM sysibm.sysdummy1";
+	} else if (DBMSConfigured("FlightSQL")) {
+		return;
 	}
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;
@@ -143,6 +145,32 @@ SELECT * FROM odbc_query(
 		REQUIRE(QuerySuccess(res.Get(), st_exec));
 		REQUIRE(res.NextChunk());
 		REQUIRE(res.Value<std::string>(0, 0) == (str + str + str + str + str + str + str + str));
+	}
+}
+
+TEST_CASE("Long string query FlightSQL", group_name) {
+	if (!DBMSConfigured("FlightSQL")) {
+		return;
+	}
+	ScannerConn sc;
+
+	for (size_t i = (1 << 10) - 4; i < (1 << 10) + 4; i++) {
+		Result res;
+		duckdb_state st = duckdb_query(sc.conn,
+		                               (R"(
+	SELECT * FROM odbc_query(
+		getvariable('conn'), 
+		'
+			SELECT repeat(''0123456789'', )" +
+		                                std::to_string(i) + R"()
+		'
+		)
+	)")
+		                                   .c_str(),
+		                               res.Get());
+		REQUIRE(QuerySuccess(res.Get(), st));
+		REQUIRE(res.NextChunk());
+		REQUIRE(res.Value<std::string>(0, 0).length() == i * 10);
 	}
 }
 

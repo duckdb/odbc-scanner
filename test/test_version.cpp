@@ -4,7 +4,8 @@ static const std::string group_name = "[capi_version]";
 
 TEST_CASE("Common version query", group_name) {
 	if (!(DBMSConfigured("DuckDB") || DBMSConfigured("PostgreSQL") || DBMSConfigured("MySQL") ||
-	      DBMSConfigured("MariaDB") || DBMSConfigured("ClickHouse") || DBMSConfigured("Spark"))) {
+	      DBMSConfigured("MariaDB") || DBMSConfigured("ClickHouse") || DBMSConfigured("Spark") ||
+	      DBMSConfigured("FlightSQL"))) {
 		return;
 	}
 	ScannerConn sc;
