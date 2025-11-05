@@ -1,0 +1,30 @@
+# name: test/sql/flightsql/varchar.test
+# description: test for FlightSQL VARCHAR type
+# group: [flightsql_type_varchar]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARCHAR)')
+----
+foo
+
+# 'Hello' in Bulgarian
+query I
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(''\u0417\u0434\u0440\u0430\u0432\u0435\u0439\u0442\u0435'' AS VARCHAR)')
+----
+\u0417\u0434\u0440\u0430\u0432\u0435\u0439\u0442\u0435
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARCHAR)')
+)
+----
+VARCHAR
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

@@ -57,6 +57,19 @@ OdbcConnection::OdbcConnection(const std::string &url) {
 		}
 		this->dbms_name = std::string(buf.data(), len);
 	}
+
+	{
+		std::vector<char> buf;
+		buf.resize(256);
+		SQLSMALLINT len = 0;
+		SQLRETURN ret = SQLGetInfo(dbc, SQL_DRIVER_NAME, buf.data(), static_cast<SQLSMALLINT>(buf.size()), &len);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(dbc, SQL_HANDLE_DBC);
+			throw ScannerException("'SQLGetInfo' failed for SQL_DRIVER_NAME, url: '" + url +
+			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
+		this->driver_name = std::string(buf.data(), len);
+	}
 }
 
 OdbcConnection::~OdbcConnection() noexcept {
