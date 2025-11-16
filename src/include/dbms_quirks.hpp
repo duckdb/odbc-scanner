@@ -28,6 +28,7 @@ struct DbmsQuirks {
 	bool timestamp_columns_as_timestamp_ns = false;
 	bool timestamptz_params_as_ss_timestampoffset = false;
 	bool timestamp_columns_with_typename_date_as_date = false;
+	bool timestamp_params_as_sf_timestamp_ntz = false;
 
 	DbmsQuirks();
 
