@@ -168,6 +168,9 @@ template <>
 void TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(QueryContext &ctx, ScannerParam &param,
                                                           SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_TYPE_TIMESTAMP;
+	if (ctx.quirks.timestamp_params_as_sf_timestamp_ntz) {
+		sqltype = Types::SQL_SF_TIMESTAMP_NTZ;
+	}
 	SQLRETURN ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_TIMESTAMP, sqltype, 0,
 	                                 static_cast<SQLSMALLINT>(ctx.quirks.timestamp_max_fraction_precision),
 	                                 reinterpret_cast<SQLPOINTER>(&param.Value<SQL_TIMESTAMP_STRUCT>()),

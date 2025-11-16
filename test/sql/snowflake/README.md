@@ -8,12 +8,13 @@ Reference: [link](https://docs.snowflake.com/en/sql-reference/intro-summary-data
  - [x] DOUBLE
  - [x] VARCHAR
  - [x] BINARY
- - [ ] **BOOLEAN**
+ - [x] BOOLEAN
  - [x] DATE
  - [x] TIME
- - [ ] **TIMESTAMP_LTZ**
- - [ ] **TIMESTAMP_NTZ**
- - [ ] **TIMESTAMP_TZ**
+ - [x] TIMESTAMP
+ - [x] TIMESTAMP_LTZ
+ - [x] TIMESTAMP_NTZ
+ - [x] TIMESTAMP_TZ
  - [ ] **VARIANT**
  - [ ] **OBJECT**
  - [ ] **ARRAY**

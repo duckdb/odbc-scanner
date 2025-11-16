@@ -53,6 +53,7 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const DbmsQuirks &user_quirks) {
 	} else if (conn.dbms_name == SNOWFLAKE_DBMS_NAME) {
 		this->decimal_columns_precision_through_ard = true;
 		this->decimal_params_as_chars = true;
+		this->timestamp_params_as_sf_timestamp_ntz = true;
 
 	} else if (conn.driver_name == FLIGTHSQL_DRIVER_NAME) {
 		this->decimal_columns_as_chars = true;

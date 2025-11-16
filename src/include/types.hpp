@@ -42,6 +42,11 @@ struct Types {
 
 	static const SQLSMALLINT SQL_SS_TIME2 = -154;
 	static const SQLSMALLINT SQL_SS_TIMESTAMPOFFSET = -155;
+
+	static const SQLSMALLINT SQL_SF_TIMESTAMP_LTZ = 2000;
+	static const SQLSMALLINT SQL_SF_TIMESTAMP_TZ = 2001;
+	static const SQLSMALLINT SQL_SF_TIMESTAMP_NTZ = 2002;
+
 	static const std::string MSSQL_DATETIME2_TYPE_NAME;
 	static const std::string SQL_DATE_TYPE_NAME;
 
