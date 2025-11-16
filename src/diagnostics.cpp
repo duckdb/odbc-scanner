@@ -30,7 +30,7 @@ static DiagMsg ReadDiagInternal(SQLHANDLE handle, SQLSMALLINT handle_type) {
 	idx_t state_len = 5;
 	std::vector<SQLWCHAR> sqlstate;
 	sqlstate.resize(state_len + 1);
-	SQLINTEGER native_error;
+	SQLINTEGER native_error = -1;
 	std::vector<SQLWCHAR> message_text;
 	message_text.resize(4096);
 	SQLRETURN ret = SQL_SUCCESS;

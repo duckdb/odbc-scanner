@@ -137,6 +137,74 @@ jobs:
         run: |
           ./configure/venv/bin/python ./resources/scripts/run_sqllogic_tests.py --dbms DuckDB
 
+  duckdb-windows-amd64:
+    name: DuckDB Windows (amd64)
+    runs-on: windows-latest
+    needs: duckdb-linux-amd64
+    env:
+      ODBC_CONN_STRING: Driver={DuckDB Driver};
+      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/latest/download/duckdb_odbc-windows-amd64.zip
+      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/latest/download/libduckdb-windows-amd64.zip
+      DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/duckdb.lib
+      DUCKDB_CAPI_LIB_SHARED_PATH: ${{ github.workspace }}/libduckdb/duckdb.dll
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      - name: Dependencies
+        shell: bash
+        run: |
+          choco install \
+            curl \
+            unzip \
+            --no-progress
+
+      - name: Configure
+        shell: bash
+        run: |
+          make configure
+
+      - name: DuckDB ODBC Lib
+        shell: bash
+        run: |
+          mkdir odbc
+          pushd odbc
+          curl --no-progress-meter -LO "${DUCKDB_ODBC_LIB_URL}"
+          unzip -q duckdb_odbc-windows-amd64.zip
+          ls -laR
+          ./odbc_install.exe //CI //Install
+          popd
+          ./configure/venv/Scripts/python.exe -m pip install pyodbc
+          ./configure/venv/Scripts/python.exe ./resources/scripts/pyodbc_version.py --dbms DuckDB --conn-str "${ODBC_CONN_STRING}"
+
+      - name: DuckDB CAPI lib
+        shell: bash
+        run: |
+          mkdir libduckdb
+          pushd libduckdb
+          curl --no-progress-meter -LO "${DUCKDB_CAPI_LIB_URL}"
+          unzip -q libduckdb-windows-amd64.zip
+          ls -laR
+          popd
+
+      - name: Build
+        shell: bash
+        run: |
+          make release
+
+      - name: C API Tests
+        shell: bash
+        run: |
+          cp "${DUCKDB_CAPI_LIB_SHARED_PATH}" ./cmake_build/release/test/
+          make test
+
+      - name: SQL Tests
+        shell: bash
+        run: |
+          ./configure/venv/Scripts/python.exe ./resources/scripts/run_sqllogic_tests.py --dbms DuckDB
+
   mssql-linux-amd64:
     name: MSSQL Linux (amd64)
     runs-on: ubuntu-latest

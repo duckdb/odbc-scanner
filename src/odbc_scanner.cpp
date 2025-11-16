@@ -4,6 +4,7 @@
 #include <string>
 
 #include "capi_pointers.hpp"
+#include "capi_entry_point.hpp"
 #include "registries.hpp"
 #include "scanner_exception.hpp"
 
@@ -21,7 +22,7 @@ static void Initialize(duckdb_connection connection, duckdb_extension_info, duck
 } // namespace odbcscanner
 
 bool initiaize_odbc_scanner(duckdb_connection connection, duckdb_extension_info info,
-                            duckdb_extension_access *access) /* noexcept */ {
+                            duckdb_extension_access *access) noexcept {
 	try {
 		odbcscanner::Initialize(connection, info, access);
 		return true;

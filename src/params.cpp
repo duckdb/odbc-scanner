@@ -460,8 +460,8 @@ std::vector<ScannerParam> Params::Extract(DbmsQuirks &quirks, duckdb_data_chunk 
 			    ", column: " + std::to_string(col_idx) + ", columns count: " + std::to_string(col_count));
 		}
 
-		uint64_t *validity = duckdb_vector_get_validity(child_vec);
-		if (validity != nullptr && !duckdb_validity_row_is_valid(validity, 0)) {
+		uint64_t *child_validity = duckdb_vector_get_validity(child_vec);
+		if (child_validity != nullptr && !duckdb_validity_row_is_valid(child_validity, 0)) {
 			params.emplace_back(ScannerParam());
 			continue;
 		}

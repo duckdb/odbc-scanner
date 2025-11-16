@@ -1,13 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import gc, os, sys
+import gc, os, platform, sys
 from argparse import ArgumentParser, BooleanOptionalAction
 from os import path
 
 script_dir = path.dirname(path.abspath(__file__))
 project_dir = path.dirname(path.dirname(script_dir))
-venv_sitepackages_path = path.join(project_dir, "configure", "venv", "lib", f"python{sys.version_info.major}.{sys.version_info.minor}", "site-packages")
+if platform.system() != "Windows":
+  venv_sitepackages_path = path.join(project_dir, "configure", "venv", "lib", f"python{sys.version_info.major}.{sys.version_info.minor}", "site-packages")
+else:
+  venv_sitepackages_path = path.join(project_dir, "configure", "venv", "Lib", "site-packages")
 sys.path.append(venv_sitepackages_path)
 
 from duckdb_sqllogictest import SQLLogicParser, SQLParserException

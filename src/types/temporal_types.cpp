@@ -309,7 +309,7 @@ static int64_t MicrosToNanos(duckdb_timestamp ts_no_fraction, SQLUINTEGER fetche
 	}
 	// convert to signed, for negative overflow (min + 1) is returned
 	int64_t nanos = 0;
-	if (unanos > std::numeric_limits<int64_t>::max()) {
+	if (unanos > static_cast<uint64_t>(std::numeric_limits<int64_t>::max())) {
 		nanos = std::numeric_limits<int64_t>::max();
 	} else {
 		nanos = static_cast<int64_t>(unanos);

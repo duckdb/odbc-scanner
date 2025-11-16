@@ -30,14 +30,23 @@ project(${EXTENSION_NAME} LANGUAGES C CXX)
 
 find_package(ODBC REQUIRED)
 message(STATUS "ODBC library found at: " ${ODBC_LIBRARIES})
-get_filename_component(ODBC_LIB_DIR ${ODBC_LIBRARIES} DIRECTORY)
-find_library(ODBCINST_LIB NAMES odbcinst libodbcinst REQUIRED HINTS ${ODBC_LIB_DIR})
+
+if (NOT MSVC)
+    get_filename_component(ODBC_LIB_DIR ${ODBC_LIBRARIES} DIRECTORY)
+    find_library(ODBCINST_LIB NAMES odbcinst libodbcinst REQUIRED HINTS ${ODBC_LIB_DIR})
+endif ()
 
 set(CMAKE_CXX_STANDARD "11" CACHE STRING "C++ standard to enforce")
 
+if (MSVC) 
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR})
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+endif ()
+
 # Create Extension library
 set(EXTENSION_SOURCES
-    src/capi_entry_point.c
+    src/capi_entry_point.cpp
     src/columns.cpp
     src/connection.cpp
     src/dbms_quirks.cpp
@@ -63,11 +72,7 @@ set(EXTENSION_SOURCES
     src/types/varchar_type.cpp
 )
 
-if (DUCKDB_WASM_EXTENSION)
-	add_library(${EXTENSION_NAME} STATIC ${EXTENSION_SOURCES})
-else()
-	add_library(${EXTENSION_NAME} SHARED ${EXTENSION_SOURCES})
-endif()
+add_library(${EXTENSION_NAME} SHARED ${EXTENSION_SOURCES})
 
 # Hide symbols
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
@@ -87,15 +92,24 @@ target_include_directories(${EXTENSION_NAME} PRIVATE
     src/include
 )
 
-target_compile_options(${EXTENSION_NAME} PRIVATE
-    -Wall
-    -Werror
-    -Wextra
-)
-    
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (NOT MSVC)
     target_compile_options(${EXTENSION_NAME} PRIVATE
-        -O0
+        -Wall
+        -Werror
+        -Wextra
+    )
+    if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+        target_compile_options(${EXTENSION_NAME} PRIVATE
+            -O0
+        )
+    endif ()
+else ()
+    target_compile_options(${EXTENSION_NAME} PRIVATE
+        /W4
+        /WX
+    )
+    target_compile_definitions(${EXTENSION_NAME} PRIVATE
+        -D_CRT_SECURE_NO_WARNINGS
     )
 endif ()
 

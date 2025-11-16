@@ -31,7 +31,7 @@ static u16bit_iterator utf16_find_invalid(u16bit_iterator start, u16bit_iterator
 
 template <typename u16bit_iterator, typename output_iterator>
 static output_iterator utf16_replace_invalid(u16bit_iterator start, u16bit_iterator end, output_iterator out,
-                                             utf8::utfchar32_t replacement) {
+                                             utf8::utfchar16_t replacement) {
 	while (start != end) {
 		uint16_t char1 = *start++;
 		utf8::utfchar32_t cp = utf8::internal::mask16(char1);

@@ -1,7 +1,5 @@
 #pragma once
 
-#include "capi_entry_point.h"
-
 #include "duckdb_extension_api.hpp"
 
 namespace odbcscanner {

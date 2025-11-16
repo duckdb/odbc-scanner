@@ -1,3 +1,11 @@
+cmake_minimum_required(VERSION 3.5...3.29)
+
+if (MSVC) 
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG ${CMAKE_CURRENT_BINARY_DIR})
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE ${CMAKE_CURRENT_BINARY_DIR})
+endif ()
+
 add_executable(test_${EXTENSION_NAME}
     test_basic.cpp
     test_common.cpp
