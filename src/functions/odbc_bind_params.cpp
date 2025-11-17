@@ -1,6 +1,7 @@
 #include "odbc_scanner.hpp"
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -55,7 +56,7 @@ static void BindParams(duckdb_function_info info, duckdb_data_chunk input, duckd
 	params_ptr->clear();
 
 	// currently do not support user quirks in 'odbc_bind_params'
-	DbmsQuirks quirks(conn, DbmsQuirks());
+	DbmsQuirks quirks(conn, std::map<std::string, ValuePtr>());
 	std::vector<ScannerParam> params = Params::Extract(quirks, input, 2);
 
 	for (ScannerParam &p : params) {

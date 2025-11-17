@@ -101,18 +101,13 @@ struct LocalInitData {
 	}
 };
 
-static bool ExtractBoolFlag(duckdb_bind_info info, const std::string &name) {
-	auto val = ValuePtr(duckdb_bind_get_named_parameter(info, name.c_str()), ValueDeleter);
-	if (val.get() != nullptr && !duckdb_is_null_value(val.get())) {
-		return duckdb_get_bool(val.get());
+static std::map<std::string, ValuePtr> ExtractUserQuirks(duckdb_bind_info info) {
+	std::map<std::string, ValuePtr> res;
+	for (auto &name : DbmsQuirks::AllNames()) {
+		auto val = ValuePtr(duckdb_bind_get_named_parameter(info, name.c_str()), ValueDeleter);
+		res.emplace(name, std::move(val));
 	}
-	return false;
-}
-
-static DbmsQuirks ExtractUserQuirks(duckdb_bind_info info) {
-	DbmsQuirks quirks;
-	quirks.timestamp_columns_as_timestamp_ns = ExtractBoolFlag(info, "timestamp_columns_as_timestamp_ns");
-	return quirks;
+	return res;
 }
 
 static void Bind(duckdb_bind_info info) {
@@ -156,7 +151,7 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 
-	DbmsQuirks user_quirks = ExtractUserQuirks(info);
+	std::map<std::string, ValuePtr> user_quirks = ExtractUserQuirks(info);
 	DbmsQuirks quirks(conn, user_quirks);
 	QueryContext ctx(query, hstmt, quirks);
 
@@ -339,12 +334,26 @@ void OdbcQueryFunction::Register(duckdb_connection conn) {
 	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
 	auto any_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_ANY), LogicalTypeDeleter);
 	auto bool_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN), LogicalTypeDeleter);
+	auto utinyint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_UTINYINT), LogicalTypeDeleter);
+	auto uint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER), LogicalTypeDeleter);
 	duckdb_table_function_add_parameter(fun.get(), bigint_type.get());
 	duckdb_table_function_add_parameter(fun.get(), varchar_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "params", any_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "params_handle", bigint_type.get());
 	// quirks
+	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_as_chars", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_precision_through_ard", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "decimal_params_as_chars", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "reset_stmt_before_execute", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "time_params_as_ss_time2", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "timestamp_columns_as_timestamp_ns", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "timestamp_columns_with_typename_date_as_date",
+	                                          bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "timestamp_max_fraction_precision", utinyint_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "timestamp_params_as_sf_timestamp_ntz", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "timestamptz_params_as_ss_timestampoffset", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "var_len_data_single_part", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "var_len_params_long_threshold_bytes", uint_type.get());
 
 	// callbacks
 	duckdb_table_function_set_bind(fun.get(), odbc_query_bind);

@@ -1,0 +1,57 @@
+# name: test/sql/duckdb/user_quirks.test
+# description: test for user-specified DBMS quirks configuration
+# group: [duckdb_user_quirks]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement ok
+SELECT * FROM odbc_query(
+  getvariable('conn'),
+  'SELECT 42',
+	decimal_columns_as_chars=TRUE,
+	decimal_columns_precision_through_ard=TRUE,
+	decimal_params_as_chars=TRUE,
+	reset_stmt_before_execute=TRUE,
+	time_params_as_ss_time2=TRUE,
+	timestamp_columns_as_timestamp_ns=TRUE,
+	timestamp_columns_with_typename_date_as_date=TRUE,
+	timestamp_max_fraction_precision=8,
+	timestamp_params_as_sf_timestamp_ntz=TRUE,
+	timestamptz_params_as_ss_timestampoffset=TRUE,
+	var_len_data_single_part=TRUE,
+	var_len_params_long_threshold_bytes=42,
+	timestamp_columns_as_timestamp_ns=TRUE
+)
+
+statement error
+SELECT * FROM odbc_query(
+  getvariable('conn'),
+  'SELECT 42',
+	timestamp_max_fraction_precision=10
+)
+----
+Invalid value for user option 'timestamp_max_fraction_precision'
+
+statement error
+SELECT * FROM odbc_query(
+  getvariable('conn'),
+  'SELECT 42',
+	foobar=42
+)
+----
+Invalid named parameter "foobar"
+
+statement error
+SELECT * FROM odbc_query(
+  getvariable('conn'),
+  'SELECT 42',
+	timestamp_max_fraction_precision="foo"
+)
+----
+Failed to cast value: Could not convert string 'foo' to UINT8
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
