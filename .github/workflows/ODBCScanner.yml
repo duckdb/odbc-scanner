@@ -441,8 +441,6 @@ jobs:
           
       - name: MySQL ODBC Lib
         run: |
-          sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
-            libmysqlclient-dev
           curl --no-progress-meter -LO "${MYSQL_ODBC_LIB_URL}"
           tar xJvf mysql_odbc_9.4.0_ubuntu_24.04_amd64.tar.xz
           ldd "${MYSQL_ODBC_LIB_PATH}"
