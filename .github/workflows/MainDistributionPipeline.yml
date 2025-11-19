@@ -14,9 +14,24 @@ concurrency:
 jobs:
   duckdb-build:
     name: Build extension binaries
-    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@v1.3.1
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_distribution.yml@main
     with:
-      duckdb_version: v1.3.1
-      ci_tools_version: v1.3.1
       extension_name: odbc_scanner
-      extra_toolchains: python3
+      duckdb_version: v1.2.0
+      ci_tools_version: main
+      extra_toolchains: python3;unixodbc;
+      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;windows_amd64_mingw;linux_arm64;'
+      build_duckdb_shell: false
+
+  duckdb-deploy:
+    name: Deploy extension binaries
+    needs: duckdb-build
+    uses: duckdb/extension-ci-tools/.github/workflows/_extension_deploy.yml@main
+    secrets: inherit
+    with:
+      extension_name: odbc_scanner
+      duckdb_version: v1.2.0
+      ci_tools_version: main
+      exclude_archs: 'wasm_mvp;wasm_eh;wasm_threads;windows_amd64_mingw;linux_arm64;'
+      deploy_latest: ${{ startsWith(github.ref, 'refs/heads/v') }}
+      deploy_versioned: ${{ startsWith(github.ref, 'refs/heads/v') || github.ref == 'refs/heads/main' }}

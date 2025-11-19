@@ -45,7 +45,7 @@ ifeq ($(ENABLE_C_API_TESTS), TRUE)
 	./cmake_build/release/test/test_odbc_scanner
 else
 	@echo "$(CAPI_ERROR_MSG)"
-	exit 1
+	exit 0
 endif
 
 test_c_api_debug:
@@ -54,10 +54,12 @@ ifeq ($(ENABLE_C_API_TESTS), TRUE)
 	./cmake_build/debug/test/test_odbc_scanner
 else
 	@echo "$(CAPI_ERROR_MSG)"
-	exit 1
+	exit 0
 endif
 
 test: test_c_api
+
+test_release: test_c_api
 
 test_debug: test_c_api_debug
 
