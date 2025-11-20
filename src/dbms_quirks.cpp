@@ -117,7 +117,6 @@ const std::vector<std::string> DbmsQuirks::AllNames() {
 	res.emplace_back("timestamptz_params_as_ss_timestampoffset");
 	res.emplace_back("var_len_data_single_part");
 	res.emplace_back("var_len_params_long_threshold_bytes");
-	res.emplace_back("timestamp_columns_as_timestamp_ns");
 	return res;
 }
 

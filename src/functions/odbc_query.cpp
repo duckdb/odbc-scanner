@@ -90,7 +90,9 @@ struct GlobalInitData {
 };
 
 struct LocalInitData {
-	bool finished = false;
+	bool executed = false;
+	bool exhausted = false;
+	std::vector<duckdb_vector> col_vectors;
 
 	LocalInitData() {
 	}
@@ -212,15 +214,8 @@ static void LocalInit(duckdb_init_info info) {
 	duckdb_init_set_init_data(info, ldata_ptr.release(), LocalInitData::Destroy);
 }
 
-static void Query(duckdb_function_info info, duckdb_data_chunk output) {
-	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_function_get_bind_data(info));
-	LocalInitData &ldata = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
+static void BindParamsAndExecute(BindData &bdata) {
 	QueryContext &ctx = bdata.ctx;
-
-	if (ldata.finished) {
-		duckdb_data_chunk_set_size(output, 0);
-		return;
-	}
 
 	if (bdata.params.size() > 0) {
 		Params::BindToOdbc(ctx, bdata.params);
@@ -252,49 +247,63 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 			                       ", diagnostics: '" + diag + "'");
 		}
 	}
+}
 
-	std::vector<ResultColumn> columns = Columns::Collect(ctx);
-	Columns::CheckSame(ctx, bdata.columns, columns);
+static void Query(duckdb_function_info info, duckdb_data_chunk output) {
+	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_function_get_bind_data(info));
+	LocalInitData &ldata = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
+	QueryContext &ctx = bdata.ctx;
 
-	// DDL or DML query
-
-	if (columns.size() == 0) {
-		SQLLEN count = -1;
-		SQLRETURN ret = SQLRowCount(ctx.hstmt, &count);
-		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
-			throw ScannerException("'SQLRowCount' failed, DDL/DML query: '" + ctx.query +
-			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
-		}
-
-		duckdb_vector vec = duckdb_data_chunk_get_vector(output, 0);
-		if (vec == nullptr) {
-			throw ScannerException("Vector is NULL, DDL/DML query: '" + ctx.query +
-			                       "', columns count: " + std::to_string(columns.size()));
-		}
-
-		int64_t *vec_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
-		vec_data[0] = static_cast<int64_t>(count);
-		duckdb_data_chunk_set_size(output, 1);
-		ldata.finished = true;
+	if (ldata.exhausted) {
+		duckdb_data_chunk_set_size(output, 0);
 		return;
 	}
 
-	// normal query
+	if (!ldata.executed) {
+		BindParamsAndExecute(bdata);
+		ldata.executed = true;
 
-	std::vector<duckdb_vector> col_vectors;
-	for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(columns.size()); col_idxz++) {
-		duckdb_vector vec = duckdb_data_chunk_get_vector(output, col_idxz);
-		if (vec == nullptr) {
-			throw ScannerException("Vector is NULL, query: '" + ctx.query + "', columns count: " +
-			                       std::to_string(columns.size()) + ", column index: " + std::to_string(col_idxz));
+		std::vector<ResultColumn> columns = Columns::Collect(ctx);
+		Columns::CheckSame(ctx, bdata.columns, columns);
+
+		// DDL or DML query
+
+		if (columns.size() == 0) {
+			SQLLEN count = -1;
+			SQLRETURN ret = SQLRowCount(ctx.hstmt, &count);
+			if (!SQL_SUCCEEDED(ret)) {
+				std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+				throw ScannerException("'SQLRowCount' failed, DDL/DML query: '" + ctx.query +
+				                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+			}
+
+			duckdb_vector vec = duckdb_data_chunk_get_vector(output, 0);
+			if (vec == nullptr) {
+				throw ScannerException("Vector is NULL, DDL/DML query: '" + ctx.query +
+				                       "', columns count: " + std::to_string(columns.size()));
+			}
+
+			int64_t *vec_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
+			vec_data[0] = static_cast<int64_t>(count);
+			duckdb_data_chunk_set_size(output, 1);
+			ldata.exhausted = true;
+			return;
 		}
-		col_vectors.push_back(vec);
+
+		// normal query
+
+		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(columns.size()); col_idxz++) {
+			duckdb_vector vec = duckdb_data_chunk_get_vector(output, col_idxz);
+			if (vec == nullptr) {
+				throw ScannerException("Vector is NULL, query: '" + ctx.query + "', columns count: " +
+				                       std::to_string(columns.size()) + ", column index: " + std::to_string(col_idxz));
+			}
+			ldata.col_vectors.push_back(vec);
+		}
 	}
 
 	idx_t row_idx = 0;
 	for (; row_idx < duckdb_vector_size(); row_idx++) {
-
 		{
 			SQLRETURN ret = SQLFetch(ctx.hstmt);
 			if (!SQL_SUCCEEDED(ret)) {
@@ -309,20 +318,20 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 					throw ScannerException("'SQLFreeStmt' with SQL_CLOSE failed, query: '" + ctx.query +
 					                       "', return: " + std::to_string(ret_close) + ", diagnostics: '" + diag + "'");
 				}
+				ldata.exhausted = true;
 				break;
 			}
 		}
 
-		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(columns.size()); col_idxz++) {
-			ResultColumn &col = columns.at(col_idxz);
+		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(bdata.columns.size()); col_idxz++) {
+			ResultColumn &col = bdata.columns.at(col_idxz);
 			SQLSMALLINT col_idx = static_cast<SQLSMALLINT>(col_idxz + 1);
-			duckdb_vector vec = col_vectors.at(col_idxz);
+			duckdb_vector vec = ldata.col_vectors.at(col_idxz);
 
 			Types::FetchAndSetResult(ctx, col.odbc_type, col_idx, vec, row_idx);
 		}
 	}
 	duckdb_data_chunk_set_size(output, row_idx);
-	ldata.finished = true;
 }
 
 void OdbcQueryFunction::Register(duckdb_connection conn) {
