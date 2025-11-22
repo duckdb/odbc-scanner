@@ -746,6 +746,7 @@ jobs:
 
   snowflake-linux-amd64:
     name: Snowflake Linux (amd64)
+    if: ${{ false }}
     runs-on: ubuntu-latest
     needs: duckdb-linux-amd64
     env:
