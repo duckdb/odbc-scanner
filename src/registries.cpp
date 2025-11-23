@@ -13,13 +13,16 @@ static std::shared_ptr<std::mutex> SharedMutex() {
 	return mutex;
 }
 
-// todo: maybe impl determenistic closing order
+// We are NOT closing the connection on process exit - some
+// ODBC drivers don't like it and can complain to stderr or crash
 static void SharedConectionsRegistryDeleter(std::set<int64_t> *reg_ptr) {
 	auto &reg = *reg_ptr;
+	/*
 	for (int64_t conn_id : reg) {
-		OdbcConnection *conn_ptr = reinterpret_cast<OdbcConnection *>(conn_id);
-		delete conn_ptr;
+	    OdbcConnection *conn_ptr = reinterpret_cast<OdbcConnection *>(conn_id);
+	    delete conn_ptr;
 	}
+	*/
 	reg.clear();
 	delete reg_ptr;
 }

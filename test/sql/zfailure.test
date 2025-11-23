@@ -1,0 +1,20 @@
+# name: test/sql/zfailure.test
+# description: test that invalid queries don't lead to crashes
+# group: [sql_zfailure]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT FAILURE')
+----
+Error:
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
+
+# keep connection open to check driver's process exit behaviour
+statement ok
+SET VARIABLE conn_linger = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')

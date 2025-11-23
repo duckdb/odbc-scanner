@@ -12,7 +12,7 @@ require odbc_scanner
 statement error
 SELECT odbc_close()
 ----
-<REGEX>:.*Binder Error: No function matches the given name and argument types 'odbc_close\(\)'.*
+Binder Error: No function matches the given name and argument types 'odbc_close()'
 
 statement error
 SELECT odbc_close(NULL)
