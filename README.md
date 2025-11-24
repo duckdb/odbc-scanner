@@ -16,15 +16,13 @@ Outline:
 
 ## Installation
 
-`odbc_scanner` is built on DuckDB C API and can be installed on DuckDB version 1.2.0 or any newer version the following way:
+`odbc_scanner` is built on DuckDB C API and can be installed on DuckDB version `1.2.0` or any newer version the following way (use the URL with `1.2.0` version in it even if you are running later version of DuckDB):
 
 ```sql
 INSTALL 'http://nightly-extensions.duckdb.org/v1.2.0/<platform>/odbc_scanner.duckdb_extension.gz';
-
-SELECT * FROM duckdb_extensions() WHERE extension_name = 'odbc_scanner';
 ```
 
-Where the platform is one of:
+Where the `<platform>` is one of:
 
  - `linux_amd64`
  - `linux_arm64`
@@ -32,6 +30,18 @@ Where the platform is one of:
  - `osx_amd64`
  - `osx_arm64`
  - `windows_amd64`
+
+To update installed extension to the latest version run:
+
+```sql
+FORCE INSTALL 'http://nightly-extensions.duckdb.org/v1.2.0/<platform>/odbc_scanner.duckdb_extension.gz';
+```
+
+Installed version (commit ID) can be checked using the following query:
+
+```sql
+SELECT * FROM duckdb_extensions() WHERE extension_name = 'odbc_scanner';
+```
 
 ## Usage example
 
