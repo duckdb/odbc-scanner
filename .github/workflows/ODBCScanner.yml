@@ -639,7 +639,7 @@ jobs:
 
       - name: ClickHouse Server
         run: |
-          curl --no-progress-meter -fsSL 'https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key' | sudo gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
+          curl --no-progress-meter -fsSL 'https://packages.clickhouse.com/rpm/stable/repodata/repomd.xml.key' | sudo gpg --dearmor -o /usr/share/keyrings/clickhouse-keyring.gpg
           ARCH=$(dpkg --print-architecture)
           echo "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=${ARCH}] https://packages.clickhouse.com/deb stable main" | sudo tee /etc/apt/sources.list.d/clickhouse.list
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
