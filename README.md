@@ -70,7 +70,7 @@ SELECT odbc_close(getvariable('conn'));
  - Oracle: [types coverage status](https://github.com/duckdb/odbc-scanner/tree/main/test/sql/oracle/README.md)
  - SQL Server: [types coverage status](https://github.com/duckdb/odbc-scanner/blob/main/test/sql/mssql/README.md)
  - Snowflake: [types coverage status](https://github.com/duckdb/odbc-scanner/blob/main/test/sql/snowflake/README.md)
- - DB2: basic types covered
+ - DB2: [types coverage status](https://github.com/duckdb/odbc-scanner/blob/main/test/sql/db2/README.md)
  - PostgreSQL: basic types covered
  - MySQL/MariaDB: basic types covered
  - ClickHouse: basic types covered

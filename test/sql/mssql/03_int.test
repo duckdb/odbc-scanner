@@ -1,6 +1,6 @@
-# name: test/sql/mssql/type_integer.test
-# description: test for INTEGER type with MSSQL
-# group: [mssql_type_integer]
+# name: test/sql/mssql/03_int.test
+# description: test for INT type with MSSQL
+# group: [mssql_03_int]
 
 require odbc_scanner
 
