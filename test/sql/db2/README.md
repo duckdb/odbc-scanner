@@ -9,19 +9,19 @@ Reference: [link](https://www.ibm.com/docs/en/db2/12.1.x?topic=elements-data-typ
  - [x] BIGINT
  - [x] REAL
  - [x] DOUBLE
- - [] **DECIMAL**
- - [] **DECFLOAT**
- - [] **TIME**
- - [] **TIMESTAMP**
- - [] **DATE**
- - [] **CHAR**
- - [] **VARCHAR**
- - [] **CLOB**
- - [] **BINARY**
- - [] **VARBINARY**
- - [] **BLOB**
- - [] **GRAPHIC**
- - [] **VARGRAPHIC**
- - [] **DBCLOB**
- - [] **VECTOR**
- - [] **XML**
+ - [x] DECIMAL
+ - [ ] **DECFLOAT**
+ - [x] TIME
+ - [x] TIMESTAMP
+ - [x] DATE
+ - [ ] **CHAR**
+ - [ ] **VARCHAR**
+ - [ ] **CLOB**
+ - [ ] **BINARY**
+ - [ ] **VARBINARY**
+ - [ ] **BLOB**
+ - [ ] **GRAPHIC**
+ - [ ] **VARGRAPHIC**
+ - [ ] **DBCLOB**
+ - [ ] **VECTOR**
+ - [ ] **XML**

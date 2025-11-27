@@ -1,0 +1,60 @@
+# name: test/sql/db2/09_time.test
+# description: test for DB2 TIME type
+# group: [db2_09_time]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:58:59'' AS TIME) FROM sysibm.sysdummy1')
+----
+23:58:59
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:58:59'' AS TIME) FROM sysibm.sysdummy1')
+)
+----
+TIME
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIME) FROM sysibm.sysdummy1', params=row('23:58:59'::TIME))
+----
+23:58:59
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIME) FROM sysibm.sysdummy1',
+  params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind('23:58:59'::TIME)
+
+query I
+EXECUTE p1
+----
+23:58:59
+
+statement ok
+EXECUTE p1_bind('00:00:00'::TIME)
+
+query I
+EXECUTE p1
+----
+00:00:00
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
