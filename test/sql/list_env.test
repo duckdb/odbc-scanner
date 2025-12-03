@@ -1,0 +1,8 @@
+# name: test/sql/list_env.test
+# description: test odbc_list_drivers() function
+# group: [sql_list_env]
+
+require odbc_scanner
+
+statement ok
+SELECT * FROM odbc_list_drivers()

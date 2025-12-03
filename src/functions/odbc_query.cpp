@@ -27,6 +27,8 @@ static void odbc_query_function(duckdb_function_info info, duckdb_data_chunk out
 
 namespace odbcscanner {
 
+namespace {
+
 struct BindData {
 	int64_t conn_id = 0;
 	QueryContext ctx;
@@ -102,6 +104,8 @@ struct LocalInitData {
 		delete ldata;
 	}
 };
+
+} // namespace
 
 static std::map<std::string, ValuePtr> ExtractUserQuirks(duckdb_bind_info info) {
 	std::map<std::string, ValuePtr> res;

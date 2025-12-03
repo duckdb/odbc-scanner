@@ -31,8 +31,9 @@ inline void ValueDeleter(duckdb_value val) {
 struct ScannerConn {
 	duckdb_database db = nullptr;
 	duckdb_connection conn = nullptr;
+	bool odbc_connection_established = false;
 
-	ScannerConn();
+	ScannerConn(bool establish_odbc_connection = true);
 
 	~ScannerConn() noexcept;
 };

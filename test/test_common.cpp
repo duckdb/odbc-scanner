@@ -7,7 +7,7 @@
 #define SCANNER_STR(value)                   SCANNER_QUOTE(value)
 #define ODBC_SCANNER_EXTENSION_FILE_PATH_STR SCANNER_STR(ODBC_SCANNER_EXTENSION_FILE_PATH)
 
-ScannerConn::ScannerConn() {
+ScannerConn::ScannerConn(bool establish_odbc_connection) {
 	duckdb_config config = nullptr;
 
 	duckdb_state state_config_create = duckdb_create_config(&config);
@@ -31,6 +31,10 @@ ScannerConn::ScannerConn() {
 	duckdb_state state_load = duckdb_query(conn, load_query.c_str(), res_load.Get());
 	REQUIRE(QuerySuccess(res_load.Get(), state_load));
 
+	if (!establish_odbc_connection) {
+		return;
+	}
+
 	char *conn_cstr = std::getenv("ODBC_CONN_STRING");
 	std::string conn_str = conn_cstr != nullptr ? std::string(conn_cstr) : "Driver={DuckDB Driver};threads=1;";
 
@@ -41,11 +45,14 @@ ScannerConn::ScannerConn() {
 		std::cerr << duckdb_result_error(conn_res.Get()) << std::endl;
 	}
 	REQUIRE(state_odbc_conn == DuckDBSuccess);
+	this->odbc_connection_established = true;
 }
 
 ScannerConn::~ScannerConn() noexcept {
-	duckdb_state state_close = duckdb_query(conn, "SELECT odbc_close(getvariable('conn'))", nullptr);
-	REQUIRE(state_close == DuckDBSuccess);
+	if (odbc_connection_established) {
+		duckdb_state state_close = duckdb_query(conn, "SELECT odbc_close(getvariable('conn'))", nullptr);
+		REQUIRE(state_close == DuckDBSuccess);
+	}
 
 	duckdb_disconnect(&conn);
 	duckdb_close(&db);

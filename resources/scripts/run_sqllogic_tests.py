@@ -46,11 +46,13 @@ elif args.dbms is not None:
             file_paths.append(path.join(dirpath, name))
   file_paths.append(path.join(sqllogic_tests_dir, "close.test"))
   file_paths.append(path.join(sqllogic_tests_dir, "connect.test"))
+  file_paths.append(path.join(sqllogic_tests_dir, "list_env.test"))
   file_paths.append(path.join(sqllogic_tests_dir, "zfailure.test"))
 else:
   print(f"Running connect/close SQLLogic tests")
   file_paths.append(path.join(sqllogic_tests_dir, "close.test"))
   file_paths.append(path.join(sqllogic_tests_dir, "connect.test"))
+  file_paths.append(path.join(sqllogic_tests_dir, "list_env.test"))
   file_paths.append(path.join(sqllogic_tests_dir, "zfailure.test"))
 
 odbc_conn_string = os.environ.get("ODBC_CONN_STRING", "Driver={DuckDB Driver};")

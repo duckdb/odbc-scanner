@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 extern "C" {
 
 #ifdef _MSC_VER
@@ -12,3 +14,13 @@ extern "C" {
 #include <sql.h>
 #include <sqlext.h>
 }
+
+namespace odbcscanner {
+
+using EnvHandlePtr = std::unique_ptr<void, void (*)(SQLHANDLE)>;
+
+inline void EnvHandleDeleter(SQLHANDLE env) {
+	SQLFreeHandle(SQL_HANDLE_ENV, env);
+}
+
+} // namespace odbcscanner

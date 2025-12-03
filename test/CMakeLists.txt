@@ -11,6 +11,7 @@ add_executable(test_${EXTENSION_NAME}
     test_common.cpp
     test_dates.cpp
     test_decimal.cpp
+    test_list_env.cpp
     test_long_strings.cpp
     test_params.cpp
     test_version.cpp
