@@ -260,3 +260,12 @@ a script is run to transform the shared library into a loadable extension by app
 to the `build/debug` directory.
 
 To create optimized release binaries, simply run `make release` instead.
+
+## License
+
+The source code in this repository is published under the [MIT license](https://github.com/duckdb/odbc-scanner/blob/main/LICENSE).
+
+The resulting binaries of this extension (that are distributed on `duckdb.org`) for Linux and macOS platforms
+contain the [unixODBC](https://www.unixodbc.org/) library that is linked statically into the shared library of the extension.
+`unixODBC` source code is published under the [LGPL v2.1 license](https://opensource.org/license/lgpl-2-1).
+Thus the binary shared library `odbc_scanner.duckdb_extension` is also published under the LGPL v2.1 license.

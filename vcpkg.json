@@ -1,0 +1,13 @@
+{
+  "dependencies": [
+    {
+      "name": "unixodbc",
+      "platform": "!windows"
+    }
+  ],
+  "vcpkg-configuration": {
+    "overlay-ports": [
+      "./vcpkg_ports"
+    ]
+  }
+}
