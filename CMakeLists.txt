@@ -28,12 +28,10 @@ endif()
 ###
 project(${EXTENSION_NAME} LANGUAGES C CXX)
 
-find_package(ODBC REQUIRED)
-message(STATUS "ODBC library found at: " ${ODBC_LIBRARIES})
-
-if (NOT MSVC)
-    get_filename_component(ODBC_LIB_DIR ${ODBC_LIBRARIES} DIRECTORY)
-    find_library(ODBCINST_LIB NAMES odbcinst libodbcinst REQUIRED HINTS ${ODBC_LIB_DIR})
+if (MSVC)
+    find_package(ODBC REQUIRED)
+else ()
+    find_package(unixodbc REQUIRED)
 endif ()
 
 set(CMAKE_CXX_STANDARD "11" CACHE STRING "C++ standard to enforce")
@@ -113,9 +111,15 @@ else ()
     )
 endif ()
 
-target_link_libraries(${EXTENSION_NAME} PRIVATE
-  ${ODBC_LIBRARIES}
-)
+if (MSVC)
+    target_link_libraries(${EXTENSION_NAME} PRIVATE
+        ${ODBC_LIBRARIES}
+    )
+else ()
+    target_link_libraries(${EXTENSION_NAME} PRIVATE
+        UNIX::odbc
+    )
+endif ()
 
 SET (CAPI_ERROR_MSG "C API test suite is disabled, to enable it specify DuckDB shared library in 'DUCKDB_CAPI_LIB_PATH' environment variable.")
 
