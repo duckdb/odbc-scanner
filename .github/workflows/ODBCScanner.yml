@@ -6,6 +6,7 @@ on:
 
 env:
   DUCKDB_CAPI_LIB_URL_LINUX_AMD64: https://github.com/duckdb/duckdb/releases/latest/download/libduckdb-linux-amd64.zip
+  CCACHE_DIR: ${{ github.workspace }}/ccache
 
 jobs:
   format-check:
@@ -23,6 +24,8 @@ jobs:
     needs: format-check
     env:
       GEN: ninja
+      CC: 'ccache gcc'
+      CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={DuckDB Driver};
       DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/latest/download/duckdb_odbc-linux-amd64.zip
       DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.so
@@ -40,6 +43,7 @@ jobs:
           sudo dpkg-reconfigure man-db
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ccache \
             ninja-build \
             python3-pyodbc \
             unixodbc-dev
@@ -75,6 +79,12 @@ jobs:
       - name: SQL Tests
         run: |
           python ./resources/scripts/run_sqllogic_tests.py --dbms DuckDB
+
+      - name: Save Cache
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
 
   duckdb-osx-aarch64:
     name: DuckDB MacOS (aarch64)
@@ -116,7 +126,7 @@ jobs:
           ./configure/venv/bin/python -m pip install pyodbc
           ./configure/venv/bin/python ./resources/scripts/pyodbc_version.py --dbms DuckDB --conn-str "${ODBC_CONN_STRING}"
 
-      - name: DuckDB CAPI lib
+      - name: DuckDB CAPI Lib
         run: |
           mkdir libduckdb
           pushd libduckdb
@@ -179,7 +189,7 @@ jobs:
           ./configure/venv/Scripts/python.exe -m pip install pyodbc
           ./configure/venv/Scripts/python.exe ./resources/scripts/pyodbc_version.py --dbms DuckDB --conn-str "${ODBC_CONN_STRING}"
 
-      - name: DuckDB CAPI lib
+      - name: DuckDB CAPI Lib
         shell: bash
         run: |
           mkdir libduckdb
@@ -211,6 +221,8 @@ jobs:
     needs: duckdb-linux-amd64
     env:
       GEN: ninja
+      CC: 'ccache gcc'
+      CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={MSSQL Driver};Server=tcp:127.0.0.1,1433;UID=sa;PWD=P@ssword2;TrustServerCertificate=yes;
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       MSSQL_ODBC_LIB_PATH: /opt/microsoft/msodbcsql18/lib64/libmsodbcsql-18.5.so.1.1
@@ -221,12 +233,19 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
+      - name: Restore Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+
       - name: Dependencies
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate
           sudo dpkg-reconfigure man-db
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ccache \
             ninja-build \
             python3-pyodbc \
             unixodbc-dev
@@ -286,6 +305,8 @@ jobs:
     needs: duckdb-linux-amd64
     env:
       GEN: ninja
+      CC: 'ccache gcc'
+      CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={PostgreSQL Driver};Server=127.0.0.1;Port:1433;Username=postgres;Password=postgres;
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       POSTGRES_ODBC_LIB_PATH: /usr/lib/x86_64-linux-gnu/odbc/psqlodbcw.so
@@ -296,12 +317,19 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
+      - name: Restore Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+
       - name: Dependencies
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate
           sudo dpkg-reconfigure man-db
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ccache \
             ninja-build \
             python3-pyodbc \
             unixodbc-dev
@@ -348,6 +376,8 @@ jobs:
     needs: duckdb-linux-amd64
     env:
       GEN: ninja
+      CC: 'ccache gcc'
+      CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={MariaDB Driver};SERVER=127.0.0.1;PORT=3306;USER=root;PASSWORD=root;
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       MARIADB_ODBC_LIB_PATH: /usr/lib/x86_64-linux-gnu/odbc/libmaodbc.so
@@ -358,12 +388,19 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
+      - name: Restore Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+
       - name: Dependencies
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate
           sudo dpkg-reconfigure man-db
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ccache \
             ninja-build \
             python3-pyodbc \
             unixodbc-dev
@@ -412,6 +449,8 @@ jobs:
     needs: duckdb-linux-amd64
     env:
       GEN: ninja
+      CC: 'ccache gcc'
+      CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={MySQL Driver};SERVER=127.0.0.1;PORT=3306;USER=root;PASSWORD=root;
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       MYSQL_ODBC_LIB_URL: https://github.com/staticlibs/odbclibs_tmp/releases/download/tmp1/mysql_odbc_9.4.0_ubuntu_24.04_amd64.tar.xz
@@ -423,12 +462,19 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
+      - name: Restore Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+
       - name: Dependencies
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate
           sudo dpkg-reconfigure man-db
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ccache \
             ninja-build \
             python3-pyodbc \
             unixodbc-dev
@@ -474,6 +520,8 @@ jobs:
     needs: duckdb-linux-amd64
     env:
       GEN: ninja
+      CC: 'ccache gcc'
+      CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={Oracle Driver};DBQ=//127.0.0.1:1521/XE;UID=system;PWD=tiger;
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       ORACLE_ODBC_LIB_URL1: https://download.oracle.com/otn_software/linux/instantclient/2326000/instantclient-basiclite-linux.x64-23.26.0.0.0.zip
@@ -487,12 +535,19 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
+      - name: Restore Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+
       - name: Dependencies
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate
           sudo dpkg-reconfigure man-db
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ccache \
             ninja-build \
             python3-pyodbc \
             unixodbc-dev
@@ -547,6 +602,8 @@ jobs:
     needs: duckdb-linux-amd64
     env:
       GEN: ninja
+      CC: 'ccache gcc'
+      CXX: 'ccache g++'
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       ODBC_CONN_STRING: Driver={DB2 Driver};HostName=127.0.0.1;Port=50000;Database=testdb;UID=db2inst1;PWD=testpwd;
       DB2_ODBC_LIB_URL: https://github.com/staticlibs/odbclibs_tmp/releases/download/tmp1/v12.1.2_linuxx64_odbc_cli.tar.gz
@@ -558,12 +615,19 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
+      - name: Restore Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+
       - name: Dependencies
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate
           sudo dpkg-reconfigure man-db
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ccache \
             ninja-build \
             python3-pyodbc \
             unixodbc-dev
@@ -616,6 +680,8 @@ jobs:
     needs: duckdb-linux-amd64
     env:
       GEN: ninja
+      CC: 'ccache gcc'
+      CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={ClickHouse Driver};Server=127.0.0.1;Port=8123;
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       CLICKHOUSE_ODBC_LIB_URL: https://github.com/ClickHouse/clickhouse-odbc/releases/download/1.4.3.20250807/clickhouse-odbc-linux-Clang-UnixODBC-Release.zip
@@ -627,12 +693,19 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
+      - name: Restore Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+
       - name: Dependencies
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate
           sudo dpkg-reconfigure man-db
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ccache \
             ninja-build \
             python3-pyodbc \
             unixodbc-dev
@@ -684,6 +757,8 @@ jobs:
     needs: duckdb-linux-amd64
     env:
       GEN: ninja
+      CC: 'ccache gcc'
+      CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={Spark Driver};Host=127.0.0.1;Port=10000;
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       SPARK_SERVER_URL: https://blobs.duckdb.org/ci/spark-3.5.3-bin-hadoop3.tgz
@@ -696,12 +771,19 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
+      - name: Restore Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+
       - name: Dependencies
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate
           sudo dpkg-reconfigure man-db
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ccache \
             ninja-build \
             python3-pyodbc \
             unixodbc-dev
@@ -751,6 +833,8 @@ jobs:
     needs: duckdb-linux-amd64
     env:
       GEN: ninja
+      CC: 'ccache gcc'
+      CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={Snowflake Driver};Server=${{ secrets.SNOWFLAKE_ACCOUNT_ID }}.snowflakecomputing.com;Database=SNOWFLAKE_SAMPLE_DATA;UID=${{ secrets.SNOWFLAKE_USERNAME }};PWD=${{ secrets.SNOWFLAKE_PASSWORD }};
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       SNOWFLAKE_ODBC_LIB_URL: https://sfc-repo.snowflakecomputing.com/odbc/linux/3.12.0/snowflake_linux_x8664_odbc-3.12.0.tgz
@@ -762,12 +846,19 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
+      - name: Restore Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+
       - name: Dependencies
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate
           sudo dpkg-reconfigure man-db
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ccache \
             ninja-build \
             python3-pyodbc \
             unixodbc-dev
@@ -807,6 +898,8 @@ jobs:
     needs: duckdb-linux-amd64
     env:
       GEN: ninja
+      CC: 'ccache gcc'
+      CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={FlightSQL Driver};Host=127.0.0.1;Port=31337;UID=gizmosql_username;PWD=gizmosql_password;useEncryption=false;
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
       GIZMOSQL_SERVER_URL: https://github.com/gizmodata/gizmosql/releases/download/v1.12.5/gizmosql_cli_linux_amd64.zip
@@ -819,12 +912,19 @@ jobs:
           fetch-depth: 0
           submodules: 'true'
 
+      - name: Restore Cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/ccache
+          key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
+
       - name: Dependencies
         run: |
           echo "set man-db/auto-update false" | sudo debconf-communicate
           sudo dpkg-reconfigure man-db
           sudo apt-get update -y -q -o=Dpkg::Use-Pty=0
           sudo apt-get install -y -q -o=Dpkg::Use-Pty=0 \
+            ccache \
             ninja-build \
             python3-pyodbc \
             rpm2cpio \
