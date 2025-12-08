@@ -20,6 +20,10 @@ struct OdbcCreateParamsFunction {
 	static void Register(duckdb_connection connection);
 };
 
+struct OdbcListDataSourcesFunction {
+	static void Register(duckdb_connection connection);
+};
+
 struct OdbcListDriversFunction {
 	static void Register(duckdb_connection connection);
 };
