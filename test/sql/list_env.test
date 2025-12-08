@@ -6,3 +6,6 @@ require odbc_scanner
 
 statement ok
 SELECT * FROM odbc_list_drivers()
+
+statement ok
+SELECT * FROM odbc_list_data_sources()
