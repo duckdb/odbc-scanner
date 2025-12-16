@@ -1,13 +1,13 @@
 # DuckDB ODBC Scanner
 
-ODBC Scanner extension allows to connect to other DBMSes (using their ODBC drivers) and run queries with `odbc_query()` table function.
+ODBC Scanner extension allows to connect to other databases (using their ODBC drivers) and run queries with [odbc_query](#odbc_query) table function.
 
 Outline:
 
  - [Installation](#installation)
  - [Usage example](#usage-example)
  - [DBMS-specific types support status](#dbms-specific-types-support-status)
- - [DBMS-specific options](#dbms-specific-options)
+ - [Functions](#functions)
  - [Connection string examples](#connection-string-examples)
  - [Query parameters](#query-parameters)
  - [Connections and concurrency](#connections-and-concurrency)
@@ -30,6 +30,7 @@ Where the `<platform>` is one of:
  - `osx_amd64`
  - `osx_arm64`
  - `windows_amd64`
+ - `windows_arm64`
 
 To update installed extension to the latest version run:
 
@@ -77,9 +78,178 @@ SELECT odbc_close(getvariable('conn'));
  - Spark: basic types covered
  - Arrow Flight SQL: basic types covered
 
-## DBMS-specific options
+## Functions 
 
-`odbc_scanner` supports a number of options that can be used to change how the query parameters are passed and how the resulting data is handled. For known DBMSes these options are set automatically. They also can be passed as named parameters to `odbc_query()` function to override the autoconfiguration:
+ - [odbc_bind_params](#odbc_bind_params)
+ - [odbc_close](#odbc_close)
+ - [odbc_connect](#odbc_connect)
+ - [odbc_create_params](#odbc_create_params)
+ - [odbc_list_data_sources](#odbc_list_data_sources)
+ - [odbc_list_drivers](#odbc_list_drivers)
+ - [odbc_query](#odbc_query)
+
+### odbc_bind_params
+
+```sql
+odbc_bind_params(conn_handle BIGINT, params_handle BIGINT, params STRUCT) -> BIGINT
+```
+
+Binds specified parameter values to the specified parameters handle. Only necessary with 2-step parameters binding, see [Query parameters](#query-parameters) for details.
+
+#### Parameters:
+
+ - `conn_handle` (`BIGINT`): ODBC connection handle created with [odbc_connect](#odbc_connect)
+ - `params_handle` (`BIGINT`): parameters handle created with [odbc_create_params](#odbc_create_params)
+ - `params` (`STRUCT`): parameters values
+
+#### Returns:
+
+Parameters handle (`BIGINT`), the same one that was passed as a second argument.
+
+#### Example:
+
+```sql
+SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(42, 'foo'))
+```
+
+### odbc_close
+
+```sql
+odbc_close(conn_handle BIGINT) -> VARCHAR
+```
+
+Closes specified ODBC connection to a remote DBMS. Does not throw errors if the connection is already closed.
+
+#### Parameters:
+
+ - `conn_handle` (`BIGINT`): ODBC connection handle created with [odbc_connect](#odbc_connect)
+
+#### Returns:
+
+Always returns `NULL` (`VARCHAR`).
+
+#### Example:
+
+```sql
+SELECT odbc_close(getvariable('conn'))
+```
+
+### odbc_connect
+
+```sql
+odbc_connect(conn_string VARCHAR) -> BIGINT
+```
+
+Opens an ODBC connection to a remote DBMS.
+
+#### Parameters:
+
+ - `conn_string` (`VARCHAR`): ODBC connection string, passed to the Driver Manager.
+
+#### Returns:
+
+Connection handle that can be placed into a `VARIABLE`. Connection is not closed automatically, must be closed with [odbc_close](#odbc_close).
+
+#### Example:
+
+```sql
+SET VARIABLE conn = odbc_connect('Driver={Oracle Driver};DBQ=//127.0.0.1:1521/XE;UID=system;PWD=tiger;')
+```
+
+### odbc_create_params
+
+```sql
+odbc_create_params() -> BIGINT
+```
+
+Creates a parameters handle. Only necessary with 2-step parameters binding, see [Query parameters](#query-parameters) for details.
+
+#### Parameters:
+
+None.
+
+#### Returns:
+
+Parameters handle (`BIGINT`). When the handle is passed to [odbc_query](#odbc_query) it gets tied to the underlying prepared statement and is closed automatically when the statement is closed.
+
+#### Example:
+
+```sql
+SET VARIABLE params1 = odbc_create_params()
+```
+
+### odbc_list_data_sources
+
+```sql
+odbc_list_data_sources() -> TABLE(name VARCHAR, description VARCHAR, type VARCHAR)
+```
+
+Returns the list of ODBC data sources registered in the OS. Uses driver manager call `SQLDataSources`.
+
+#### Parameters:
+
+None.
+
+#### Returns:
+
+A table with the following columns:
+
+ - `name` (`VARCHAR`): data source name
+ - `description` (`VARCHAR`): data source description
+ - `type` (`VARCHAR`): data source type, `USER` or `SYSTEM`
+
+#### Example:
+
+```sql
+SELECT * FROM odbc_list_data_sources()
+```
+
+### odbc_list_drivers
+
+```sql
+odbc_list_drivers() -> TABLE(description VARCHAR, attributes MAP(VARCHAR, VARCHAR))
+```
+
+Returns the list of ODBC drivers registered in the OS. Uses driver manager call `SQLDrivers`.
+
+#### Parameters:
+
+None.
+
+#### Returns:
+
+A table with the following columns:
+
+ - `description` (`VARCHAR`): driver description
+ - `attributes` (`MAP(VARCHAR, VARCHAR)`): driver attributes as a `name->value` map
+
+#### Example:
+
+```sql
+SELECT * FROM odbc_list_drivers()
+```
+
+### odbc_query
+
+```sql
+odbc_query(conn_handle BIGINT, query VARCHAR[, <optional named parameters>]) -> TABLE
+```
+
+Runs specified query in a remote DBMS and returns the query results table.
+
+#### Parameters:
+
+ - `conn_handle` (`BIGINT`): ODBC connection handle created with [odbc_connect](#odbc_connect)
+ - `query` (`VARCHAR`): SQL query, passed to the remote DBMS
+
+Optional named parameters that can be used to pass query parameters:
+
+ - `params` (`STRUCT`): query parameters to pass to remote DBMS
+ - `params_handle` (`BIGINT`): parameters handle created with [odbc_create_params](#odbc_create_params). Only used with 2-step parameters binding, see [Query parameters](#query-parameters) for details.
+
+Optional named parameters that can change types mapping:
+
+`odbc_scanner` supports a number of options that can be used to change how the query parameters are passed and how the resulting data is handled. For known DBMSes these options are set automatically. They also can be passed as named parameters to [odbc_query](#odbc_query) function to override the autoconfiguration:
 
  - `decimal_columns_as_chars` (`BOOLEAN`, default: `false`): read `DECIMAL` values as `VARCHAR`s that are parsed back into `DECIMAL`s before returning them to client
  - `decimal_columns_precision_through_ard` (`BOOLEAN`, default: `false`): when reading a `DECIMAL` specify its `precision` and `scale` through "Application Row Descriptor"
@@ -93,6 +263,19 @@ SELECT odbc_close(getvariable('conn'));
  - `timestamptz_params_as_ss_timestampoffset` (`BOOLEAN`, default: `false`): pass `TIMESTAMP_TZ` parameters as SQL Server's `DATETIMEOFFSET`
  - `var_len_data_single_part` (`BOOLEAN`, default: `false`): read long `VARCHAR` or `VARBINARY` values as a single read (used when a driver does not support [Retrieving Variable-Length Data in Parts](https://learn.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdata-function?view=sql-server-ver17#retrieving-variable-length-data-in-parts))
  - `var_len_params_long_threshold_bytes` (`UINTEGER`, default: `4000`): a length threshold after that `SQL_WVARCHAR` parameters are passed as `SQL_WLONGVARCHAR`
+
+#### Returns:
+
+A table with the query result.
+
+#### Example:
+
+```sql
+SELECT * FROM odbc_query(getvariable('conn'), 
+  'SELECT CAST(? AS NVARCHAR2(2)) || CAST(? AS VARCHAR2(5)) FROM dual',
+  params=row('🦆', 'quack')
+)
+```
 
 ## Connection string examples
 
@@ -150,13 +333,13 @@ Arrow Flight SQL (Dremio ODBC + GizmoSQL):
 Driver={FlightSQL Driver};Host=127.0.0.1;Port=31337;UID=gizmosql_username;PWD=gizmosql_password;useEncryption=true;
 ```
 
-Note: the `Driver` parameter depends on how the driver is registered in `odbcinst.ini` (or Windows registry) and may be different.
+Note: the `Driver` parameter depends on how the driver is registered in `odbcinst.ini` (or Windows registry) and may be different. [odbc_list_drivers](#odbc_list_drivers) can be used to get drivers names.
 
 ## Query parameters
 
-When a DuckDB query is run using prepared statement, it is possible to pass the input parameters from the client code. `odbc_scanner` allows to forward such input parameters over ODBC API to the queries to remote databases.
+When a DuckDB query is run using prepared statement, it is possible to pass input parameters from the client code. `odbc_scanner` allows to forward such input parameters over ODBC API to the queries to remote databases.
 
-`odbc_scanner` supports 2 methods of passing query parameters, using either `params` or `params_handle` named argument to `odbc_query()` function.
+`odbc_scanner` supports 2 methods of passing query parameters, using either `params` or `params_handle` named argument to [odbc_query](#odbc_query) function.
 
 `params` argument takes a `STRUCT` value as an input. Struct field names are ignored, so the `row()` function can be used to create a `STRUCT` value inline:
 
@@ -176,7 +359,7 @@ The problem with this approach, is that DuckDB is unable to resolve parameter ty
 
 This will result in re-preparing the inner query in remote DB every time `duckdb_execute_prepared()` is called.
 
-To avoid this problem is it possible to use 2-step parameter binding with `params_handle` named argument to `odbc_query()`:
+To avoid this problem is it possible to use 2-step parameter binding with `params_handle` named argument to [odbc_query](#odbc_query):
 
 ```sql
 -- create parameters handle
@@ -229,7 +412,7 @@ Or by disabling mutli-threaded execution setting `threads` DuckDB option to `1`.
 
 ## Performance
 
-ODBC is not a high-performance API, `odbc_scanner` uses multiple API calls per-row and performs `UCS-2` to `UTF-8` conversion for every `VARCHAR` value. Besides that, `odbc_query()` processing is strictly single-threaded.
+ODBC is not a high-performance API, `odbc_scanner` uses multiple API calls per-row and performs `UCS-2` to `UTF-8` conversion for every `VARCHAR` value. Besides that, [odbc_query](#odbc_query) processing is strictly single-threaded.
 
 When submitting issues related only to performance please check the performance in comparable scenarios, for example with [pyodbc](https://pypi.org/project/pyodbc/).
 
