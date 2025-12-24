@@ -225,7 +225,7 @@ jobs:
       CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={MSSQL Driver};Server=tcp:127.0.0.1,1433;UID=sa;PWD=P@ssword2;TrustServerCertificate=yes;
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
-      MSSQL_ODBC_LIB_PATH: /opt/microsoft/msodbcsql18/lib64/libmsodbcsql-18.5.so.1.1
+      MSSQL_ODBC_LIB_PATH: /opt/microsoft/msodbcsql18/lib64/libmsodbcsql-18.6.so.1.1
     steps:
       - name: Checkout
         uses: actions/checkout@v4
