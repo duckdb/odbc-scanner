@@ -204,6 +204,13 @@ jobs:
         run: |
           make release
 
+      - name: List Symbols
+        shell: cmd
+        run: |
+          call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          dumpbin.exe /imports build\release\odbc_scanner.duckdb_extension
+          dumpbin.exe /exports build\release\odbc_scanner.duckdb_extension
+
       - name: C API Tests
         shell: bash
         run: |
