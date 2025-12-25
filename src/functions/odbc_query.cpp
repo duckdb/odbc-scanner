@@ -179,6 +179,10 @@ static void Bind(duckdb_bind_info info) {
 		ParamsRegistry::Add(std::move(params_ptr));
 	}
 
+	std::vector<ResultColumn> columns = Columns::Collect(ctx);
+
+	// This must go after the Columns::Collect to prevent the crash in MSSQL ODBC driver
+	// https://web.archive.org/web/20251225082810/https://developercommunity.visualstudio.com/t/SQL-Server-ODBC-driver-186-crash-with-S/11021276
 	std::vector<SQLSMALLINT> param_types;
 	if (params_val.get() != nullptr || param_handle_val.get() != nullptr) {
 		param_types = Params::CollectTypes(ctx);
@@ -186,8 +190,6 @@ static void Bind(duckdb_bind_info info) {
 			Params::SetExpectedTypes(ctx, param_types, params);
 		}
 	}
-
-	std::vector<ResultColumn> columns = Columns::Collect(ctx);
 
 	if (columns.size() == 0) {
 		auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
