@@ -27,6 +27,9 @@ bool OdbcType::Equals(OdbcType &other) {
 
 const std::string Types::MSSQL_DATETIME2_TYPE_NAME = "datetime2";
 const std::string Types::SQL_DATE_TYPE_NAME = "DATE";
+const std::string Types::SQL_BLOB_TYPE_NAME = "BLOB";
+const std::string Types::SQL_CLOB_TYPE_NAME = "CLOB";
+const std::string Types::SQL_DB2_DBCLOB_TYPE_NAME = "DBCLOB";
 
 ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec, idx_t param_idx) {
 	switch (type_id) {
@@ -263,30 +266,48 @@ void Types::FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLIN
 	}
 }
 
+void Types::CoalesceColumnType(QueryContext &ctx, ResultColumn &column) {
+	(void)ctx;
+	OdbcType &odbc_type = column.odbc_type;
+	if (odbc_type.desc_concise_type == Types::SQL_DB2_BLOB && odbc_type.desc_type_name == Types::SQL_BLOB_TYPE_NAME) {
+		odbc_type.desc_type = SQL_LONGVARBINARY;
+		odbc_type.desc_concise_type = SQL_LONGVARBINARY;
+	} else if (odbc_type.desc_concise_type == Types::SQL_DB2_CLOB &&
+	           odbc_type.desc_type_name == Types::SQL_CLOB_TYPE_NAME) {
+		odbc_type.desc_type = SQL_LONGVARCHAR;
+		odbc_type.desc_concise_type = SQL_LONGVARCHAR;
+	} else if (odbc_type.desc_concise_type == Types::SQL_DB2_DBCLOB &&
+	           odbc_type.desc_type_name == Types::SQL_DB2_DBCLOB_TYPE_NAME) {
+		odbc_type.desc_type = SQL_WLONGVARCHAR;
+		odbc_type.desc_concise_type = SQL_WLONGVARCHAR;
+	}
+}
+
 duckdb_type Types::ResolveColumnType(QueryContext &ctx, ResultColumn &column) {
+	OdbcType &odbc_type = column.odbc_type;
 	switch (column.odbc_type.desc_concise_type) {
 	case SQL_BIT:
 		return TypeSpecific::ResolveColumnType<bool>(ctx, column);
 	case SQL_TINYINT:
-		if (column.odbc_type.is_unsigned) {
+		if (odbc_type.is_unsigned) {
 			return TypeSpecific::ResolveColumnType<uint8_t>(ctx, column);
 		} else {
 			return TypeSpecific::ResolveColumnType<int8_t>(ctx, column);
 		}
 	case SQL_SMALLINT:
-		if (column.odbc_type.is_unsigned) {
+		if (odbc_type.is_unsigned) {
 			return TypeSpecific::ResolveColumnType<uint16_t>(ctx, column);
 		} else {
 			return TypeSpecific::ResolveColumnType<int16_t>(ctx, column);
 		}
 	case SQL_INTEGER:
-		if (column.odbc_type.is_unsigned) {
+		if (odbc_type.is_unsigned) {
 			return TypeSpecific::ResolveColumnType<uint32_t>(ctx, column);
 		} else {
 			return TypeSpecific::ResolveColumnType<int32_t>(ctx, column);
 		}
 	case SQL_BIGINT:
-		if (column.odbc_type.is_unsigned) {
+		if (odbc_type.is_unsigned) {
 			return TypeSpecific::ResolveColumnType<uint64_t>(ctx, column);
 		} else {
 			return TypeSpecific::ResolveColumnType<int64_t>(ctx, column);
@@ -320,8 +341,8 @@ duckdb_type Types::ResolveColumnType(QueryContext &ctx, ResultColumn &column) {
 	case Types::SQL_SS_TIMESTAMPOFFSET:
 		return TypeSpecific::ResolveColumnType<duckdb_timestamp_struct>(ctx, column);
 	default:
-		throw ScannerException("Unsupported ODBC column type: " + column.odbc_type.ToString() + ", query: '" +
-		                       ctx.query + "', column name: '" + column.name + "'");
+		throw ScannerException("Unsupported ODBC column type: " + odbc_type.ToString() + ", query: '" + ctx.query +
+		                       "', column name: '" + column.name + "'");
 	}
 }
 

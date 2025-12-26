@@ -14,14 +14,14 @@ Reference: [link](https://www.ibm.com/docs/en/db2/12.1.x?topic=elements-data-typ
  - [x] TIME
  - [x] TIMESTAMP
  - [x] DATE
- - [ ] **CHAR**
- - [ ] **VARCHAR**
- - [ ] **CLOB**
- - [ ] **BINARY**
- - [ ] **VARBINARY**
- - [ ] **BLOB**
+ - [x] CHAR
+ - [x] VARCHAR
+ - [x] CLOB
+ - [x] BINARY
+ - [x] VARBINARY
+ - [x] BLOB
  - [ ] **GRAPHIC**
  - [ ] **VARGRAPHIC**
- - [ ] **DBCLOB**
+ - [x] DBCLOB
  - [ ] **VECTOR**
  - [ ] **XML**

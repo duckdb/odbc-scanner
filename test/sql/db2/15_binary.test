@@ -1,0 +1,76 @@
+# name: test/sql/db2/15_binary.test
+# description: test for DB2 BINARY type
+# group: [db2_15_binary]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS BINARY(3)) FROM sysibm.sysdummy1')
+----
+foo
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS BINARY(6)) FROM sysibm.sysdummy1')
+----
+foo\x00\x00\x00
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS BINARY(3)) FROM sysibm.sysdummy1')
+)
+----
+BLOB
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BINARY(3)) FROM sysibm.sysdummy1',
+  params=row('foo'::BLOB))
+----
+foo
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BINARY(6)) FROM sysibm.sysdummy1',
+  params=row('foo'::BLOB))
+----
+foo\x00\x00\x00
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BINARY(7)) FROM sysibm.sysdummy1',
+  params=row('foo\x00bar'::BLOB))
+----
+foo\x00bar
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BINARY(2)) FROM sysibm.sysdummy1',
+  params=row(NULL::BLOB))
+----
+NULL
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BINARY(7)) FROM sysibm.sysdummy1',
+  params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind('foo\x00bar'::BLOB)
+
+query I
+EXECUTE p1
+----
+foo\x00bar
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

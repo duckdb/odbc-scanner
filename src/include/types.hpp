@@ -47,8 +47,15 @@ struct Types {
 	static const SQLSMALLINT SQL_SF_TIMESTAMP_TZ = 2001;
 	static const SQLSMALLINT SQL_SF_TIMESTAMP_NTZ = 2002;
 
+	static const SQLSMALLINT SQL_DB2_BLOB = -98;
+	static const SQLSMALLINT SQL_DB2_CLOB = -99;
+	static const SQLSMALLINT SQL_DB2_DBCLOB = -350;
+
 	static const std::string MSSQL_DATETIME2_TYPE_NAME;
 	static const std::string SQL_DATE_TYPE_NAME;
+	static const std::string SQL_BLOB_TYPE_NAME;
+	static const std::string SQL_CLOB_TYPE_NAME;
+	static const std::string SQL_DB2_DBCLOB_TYPE_NAME;
 
 	// Type-dispatched functions
 
@@ -61,6 +68,8 @@ struct Types {
 
 	static void FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
 	                              idx_t row_idx);
+
+	static void CoalesceColumnType(QueryContext &ctx, ResultColumn &column);
 
 	static duckdb_type ResolveColumnType(QueryContext &ctx, ResultColumn &column);
 

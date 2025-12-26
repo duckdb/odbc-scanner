@@ -1,0 +1,87 @@
+# name: test/sql/db2/16_varbinary.test
+# description: test for DB2 VARBINARY type
+# group: [db2_16_varbinary]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARBINARY(3)) FROM sysibm.sysdummy1')
+----
+foo
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARBINARY(7)) FROM sysibm.sysdummy1')
+----
+foo
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARBINARY(32672)) FROM sysibm.sysdummy1')
+----
+foo
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARBINARY(32672)) FROM sysibm.sysdummy1')
+)
+----
+BLOB
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARBINARY(3)) FROM sysibm.sysdummy1',
+  params=row('foo'::BLOB))
+----
+foo
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARBINARY(6)) FROM sysibm.sysdummy1',
+  params=row('foo'::BLOB))
+----
+foo
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARBINARY(7)) FROM sysibm.sysdummy1',
+  params=row('foo\x00bar'::BLOB))
+----
+foo\x00bar
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARBINARY(32672)) FROM sysibm.sysdummy1',
+  params=row('foo\x00bar'::BLOB))
+----
+foo\x00bar
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARBINARY(32672)) FROM sysibm.sysdummy1',
+  params=row(NULL::BLOB))
+----
+NULL
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARBINARY(32672)) FROM sysibm.sysdummy1',
+  params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind('foo\x00bar'::BLOB)
+
+query I
+EXECUTE p1
+----
+foo\x00bar
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

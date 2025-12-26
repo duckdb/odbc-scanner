@@ -196,6 +196,7 @@ static void Bind(duckdb_bind_info info) {
 		duckdb_bind_add_result_column(info, "rowcount", bigint_type.get());
 	} else {
 		for (ResultColumn &col : columns) {
+			Types::CoalesceColumnType(ctx, col);
 			duckdb_type type_id = Types::ResolveColumnType(ctx, col);
 			Columns::AddToResults(info, type_id, col);
 		}

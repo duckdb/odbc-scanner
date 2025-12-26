@@ -1,0 +1,86 @@
+# name: test/sql/db2/20_dbclob.test
+# description: test for DB2 DBCLOB type
+# group: [db2_20_dbclob]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS DBCLOB) FROM sysibm.sysdummy1')
+----
+foo
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS DBCLOB) FROM sysibm.sysdummy1')
+----
+foo
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS DBCLOB) FROM sysibm.sysdummy1')
+)
+----
+VARCHAR
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DBCLOB) FROM sysibm.sysdummy1',
+  params=row('foo'::VARCHAR))
+----
+foo
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DBCLOB) FROM sysibm.sysdummy1',
+  params=row('🌌'::VARCHAR))
+----
+🌌
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DBCLOB) FROM sysibm.sysdummy1',
+  params=row(NULL::VARCHAR))
+----
+NULL
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DBCLOB) FROM sysibm.sysdummy1',
+  params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind('foo'::VARCHAR)
+
+query I
+EXECUTE p1
+----
+foo
+
+statement ok
+EXECUTE p1_bind('bar'::VARCHAR)
+
+query I
+EXECUTE p1
+----
+bar
+
+statement ok
+EXECUTE p1_bind('🌌'::VARCHAR)
+
+query I
+EXECUTE p1
+----
+🌌
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
