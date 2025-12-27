@@ -53,10 +53,10 @@ Reference: [link](https://learn.microsoft.com/en-us/sql/t-sql/data-types/data-ty
  - [ ] **GEOGRAPHY**
  - [ ] **GEOMETRY**
  - [ ] **HIERARCHYID**
- - [ ] **JSON**
+ - [x] JSON
  - [ ] **VECTOR**
- - [ ] **ROWVERSION**
+ - [x] ROWVERSION
  - [ ] **SQL_VARIANT**
  - [ ] **TABLE**
  - [ ] **UNIQUEIDENTIFIER**
- - [ ] **XML**
+ - [x] XML
