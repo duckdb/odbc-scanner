@@ -1,0 +1,40 @@
+# name: test/sql/mssql/31_json.test
+# description: test for MSSQL JSON type
+# group: [mssql_31_json]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT COLUMNS(*)::JSON FROM odbc_query(getvariable('conn'), '
+  SELECT ''foo'' AS col1, 42 AS col2
+  FROM (VALUES (1)) AS tab1(dummy)
+  FOR JSON AUTO;
+')
+----
+[{"col1":"foo","col2":42}]
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT COLUMNS(*)::JSON FROM odbc_query(getvariable('conn'), '
+    SELECT ''foo'' AS col1, 42 AS col2
+    FROM (VALUES (1)) AS tab1(dummy)
+    FOR JSON AUTO;
+  ')
+)
+----
+JSON
+
+query I
+SELECT COLUMNS(*)::JSON FROM odbc_query(getvariable('conn'), '
+  SELECT ? AS col1, ? AS col2
+  FROM (VALUES (1)) AS tab1(dummy)
+  FOR JSON AUTO;
+', params=row('foo', 42))
+----
+[{"col1":"foo","col2":42}]
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

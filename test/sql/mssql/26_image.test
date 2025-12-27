@@ -1,6 +1,6 @@
 # name: test/sql/mssql/26_image.test
 # description: test for MSSQL IMAGE type
-# group: [mssql_26_IMAGE]
+# group: [mssql_26_image]
 
 require odbc_scanner
 

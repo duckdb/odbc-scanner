@@ -1,0 +1,34 @@
+# name: test/sql/mssql/33_rowversion.test
+# description: test for MSSQL ROWVERSION type
+# group: [mssql_33_rowversion]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement ok
+CALL odbc_query(getvariable('conn'), 'DROP TABLE IF EXISTS test_rowversion')
+
+statement ok
+CALL odbc_query(getvariable('conn'), 'CREATE TABLE test_rowversion(col1 INT, col2 ROWVERSION)')
+
+statement ok
+CALL odbc_query(getvariable('conn'), 'INSERT INTO test_rowversion(col1) VALUES(42)')
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT col2 FROM test_rowversion')
+-- \x00\x00\x00\x00\x00\x00e\x98
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT col2 FROM test_rowversion')
+)
+----
+BLOB
+
+statement ok
+CALL odbc_query(getvariable('conn'), 'DROP TABLE test_rowversion')
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
