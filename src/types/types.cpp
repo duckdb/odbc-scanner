@@ -61,6 +61,8 @@ ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id,
 		return TypeSpecific::ExtractNotNullParam<std::string>(quirks, vec);
 	case DUCKDB_TYPE_BLOB:
 		return TypeSpecific::ExtractNotNullParam<duckdb_blob>(quirks, vec);
+	case DUCKDB_TYPE_UUID:
+		return TypeSpecific::ExtractNotNullParam<OdbcUuid>(quirks, vec);
 	case DUCKDB_TYPE_DATE:
 		return TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(quirks, vec);
 	case DUCKDB_TYPE_TIME:
@@ -108,6 +110,8 @@ ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, 
 		return TypeSpecific::ExtractNotNullParam<std::string>(quirks, value);
 	case DUCKDB_TYPE_BLOB:
 		return TypeSpecific::ExtractNotNullParam<duckdb_blob>(quirks, value);
+	case DUCKDB_TYPE_UUID:
+		return TypeSpecific::ExtractNotNullParam<OdbcUuid>(quirks, value);
 	case DUCKDB_TYPE_DATE:
 		return TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(quirks, value);
 	case DUCKDB_TYPE_TIME:
@@ -172,6 +176,9 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 		break;
 	case DUCKDB_TYPE_BLOB:
 		TypeSpecific::BindOdbcParam<duckdb_blob>(ctx, param, param_idx);
+		break;
+	case DUCKDB_TYPE_UUID:
+		TypeSpecific::BindOdbcParam<OdbcUuid>(ctx, param, param_idx);
 		break;
 	case DUCKDB_TYPE_DATE:
 		TypeSpecific::BindOdbcParam<duckdb_date_struct>(ctx, param, param_idx);
@@ -246,6 +253,9 @@ void Types::FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLIN
 	case SQL_VARBINARY:
 	case SQL_LONGVARBINARY:
 		TypeSpecific::FetchAndSetResult<duckdb_blob>(ctx, odbc_type, col_idx, vec, row_idx);
+		break;
+	case SQL_GUID:
+		TypeSpecific::FetchAndSetResult<OdbcUuid>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	case SQL_TYPE_DATE:
 		TypeSpecific::FetchAndSetResult<duckdb_date_struct>(ctx, odbc_type, col_idx, vec, row_idx);
@@ -332,6 +342,8 @@ duckdb_type Types::ResolveColumnType(QueryContext &ctx, ResultColumn &column) {
 	case SQL_VARBINARY:
 	case SQL_LONGVARBINARY:
 		return TypeSpecific::ResolveColumnType<duckdb_blob>(ctx, column);
+	case SQL_GUID:
+		return TypeSpecific::ResolveColumnType<OdbcUuid>(ctx, column);
 	case SQL_TYPE_DATE:
 		return TypeSpecific::ResolveColumnType<duckdb_date_struct>(ctx, column);
 	case SQL_TYPE_TIME:

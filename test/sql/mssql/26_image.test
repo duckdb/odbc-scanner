@@ -13,11 +13,6 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS IMAGE)')
 foo
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS iMAGE)')
-----
-foo
-
-query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS IMAGE)')
 )

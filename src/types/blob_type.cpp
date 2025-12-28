@@ -2,6 +2,7 @@
 
 #include <cstring>
 
+#include "binary.hpp"
 #include "capi_pointers.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
@@ -23,7 +24,8 @@ ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb
 	std::vector<char> buf;
 	buf.resize(len);
 	std::memcpy(buf.data(), buf_ptr, len);
-	return ScannerParam(std::move(buf));
+	OdbcBlob blob(std::move(buf));
+	return ScannerParam(std::move(blob));
 }
 
 template <>
@@ -32,18 +34,19 @@ ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb
 	std::vector<char> buf;
 	buf.resize(dblob.size);
 	std::memcpy(buf.data(), dblob.data, dblob.size);
-	return ScannerParam(std::move(buf));
+	OdbcBlob blob(std::move(buf));
+	return ScannerParam(std::move(blob));
 }
 
 template <>
 void TypeSpecific::BindOdbcParam<duckdb_blob>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_VARBINARY;
-	std::vector<char> &blob = param.Value<std::vector<char>>();
-	if (blob.size() > ctx.quirks.var_len_params_long_threshold_bytes) {
+	OdbcBlob &blob = param.Value<OdbcBlob>();
+	if (blob.size<uint32_t>() > ctx.quirks.var_len_params_long_threshold_bytes) {
 		sqltype = SQL_LONGVARBINARY;
 	}
 	SQLRETURN ret =
-	    SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_BINARY, sqltype, blob.size(), 0,
+	    SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_BINARY, sqltype, blob.size<SQLULEN>(), 0,
 	                     reinterpret_cast<SQLPOINTER>(blob.data()), param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);

@@ -16,25 +16,6 @@ DUCKDB_EXTENSION_EXTERN
 
 namespace odbcscanner {
 
-DecimalChars::DecimalChars() {
-	this->characters.push_back('\0');
-}
-
-DecimalChars::DecimalChars(duckdb_decimal decimal) {
-	duckdb_value val = duckdb_create_decimal(decimal);
-	auto chars = VarcharPtr(duckdb_get_varchar(val), VarcharDeleter);
-	if (chars.get() == nullptr) {
-		throw ScannerException("DECIMAL parameter conversion error");
-	}
-	size_t len = std::strlen(chars.get());
-	this->characters.resize(len + 1);
-	std::memcpy(this->characters.data(), chars.get(), len);
-}
-
-char *DecimalChars::data() {
-	return characters.data();
-}
-
 template <>
 bool &ScannerParam::Value<bool>() {
 	CheckType(DUCKDB_TYPE_BOOLEAN);
@@ -120,9 +101,15 @@ WideString &ScannerParam::Value<WideString>() {
 }
 
 template <>
-std::vector<char> &ScannerParam::Value<std::vector<char>>() {
+OdbcBlob &ScannerParam::Value<OdbcBlob>() {
 	CheckType(DUCKDB_TYPE_BLOB);
 	return val.blob;
+}
+
+template <>
+OdbcUuid &ScannerParam::Value<OdbcUuid>() {
+	CheckType(DUCKDB_TYPE_UUID);
+	return val.uuid;
 }
 
 template <>
@@ -220,10 +207,16 @@ ScannerParam::ScannerParam(const char *cstr, size_t len) : type_id(DUCKDB_TYPE_V
 	this->len_bytes = val.wstr.length<SQLLEN>() * sizeof(SQLWCHAR);
 }
 
-ScannerParam::ScannerParam(std::vector<char> blob) : type_id(DUCKDB_TYPE_BLOB) {
-	new (&this->val.blob) std::vector<char>;
+ScannerParam::ScannerParam(OdbcBlob blob) : type_id(DUCKDB_TYPE_BLOB) {
+	new (&this->val.blob) OdbcBlob;
 	this->val.blob = std::move(blob);
-	this->len_bytes = val.blob.size();
+	this->len_bytes = val.blob.size<SQLLEN>();
+}
+
+ScannerParam::ScannerParam(OdbcUuid uuid) : type_id(DUCKDB_TYPE_UUID) {
+	new (&this->val.uuid) OdbcUuid;
+	this->val.uuid = std::move(uuid);
+	this->len_bytes = val.uuid.size<SQLLEN>();
 }
 
 ScannerParam::ScannerParam(const char *cstr) : ScannerParam(cstr, std::strlen(cstr)) {
@@ -325,8 +318,12 @@ void ScannerParam::AssignByType(param_type type_id, InternalValue &val, ScannerP
 		val.wstr = std::move(other.Value<WideString>());
 		break;
 	case DUCKDB_TYPE_BLOB:
-		new (&val.blob) std::vector<char>;
-		val.blob = std::move(other.Value<std::vector<char>>());
+		new (&val.blob) OdbcBlob;
+		val.blob = std::move(other.Value<OdbcBlob>());
+		break;
+	case DUCKDB_TYPE_UUID:
+		new (&val.blob) OdbcUuid;
+		val.uuid = std::move(other.Value<OdbcUuid>());
 		break;
 	case DUCKDB_TYPE_DATE:
 		val.date = other.Value<SQL_DATE_STRUCT>();

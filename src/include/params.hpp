@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "binary.hpp"
 #include "capi_pointers.hpp"
 #include "duckdb_extension_api.hpp"
 #include "odbc_api.hpp"
@@ -17,27 +18,6 @@ namespace odbcscanner {
 
 // duckdb_type with additional values
 using param_type = int;
-
-struct DecimalChars {
-	std::vector<char> characters;
-
-	DecimalChars();
-
-	explicit DecimalChars(duckdb_decimal decimal);
-
-	DecimalChars(DecimalChars &other) = delete;
-	DecimalChars(DecimalChars &&other) = default;
-
-	DecimalChars &operator=(const DecimalChars &other) = delete;
-	DecimalChars &operator=(DecimalChars &&other) = default;
-
-	template <typename INT_TYPE>
-	INT_TYPE size() {
-		return static_cast<INT_TYPE>(characters.size() - 1);
-	}
-
-	char *data();
-};
 
 class ScannerParam {
 	param_type type_id = DUCKDB_TYPE_INVALID;
@@ -60,7 +40,8 @@ class ScannerParam {
 		SQL_NUMERIC_STRUCT decimal;
 		DecimalChars decimal_chars;
 		WideString wstr;
-		std::vector<char> blob;
+		OdbcBlob blob;
+		OdbcUuid uuid;
 		SQL_DATE_STRUCT date;
 		SQL_TIME_STRUCT time;
 		SQL_SS_TIME2_STRUCT time_with_nanos;
@@ -96,7 +77,9 @@ class ScannerParam {
 		}
 		InternalValue(WideString wstr_in) : wstr(std::move(wstr_in)) {
 		}
-		InternalValue(std::vector<char> blob_in) : blob(std::move(blob_in)) {
+		InternalValue(OdbcBlob blob_in) : blob(std::move(blob_in)) {
+		}
+		InternalValue(OdbcUuid uuid_in) : uuid(std::move(uuid_in)) {
 		}
 		InternalValue(SQL_DATE_STRUCT value) : date(value) {
 		}
@@ -132,7 +115,8 @@ public:
 	explicit ScannerParam(duckdb_decimal value, bool decimal_as_chars);
 	explicit ScannerParam(const char *cstr, size_t len);
 	explicit ScannerParam(const char *cstr);
-	explicit ScannerParam(std::vector<char> value);
+	explicit ScannerParam(OdbcBlob value);
+	explicit ScannerParam(OdbcUuid value);
 	explicit ScannerParam(duckdb_date_struct value);
 	explicit ScannerParam(duckdb_time_struct value, bool use_time_with_nanos);
 	explicit ScannerParam(TimestampNsStruct value);

@@ -47,6 +47,7 @@ endif ()
 
 # Create Extension library
 set(EXTENSION_SOURCES
+    src/binary.cpp
     src/capi_entry_point.cpp
     src/columns.cpp
     src/connection.cpp
@@ -72,6 +73,7 @@ set(EXTENSION_SOURCES
     src/types/null_type.cpp
     src/types/temporal_types.cpp
     src/types/types.cpp
+    src/types/uuid_type.cpp
     src/types/varchar_type.cpp
 )
 

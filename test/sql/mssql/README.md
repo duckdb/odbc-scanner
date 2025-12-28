@@ -58,5 +58,5 @@ Reference: [link](https://learn.microsoft.com/en-us/sql/t-sql/data-types/data-ty
  - [x] ROWVERSION
  - [ ] **SQL_VARIANT**
  - [ ] **TABLE**
- - [ ] **UNIQUEIDENTIFIER**
+ - [x] UNIQUEIDENTIFIER
  - [x] XML
