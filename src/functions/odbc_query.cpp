@@ -29,20 +29,29 @@ namespace odbcscanner {
 
 namespace {
 
+// state of the function call
+enum class ExecState { UNINITIALIZED, EXECUTED, EXHAUSTED };
+
+// return status of the SQLExecute call
+enum class SqlExecStatus { SUCCESS, FAILURE };
+
 struct BindData {
 	int64_t conn_id = 0;
 	QueryContext ctx;
 
 	std::vector<ResultColumn> columns;
 
+	bool ignore_exec_failure = false;
+
 	std::vector<SQLSMALLINT> param_types;
 	std::vector<ScannerParam> params;
 	int64_t params_handle = 0;
 
-	BindData(int64_t conn_id_in, QueryContext ctx_in, std::vector<ResultColumn> columns_in,
+	BindData(int64_t conn_id_in, QueryContext ctx_in, std::vector<ResultColumn> columns_in, bool ignore_exec_failure_in,
 	         std::vector<SQLSMALLINT> param_types_in, std::vector<ScannerParam> params_in, int64_t params_handle_in)
 	    : conn_id(conn_id_in), ctx(std::move(ctx_in)), columns(std::move(columns_in)),
-	      param_types(std::move(param_types_in)), params(std::move(params_in)), params_handle(params_handle_in) {
+	      ignore_exec_failure(ignore_exec_failure_in), param_types(std::move(param_types_in)),
+	      params(std::move(params_in)), params_handle(params_handle_in) {
 	}
 
 	BindData(const BindData &other) = delete;
@@ -92,8 +101,7 @@ struct GlobalInitData {
 };
 
 struct LocalInitData {
-	bool executed = false;
-	bool exhausted = false;
+	ExecState exec_state = ExecState::UNINITIALIZED;
 	std::vector<duckdb_vector> col_vectors;
 
 	LocalInitData() {
@@ -157,6 +165,12 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 
+	bool ignore_exec_failure = false;
+	auto ignore_exec_failure_val = ValuePtr(duckdb_bind_get_named_parameter(info, "ignore_exec_failure"), ValueDeleter);
+	if (ignore_exec_failure_val.get() != nullptr && !duckdb_is_null_value(ignore_exec_failure_val.get())) {
+		ignore_exec_failure = duckdb_get_bool(ignore_exec_failure_val.get());
+	}
+
 	std::map<std::string, ValuePtr> user_quirks = ExtractUserQuirks(info);
 	DbmsQuirks quirks(conn, user_quirks);
 	QueryContext ctx(query, hstmt, quirks);
@@ -202,8 +216,9 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 
-	auto bdata_ptr = std::unique_ptr<BindData>(new BindData(conn_id, std::move(ctx), std::move(columns),
-	                                                        std::move(param_types), std::move(params), params_handle));
+	auto bdata_ptr =
+	    std::unique_ptr<BindData>(new BindData(conn_id, std::move(ctx), std::move(columns), ignore_exec_failure,
+	                                           std::move(param_types), std::move(params), params_handle));
 	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
 }
 
@@ -221,7 +236,7 @@ static void LocalInit(duckdb_init_info info) {
 	duckdb_init_set_init_data(info, ldata_ptr.release(), LocalInitData::Destroy);
 }
 
-static void BindParamsAndExecute(BindData &bdata) {
+static SqlExecStatus BindParamsAndExecute(BindData &bdata) {
 	QueryContext &ctx = bdata.ctx;
 
 	if (bdata.params.size() > 0) {
@@ -249,11 +264,16 @@ static void BindParamsAndExecute(BindData &bdata) {
 	{
 		SQLRETURN ret = SQLExecute(ctx.hstmt);
 		if (!SQL_SUCCEEDED(ret)) {
+			if (bdata.ignore_exec_failure) {
+				return SqlExecStatus::FAILURE;
+			}
 			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
 			throw ScannerException("'SQLExecute' failed, query: '" + ctx.query + "', return: " + std::to_string(ret) +
 			                       ", diagnostics: '" + diag + "'");
 		}
 	}
+
+	return SqlExecStatus::SUCCESS;
 }
 
 static void Query(duckdb_function_info info, duckdb_data_chunk output) {
@@ -261,14 +281,23 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 	LocalInitData &ldata = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
 	QueryContext &ctx = bdata.ctx;
 
-	if (ldata.exhausted) {
+	if (ldata.exec_state == ExecState::EXHAUSTED) {
 		duckdb_data_chunk_set_size(output, 0);
 		return;
 	}
 
-	if (!ldata.executed) {
-		BindParamsAndExecute(bdata);
-		ldata.executed = true;
+	if (ldata.exec_state == ExecState::UNINITIALIZED) {
+		// run the query
+		SqlExecStatus exec_status = BindParamsAndExecute(bdata);
+
+		// if exec error is not thrown then we return empty result set
+		if (exec_status == SqlExecStatus::FAILURE) {
+			ldata.exec_state = ExecState::EXHAUSTED;
+			duckdb_data_chunk_set_size(output, 0);
+			return;
+		}
+
+		ldata.exec_state = ExecState::EXECUTED;
 
 		std::vector<ResultColumn> columns = Columns::Collect(ctx);
 		Columns::CheckSame(ctx, bdata.columns, columns);
@@ -293,7 +322,7 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 			int64_t *vec_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
 			vec_data[0] = static_cast<int64_t>(count);
 			duckdb_data_chunk_set_size(output, 1);
-			ldata.exhausted = true;
+			ldata.exec_state = ExecState::EXHAUSTED;
 			return;
 		}
 
@@ -325,7 +354,7 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 					throw ScannerException("'SQLFreeStmt' with SQL_CLOSE failed, query: '" + ctx.query +
 					                       "', return: " + std::to_string(ret_close) + ", diagnostics: '" + diag + "'");
 				}
-				ldata.exhausted = true;
+				ldata.exec_state = ExecState::EXHAUSTED;
 				break;
 			}
 		}
@@ -354,6 +383,9 @@ void OdbcQueryFunction::Register(duckdb_connection conn) {
 	auto uint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER), LogicalTypeDeleter);
 	duckdb_table_function_add_parameter(fun.get(), bigint_type.get());
 	duckdb_table_function_add_parameter(fun.get(), varchar_type.get());
+	// named args
+	duckdb_table_function_add_named_parameter(fun.get(), "ignore_exec_failure", bool_type.get());
+	// query params
 	duckdb_table_function_add_named_parameter(fun.get(), "params", any_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "params_handle", bigint_type.get());
 	// quirks
