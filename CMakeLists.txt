@@ -58,6 +58,8 @@ set(EXTENSION_SOURCES
     src/registries.cpp
     src/strings.cpp
     src/widechar.cpp
+    src/functions/odbc_begin_transaction.cpp
+    src/functions/odbc_commit.cpp
     src/functions/odbc_bind_params.cpp
     src/functions/odbc_close.cpp
     src/functions/odbc_connect.cpp
@@ -65,6 +67,7 @@ set(EXTENSION_SOURCES
     src/functions/odbc_list_data_sources.cpp
     src/functions/odbc_list_drivers.cpp
     src/functions/odbc_query.cpp
+    src/functions/odbc_rollback.cpp
     src/types/blob_type.cpp
     src/types/bool_type.cpp
     src/types/decimal_type.cpp

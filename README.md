@@ -11,6 +11,7 @@ Outline:
  - [Connection string examples](#connection-string-examples)
  - [Query parameters](#query-parameters)
  - [Connections and concurrency](#connections-and-concurrency)
+ - [Transactions management](#transactions-management)
  - [Performance](#performance)
  - [Building](#building)
 
@@ -80,13 +81,38 @@ SELECT odbc_close(getvariable('conn'));
 
 ## Functions 
 
+ - [odbc_begin_transaction](#odbc_begin_transaction)
  - [odbc_bind_params](#odbc_bind_params)
  - [odbc_close](#odbc_close)
+ - [odbc_commit](#odbc_commit)
  - [odbc_connect](#odbc_connect)
  - [odbc_create_params](#odbc_create_params)
  - [odbc_list_data_sources](#odbc_list_data_sources)
  - [odbc_list_drivers](#odbc_list_drivers)
  - [odbc_query](#odbc_query)
+ - [odbc_rollback](#odbc_rollback)
+
+### odbc_begin_transaction
+
+```sql
+odbc_begin_transaction(conn_handle BIGINT) -> VARCHAR
+```
+
+Sets the `SQL_ATTR_AUTOCOMMIT` attribute to `SQL_AUTOCOMMIT_OFF` on the specified connection thus effectively starting an implicit transaction. [odbc_commit](#odbc_commit) or [odbc_rollback](#odbc_rollback) must be called on such connection to complete the transaction. The completion starts another implicit transaction on this connection. See [Transactions management](#transactions-management) for details.
+
+#### Parameters:
+
+ - `conn_handle` (`BIGINT`): ODBC connection handle created with [odbc_connect](#odbc_connect)
+
+#### Returns:
+
+Always returns `NULL` (`VARCHAR`).
+
+#### Example:
+
+```sql
+SELECT odbc_begin_transaction(getvariable('conn'))
+```
 
 ### odbc_bind_params
 
@@ -132,6 +158,28 @@ Always returns `NULL` (`VARCHAR`).
 
 ```sql
 SELECT odbc_close(getvariable('conn'))
+```
+
+### odbc_commit
+
+```sql
+odbc_commit(conn_handle BIGINT) -> VARCHAR
+```
+
+Calls `SQLEndTran` with `SQL_COMMIT` argument on the specified connection, completing the current transaction. [odbc_begin_transaction](#odbc_begin_transaction) must be called on this connection before this call for the completion to be effective. See [Transactions management](#transactions-management) for details.
+
+#### Parameters:
+
+ - `conn_handle` (`BIGINT`): ODBC connection handle created with [odbc_connect](#odbc_connect)
+
+#### Returns:
+
+Always returns `NULL` (`VARCHAR`).
+
+#### Example:
+
+```sql
+SELECT odbc_commit(getvariable('conn'))
 ```
 
 ### odbc_connect
@@ -264,6 +312,10 @@ Optional named parameters that can change types mapping:
  - `var_len_data_single_part` (`BOOLEAN`, default: `false`): read long `VARCHAR` or `VARBINARY` values as a single read (used when a driver does not support [Retrieving Variable-Length Data in Parts](https://learn.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdata-function?view=sql-server-ver17#retrieving-variable-length-data-in-parts))
  - `var_len_params_long_threshold_bytes` (`UINTEGER`, default: `4000`): a length threshold after that `SQL_WVARCHAR` parameters are passed as `SQL_WLONGVARCHAR`
 
+Other optional named parameters:
+
+ - `ignore_exec_failure` (`BOOLEAN`, default: `false`): when a query, that is run in remote DB, can be prepared successfully, but may or may not fail at execution time (for example, because of schema state like table existence), then this flag an be used to not thow an error when query execution fails. Empty result set is returned if query execution fails.
+
 #### Returns:
 
 A table with the query result.
@@ -275,6 +327,28 @@ SELECT * FROM odbc_query(getvariable('conn'),
   'SELECT CAST(? AS NVARCHAR2(2)) || CAST(? AS VARCHAR2(5)) FROM dual',
   params=row('🦆', 'quack')
 )
+```
+
+### odbc_rollback
+
+```sql
+odbc_rollback(conn_handle BIGINT) -> VARCHAR
+```
+
+Calls `SQLEndTran` with `SQL_ROLLBACK` argument on the specified connection, completing the current transaction. [odbc_begin_transaction](#odbc_begin_transaction) must be called on this connection before this call for the completion to be effective. See [Transactions management](#transactions-management) for details.
+
+#### Parameters:
+
+ - `conn_handle` (`BIGINT`): ODBC connection handle created with [odbc_connect](#odbc_connect)
+
+#### Returns:
+
+Always returns `NULL` (`VARCHAR`).
+
+#### Example:
+
+```sql
+SELECT odbc_rollback(getvariable('conn'))
 ```
 
 ## Connection string examples
@@ -409,6 +483,22 @@ SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT ''bar'' col1 FROM dual')
 ```
 
 Or by disabling mutli-threaded execution setting `threads` DuckDB option to `1`.
+
+## Transactions management
+
+According to ODBC specification, connections to remote DB are expected to have auto-commit mode enabled by default.
+
+As a general rule, transaction commands `BEGIN TRANSACTION`/`COMMIT`/`ROLLBACK` are not supposed to be send over ODBC as SQL commands. Doing so may or may not be supported by the particular driver. Instead ODBC provides the API to manage transactions.
+
+This API is exposed in `odbc_scanner` in the following functions:
+
+ - [odbc_begin_transaction](#odbc_begin_transaction)
+ - [odbc_commit](#odbc_commit)
+ - [odbc_rollback](#odbc_rollback)
+
+When [odbc_begin_transaction](#odbc_begin_transaction) is called on the connection, the auto-commit mode on this connection is disabled and an implicit transaction is started. There is currently no support for enabling auto-commit back on such connection.
+
+Afer the transaction is started, [odbc_commit](#odbc_commit) or [odbc_rollback](#odbc_rollback) to complete this transaction. After the completion is performed, new implicit transaction is started in this connection automatically.
 
 ## Performance
 

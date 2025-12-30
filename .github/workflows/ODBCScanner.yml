@@ -659,6 +659,10 @@ jobs:
           ldd "${DB2_ODBC_LIB_PATH}"
           ./resources/scripts/write_odbcinst_ini.sh DB2 "${DB2_ODBC_LIB_PATH}"
           python ./resources/scripts/pyodbc_version.py --dbms DB2 --conn-str "${ODBC_CONN_STRING}"
+          # The DB instance in container is auto-restarted after initialization, 
+          # so we sleep for a bit and check the connection again
+          sleep 15
+          python ./resources/scripts/pyodbc_version.py --dbms DB2 --conn-str "${ODBC_CONN_STRING}"
 
       - name: DuckDB CAPI Lib
         run: |

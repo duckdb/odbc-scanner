@@ -4,11 +4,19 @@
 
 namespace odbcscanner {
 
+struct OdbcBeginTransactionFunction {
+	static void Register(duckdb_connection connection);
+};
+
 struct OdbcBindParamsFunction {
 	static void Register(duckdb_connection connection);
 };
 
 struct OdbcCloseFunction {
+	static void Register(duckdb_connection connection);
+};
+
+struct OdbcCommitFunction {
 	static void Register(duckdb_connection connection);
 };
 
@@ -29,6 +37,10 @@ struct OdbcListDriversFunction {
 };
 
 struct OdbcQueryFunction {
+	static void Register(duckdb_connection connection);
+};
+
+struct OdbcRollbackFunction {
 	static void Register(duckdb_connection connection);
 };
 
