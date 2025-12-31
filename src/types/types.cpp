@@ -196,6 +196,16 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 	}
 }
 
+void Types::SetColumnDescriptors(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	switch (odbc_type.desc_concise_type) {
+	case SQL_DECIMAL:
+	case SQL_NUMERIC:
+		TypeSpecific::SetColumnDescriptors<duckdb_decimal>(ctx, odbc_type, col_idx);
+		break;
+		// default: no-op for all types except NUMERIC
+	}
+}
+
 void Types::FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
                               idx_t row_idx) {
 	switch (odbc_type.desc_concise_type) {

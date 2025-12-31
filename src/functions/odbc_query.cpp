@@ -329,12 +329,18 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 		// normal query
 
 		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(columns.size()); col_idxz++) {
+			// collect vectors
 			duckdb_vector vec = duckdb_data_chunk_get_vector(output, col_idxz);
 			if (vec == nullptr) {
 				throw ScannerException("Vector is NULL, query: '" + ctx.query + "', columns count: " +
 				                       std::to_string(columns.size()) + ", column index: " + std::to_string(col_idxz));
 			}
 			ldata.col_vectors.push_back(vec);
+
+			// set column descriptors
+			ResultColumn &col = bdata.columns.at(col_idxz);
+			SQLSMALLINT col_idx = static_cast<SQLSMALLINT>(col_idxz + 1);
+			Types::SetColumnDescriptors(ctx, col.odbc_type, col_idx);
 		}
 	}
 

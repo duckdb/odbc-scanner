@@ -66,6 +66,8 @@ struct Types {
 
 	static void BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx);
 
+	static void SetColumnDescriptors(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx);
+
 	static void FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
 	                              idx_t row_idx);
 
@@ -92,6 +94,9 @@ class TypeSpecific {
 
 	template <typename T>
 	static void BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx);
+
+	template <typename T>
+	static void SetColumnDescriptors(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx);
 
 	template <typename T>
 	static void FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,

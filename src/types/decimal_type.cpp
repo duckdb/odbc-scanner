@@ -229,7 +229,6 @@ static size_t RemoveSeparatorReturnScale(std::string &str) {
 static std::pair<duckdb_hugeint, bool> FetchDecimal(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
 	SQLSMALLINT ctype = SQL_C_NUMERIC;
 	if (ctx.quirks.decimal_columns_precision_through_ard) {
-		SetDescriptorFields(ctx, odbc_type, col_idx);
 		ctype = SQL_ARD_TYPE;
 	}
 
@@ -297,6 +296,13 @@ static std::pair<duckdb_hugeint, bool> FetchVarchar(QueryContext &ctx, OdbcType 
 	}
 
 	return std::make_pair(parsed, false);
+}
+
+template <>
+void TypeSpecific::SetColumnDescriptors<duckdb_decimal>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	if (ctx.quirks.decimal_columns_precision_through_ard) {
+		SetDescriptorFields(ctx, odbc_type, col_idx);
+	}
 }
 
 template <>
