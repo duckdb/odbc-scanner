@@ -102,7 +102,6 @@ struct GlobalInitData {
 
 struct LocalInitData {
 	ExecState exec_state = ExecState::UNINITIALIZED;
-	std::vector<duckdb_vector> col_vectors;
 
 	LocalInitData() {
 	}
@@ -304,7 +303,7 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 
 		// DDL or DML query
 
-		if (columns.size() == 0) {
+		if (bdata.columns.size() == 0) {
 			SQLLEN count = -1;
 			SQLRETURN ret = SQLRowCount(ctx.hstmt, &count);
 			if (!SQL_SUCCEEDED(ret)) {
@@ -328,22 +327,25 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 
 		// normal query
 
-		ctx.col_binds.resize(columns.size());
-
-		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(columns.size()); col_idxz++) {
-			// collect vectors
-			duckdb_vector vec = duckdb_data_chunk_get_vector(output, col_idxz);
-			if (vec == nullptr) {
-				throw ScannerException("Vector is NULL, query: '" + ctx.query + "', columns count: " +
-				                       std::to_string(columns.size()) + ", column index: " + std::to_string(col_idxz));
-			}
-			ldata.col_vectors.push_back(vec);
-
+		ctx.col_binds.resize(bdata.columns.size());
+		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(bdata.columns.size()); col_idxz++) {
 			// set column descriptors and bind columns
 			ResultColumn &col = bdata.columns.at(col_idxz);
 			SQLSMALLINT col_idx = static_cast<SQLSMALLINT>(col_idxz + 1);
 			Types::BindColumn(ctx, col.odbc_type, col_idx);
 		}
+	}
+
+	// collect vectors
+	std::vector<duckdb_vector> col_vectors;
+	for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(bdata.columns.size()); col_idxz++) {
+		duckdb_vector vec = duckdb_data_chunk_get_vector(output, col_idxz);
+		if (vec == nullptr) {
+			throw ScannerException("Vector is NULL, query: '" + ctx.query +
+			                       "', columns count: " + std::to_string(bdata.columns.size()) +
+			                       ", column index: " + std::to_string(col_idxz));
+		}
+		col_vectors.push_back(vec);
 	}
 
 	idx_t row_idx = 0;
@@ -369,8 +371,8 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 
 		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(bdata.columns.size()); col_idxz++) {
 			ResultColumn &col = bdata.columns.at(col_idxz);
+			duckdb_vector vec = col_vectors.at(col_idxz);
 			SQLSMALLINT col_idx = static_cast<SQLSMALLINT>(col_idxz + 1);
-			duckdb_vector vec = ldata.col_vectors.at(col_idxz);
 
 			Types::FetchAndSetResult(ctx, col.odbc_type, col_idx, vec, row_idx);
 		}

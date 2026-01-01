@@ -44,9 +44,6 @@ struct LocalInitData {
 	ExecState state = ExecState::UNINITIALIZED;
 	std::vector<DataSource> data_sources;
 	size_t ds_idx = 0;
-	duckdb_vector name_vector = nullptr;
-	duckdb_vector description_vector = nullptr;
-	duckdb_vector kind_vector = nullptr;
 
 	static void Destroy(void *ldata_in) noexcept {
 		auto ldata = reinterpret_cast<LocalInitData *>(ldata_in);
@@ -210,13 +207,14 @@ static void ListDataSources(duckdb_function_info info, duckdb_data_chunk output)
 	if (ldata.state == ExecState::UNINITIALIZED) {
 		ldata.data_sources = ReadDataSources();
 		ldata.state = ExecState::EXECUTED;
-		ldata.name_vector = duckdb_data_chunk_get_vector(output, 0);
-		ldata.description_vector = duckdb_data_chunk_get_vector(output, 1);
-		ldata.kind_vector = duckdb_data_chunk_get_vector(output, 2);
+	}
 
-		if (ldata.name_vector == nullptr || ldata.description_vector == nullptr || ldata.kind_vector == nullptr) {
-			throw ScannerException("'odbc_list_data_sources' error: invalid null output vector");
-		}
+	duckdb_vector name_vector = duckdb_data_chunk_get_vector(output, 0);
+	duckdb_vector description_vector = duckdb_data_chunk_get_vector(output, 1);
+	duckdb_vector kind_vector = duckdb_data_chunk_get_vector(output, 2);
+
+	if (name_vector == nullptr || description_vector == nullptr || kind_vector == nullptr) {
+		throw ScannerException("'odbc_list_data_sources' error: invalid null output vector");
 	}
 
 	idx_t row_idx = 0;
@@ -226,11 +224,11 @@ static void ListDataSources(duckdb_function_info info, duckdb_data_chunk output)
 			break;
 		}
 		const DataSource &ds = ldata.data_sources.at(ldata.ds_idx++);
-		duckdb_vector_assign_string_element_len(ldata.name_vector, row_idx, ds.name.c_str(), ds.name.length());
-		duckdb_vector_assign_string_element_len(ldata.description_vector, row_idx, ds.description.c_str(),
+		duckdb_vector_assign_string_element_len(name_vector, row_idx, ds.name.c_str(), ds.name.length());
+		duckdb_vector_assign_string_element_len(description_vector, row_idx, ds.description.c_str(),
 		                                        ds.description.length());
 		std::string kind = ds.kind == DataSourceKind::USER ? "USER" : "SYSTEM";
-		duckdb_vector_assign_string_element_len(ldata.kind_vector, row_idx, kind.c_str(), kind.length());
+		duckdb_vector_assign_string_element_len(kind_vector, row_idx, kind.c_str(), kind.length());
 	}
 	duckdb_data_chunk_set_size(output, row_idx);
 }
