@@ -50,8 +50,6 @@ struct LocalInitData {
 	ExecState state = ExecState::UNINITIALIZED;
 	std::vector<Driver> drivers;
 	size_t driver_idx = 0;
-	duckdb_vector description_vector = nullptr;
-	duckdb_vector attributes_vector = nullptr;
 
 	static void Destroy(void *ldata_in) noexcept {
 		auto ldata = reinterpret_cast<LocalInitData *>(ldata_in);
@@ -245,12 +243,13 @@ static void ListDrivers(duckdb_function_info info, duckdb_data_chunk output) {
 	if (ldata.state == ExecState::UNINITIALIZED) {
 		ldata.drivers = ReadDrivers();
 		ldata.state = ExecState::EXECUTED;
-		ldata.description_vector = duckdb_data_chunk_get_vector(output, 0);
-		ldata.attributes_vector = duckdb_data_chunk_get_vector(output, 1);
+	}
 
-		if (ldata.description_vector == nullptr || ldata.attributes_vector == nullptr) {
-			throw ScannerException("'odbc_list_drivers' error: invalid null output vector");
-		}
+	duckdb_vector description_vector = duckdb_data_chunk_get_vector(output, 0);
+	duckdb_vector attributes_vector = duckdb_data_chunk_get_vector(output, 1);
+
+	if (description_vector == nullptr || attributes_vector == nullptr) {
+		throw ScannerException("'odbc_list_drivers' error: invalid null output vector");
 	}
 
 	idx_t row_idx = 0;
@@ -260,9 +259,9 @@ static void ListDrivers(duckdb_function_info info, duckdb_data_chunk output) {
 			break;
 		}
 		const Driver &driver = ldata.drivers.at(ldata.driver_idx++);
-		duckdb_vector_assign_string_element_len(ldata.description_vector, row_idx, driver.description.c_str(),
+		duckdb_vector_assign_string_element_len(description_vector, row_idx, driver.description.c_str(),
 		                                        driver.description.length());
-		SetAttributesMap(row_idx, ldata.attributes_vector, driver.attributes);
+		SetAttributesMap(row_idx, attributes_vector, driver.attributes);
 	}
 	duckdb_data_chunk_set_size(output, row_idx);
 }
