@@ -21,7 +21,7 @@ static void CreateParams(duckdb_function_info info, duckdb_data_chunk input, duc
 	(void)info;
 	(void)input;
 
-	auto params_ptr = std_make_unique<std::vector<ScannerParam>>();
+	auto params_ptr = std_make_unique<std::vector<ScannerValue>>();
 	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
 	result_data[0] = ParamsRegistry::Add(std::move(params_ptr));
 }

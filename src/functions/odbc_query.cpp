@@ -44,11 +44,11 @@ struct BindData {
 	bool ignore_exec_failure = false;
 
 	std::vector<SQLSMALLINT> param_types;
-	std::vector<ScannerParam> params;
+	std::vector<ScannerValue> params;
 	int64_t params_handle = 0;
 
 	BindData(int64_t conn_id_in, QueryContext ctx_in, std::vector<ResultColumn> columns_in, bool ignore_exec_failure_in,
-	         std::vector<SQLSMALLINT> param_types_in, std::vector<ScannerParam> params_in, int64_t params_handle_in)
+	         std::vector<SQLSMALLINT> param_types_in, std::vector<ScannerValue> params_in, int64_t params_handle_in)
 	    : conn_id(conn_id_in), ctx(std::move(ctx_in)), columns(std::move(columns_in)),
 	      ignore_exec_failure(ignore_exec_failure_in), param_types(std::move(param_types_in)),
 	      params(std::move(params_in)), params_handle(params_handle_in) {
@@ -175,7 +175,7 @@ static void Bind(duckdb_bind_info info) {
 	DbmsQuirks quirks(conn, user_quirks);
 	QueryContext ctx(query, hstmt, quirks);
 
-	std::vector<ScannerParam> params;
+	std::vector<ScannerValue> params;
 	auto params_val = ValuePtr(duckdb_bind_get_named_parameter(info, "params"), ValueDeleter);
 	if (params_val.get() != nullptr) {
 		params = Params::Extract(quirks, params_val.get());
@@ -328,6 +328,8 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 
 		// normal query
 
+		ctx.col_binds.resize(columns.size());
+
 		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(columns.size()); col_idxz++) {
 			// collect vectors
 			duckdb_vector vec = duckdb_data_chunk_get_vector(output, col_idxz);
@@ -337,10 +339,10 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 			}
 			ldata.col_vectors.push_back(vec);
 
-			// set column descriptors
+			// set column descriptors and bind columns
 			ResultColumn &col = bdata.columns.at(col_idxz);
 			SQLSMALLINT col_idx = static_cast<SQLSMALLINT>(col_idxz + 1);
-			Types::SetColumnDescriptors(ctx, col.odbc_type, col_idx);
+			Types::BindColumn(ctx, col.odbc_type, col_idx);
 		}
 	}
 

@@ -5,6 +5,7 @@
 #include "duckdb_extension_api.hpp"
 #include "odbc_api.hpp"
 #include "query_context.hpp"
+#include "scanner_value.hpp"
 #include "types.hpp"
 
 namespace odbcscanner {

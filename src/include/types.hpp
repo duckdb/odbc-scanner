@@ -59,14 +59,14 @@ struct Types {
 
 	// Type-dispatched functions
 
-	static ScannerParam ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec,
+	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec,
 	                                        idx_t param_idx);
 
-	static ScannerParam ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, idx_t param_idx);
+	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, idx_t param_idx);
 
-	static void BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx);
+	static void BindOdbcParam(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx);
 
-	static void SetColumnDescriptors(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx);
+	static void BindColumn(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx);
 
 	static void FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
 	                              idx_t row_idx);
@@ -87,16 +87,16 @@ class TypeSpecific {
 	friend struct Types;
 
 	template <typename T>
-	static ScannerParam ExtractNotNullParam(DbmsQuirks &quirks, duckdb_vector vec);
+	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_vector vec);
 
 	template <typename T>
-	static ScannerParam ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value);
+	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value);
 
 	template <typename T>
-	static void BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx);
+	static void BindOdbcParam(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx);
 
 	template <typename T>
-	static void SetColumnDescriptors(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx);
+	static void BindColumn(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx);
 
 	template <typename T>
 	static void FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,

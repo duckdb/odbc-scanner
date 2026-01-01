@@ -3,412 +3,18 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
-#include <string>
 
 #include "capi_pointers.hpp"
 #include "connection.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
 #include "types.hpp"
-#include "widechar.hpp"
 
 DUCKDB_EXTENSION_EXTERN
 
 namespace odbcscanner {
 
-template <>
-bool &ScannerParam::Value<bool>() {
-	CheckType(DUCKDB_TYPE_BOOLEAN);
-	return val.bool_val;
-}
-
-template <>
-int8_t &ScannerParam::Value<int8_t>() {
-	CheckType(DUCKDB_TYPE_TINYINT);
-	return val.int8;
-}
-
-template <>
-uint8_t &ScannerParam::Value<uint8_t>() {
-	CheckType(DUCKDB_TYPE_UTINYINT);
-	return val.uint8;
-}
-
-template <>
-int16_t &ScannerParam::Value<int16_t>() {
-	CheckType(DUCKDB_TYPE_SMALLINT);
-	return val.int16;
-}
-
-template <>
-uint16_t &ScannerParam::Value<uint16_t>() {
-	CheckType(DUCKDB_TYPE_USMALLINT);
-	return val.uint16;
-}
-
-template <>
-int32_t &ScannerParam::Value<int32_t>() {
-	CheckType(DUCKDB_TYPE_INTEGER);
-	return val.int32;
-}
-
-template <>
-uint32_t &ScannerParam::Value<uint32_t>() {
-	CheckType(DUCKDB_TYPE_UINTEGER);
-	return val.uint32;
-}
-
-template <>
-int64_t &ScannerParam::Value<int64_t>() {
-	CheckType(DUCKDB_TYPE_BIGINT);
-	return val.int64;
-}
-
-template <>
-uint64_t &ScannerParam::Value<uint64_t>() {
-	CheckType(DUCKDB_TYPE_UBIGINT);
-	return val.uint64;
-}
-
-template <>
-float &ScannerParam::Value<float>() {
-	CheckType(DUCKDB_TYPE_FLOAT);
-	return val.float_val;
-}
-
-template <>
-double &ScannerParam::Value<double>() {
-	CheckType(DUCKDB_TYPE_DOUBLE);
-	return val.double_val;
-}
-
-template <>
-SQL_NUMERIC_STRUCT &ScannerParam::Value<SQL_NUMERIC_STRUCT>() {
-	CheckType(DUCKDB_TYPE_DECIMAL);
-	return val.decimal;
-}
-
-template <>
-DecimalChars &ScannerParam::Value<DecimalChars>() {
-	CheckType(Params::TYPE_DECIMAL_AS_CHARS);
-	return val.decimal_chars;
-}
-
-template <>
-WideString &ScannerParam::Value<WideString>() {
-	CheckType(DUCKDB_TYPE_VARCHAR);
-	return val.wstr;
-}
-
-template <>
-OdbcBlob &ScannerParam::Value<OdbcBlob>() {
-	CheckType(DUCKDB_TYPE_BLOB);
-	return val.blob;
-}
-
-template <>
-OdbcUuid &ScannerParam::Value<OdbcUuid>() {
-	CheckType(DUCKDB_TYPE_UUID);
-	return val.uuid;
-}
-
-template <>
-SQL_DATE_STRUCT &ScannerParam::Value<SQL_DATE_STRUCT>() {
-	CheckType(DUCKDB_TYPE_DATE);
-	return val.date;
-}
-
-template <>
-SQL_TIME_STRUCT &ScannerParam::Value<SQL_TIME_STRUCT>() {
-	CheckType(DUCKDB_TYPE_TIME);
-	return val.time;
-}
-
-template <>
-SQL_SS_TIME2_STRUCT &ScannerParam::Value<SQL_SS_TIME2_STRUCT>() {
-	CheckType(Params::TYPE_TIME_WITH_NANOS);
-	return val.time_with_nanos;
-}
-
-template <>
-SQL_TIMESTAMP_STRUCT &ScannerParam::Value<SQL_TIMESTAMP_STRUCT>() {
-	CheckType(DUCKDB_TYPE_TIMESTAMP);
-	return val.timestamp;
-}
-
-ScannerParam::ScannerParam() : type_id(DUCKDB_TYPE_SQLNULL), len_bytes(SQL_NULL_DATA) {
-}
-
-ScannerParam::ScannerParam(bool value) : type_id(DUCKDB_TYPE_BOOLEAN), len_bytes(sizeof(value)), val(value) {
-}
-
-ScannerParam::ScannerParam(int8_t value) : type_id(DUCKDB_TYPE_TINYINT), len_bytes(sizeof(value)), val(value) {
-}
-
-ScannerParam::ScannerParam(uint8_t value) : type_id(DUCKDB_TYPE_UTINYINT), len_bytes(sizeof(value)), val(value) {
-}
-
-ScannerParam::ScannerParam(int16_t value) : type_id(DUCKDB_TYPE_SMALLINT), len_bytes(sizeof(value)), val(value) {
-}
-
-ScannerParam::ScannerParam(uint16_t value) : type_id(DUCKDB_TYPE_USMALLINT), len_bytes(sizeof(value)), val(value) {
-}
-
-ScannerParam::ScannerParam(int32_t value) : type_id(DUCKDB_TYPE_INTEGER), len_bytes(sizeof(value)), val(value) {
-}
-
-ScannerParam::ScannerParam(uint32_t value) : type_id(DUCKDB_TYPE_UINTEGER), len_bytes(sizeof(value)), val(value) {
-}
-
-ScannerParam::ScannerParam(int64_t value) : type_id(DUCKDB_TYPE_BIGINT), len_bytes(sizeof(value)), val(value) {
-}
-
-ScannerParam::ScannerParam(uint64_t value) : type_id(DUCKDB_TYPE_UBIGINT), len_bytes(sizeof(value)), val(value) {
-}
-
-ScannerParam::ScannerParam(float value) : type_id(DUCKDB_TYPE_FLOAT), len_bytes(sizeof(value)), val(value) {
-}
-
-ScannerParam::ScannerParam(double value) : type_id(DUCKDB_TYPE_DOUBLE), len_bytes(sizeof(value)), val(value) {
-}
-
-ScannerParam::ScannerParam(duckdb_decimal value, bool decimal_as_chars) {
-	if (decimal_as_chars) {
-		this->type_id = Params::TYPE_DECIMAL_AS_CHARS;
-		new (&this->val.decimal_chars) DecimalChars;
-		this->val.decimal_chars = DecimalChars(value);
-		this->len_bytes = val.decimal_chars.size<SQLLEN>();
-	} else {
-		this->type_id = DUCKDB_TYPE_DECIMAL;
-		SQL_NUMERIC_STRUCT ns;
-		std::memset(&ns, '\0', sizeof(ns));
-		ns.precision = value.width;
-		ns.scale = value.scale;
-		ns.sign = (value.value.upper & (1LL << 63)) == 0;
-		if (ns.sign == 0) {
-			// negate
-			value.value.lower = ~value.value.lower + 1;
-			value.value.upper = ~value.value.upper;
-			if (value.value.lower == 0) {
-				value.value.upper += 1; // carry from low to high
-			}
-		}
-		std::memcpy(ns.val, &value.value.lower, sizeof(value.value.lower));
-		std::memcpy(ns.val + sizeof(value.value.lower), &value.value.upper, sizeof(value.value.upper));
-		this->val.decimal = ns;
-		this->len_bytes = sizeof(ns);
-	}
-}
-
-ScannerParam::ScannerParam(const char *cstr, size_t len) : type_id(DUCKDB_TYPE_VARCHAR) {
-	WideString wstr = WideChar::Widen(cstr, len);
-	new (&this->val.wstr) WideString;
-	this->val.wstr = std::move(wstr);
-	this->len_bytes = val.wstr.length<SQLLEN>() * sizeof(SQLWCHAR);
-}
-
-ScannerParam::ScannerParam(OdbcBlob blob) : type_id(DUCKDB_TYPE_BLOB) {
-	new (&this->val.blob) OdbcBlob;
-	this->val.blob = std::move(blob);
-	this->len_bytes = val.blob.size<SQLLEN>();
-}
-
-ScannerParam::ScannerParam(OdbcUuid uuid) : type_id(DUCKDB_TYPE_UUID) {
-	new (&this->val.uuid) OdbcUuid;
-	this->val.uuid = std::move(uuid);
-	this->len_bytes = val.uuid.size<SQLLEN>();
-}
-
-ScannerParam::ScannerParam(const char *cstr) : ScannerParam(cstr, std::strlen(cstr)) {
-}
-
-ScannerParam::ScannerParam(duckdb_date_struct value) : type_id(DUCKDB_TYPE_DATE) {
-	SQL_DATE_STRUCT dt;
-	std::memset(&dt, '\0', sizeof(dt));
-	dt.day = static_cast<SQLUSMALLINT>(value.day);
-	dt.month = static_cast<SQLUSMALLINT>(value.month);
-	dt.year = static_cast<SQLSMALLINT>(value.year);
-	this->val.date = dt;
-	this->len_bytes = sizeof(dt);
-}
-
-ScannerParam::ScannerParam(duckdb_time_struct value, bool use_time_with_nanos) {
-	if (use_time_with_nanos) {
-		this->type_id = Params::TYPE_TIME_WITH_NANOS;
-		SQL_SS_TIME2_STRUCT tm;
-		std::memset(&tm, '\0', sizeof(tm));
-		tm.hour = static_cast<SQLUSMALLINT>(value.hour);
-		tm.minute = static_cast<SQLUSMALLINT>(value.min);
-		tm.second = static_cast<SQLUSMALLINT>(value.sec);
-		tm.fraction = static_cast<SQLUINTEGER>(value.micros * 1000);
-		this->val.time_with_nanos = tm;
-		this->len_bytes = sizeof(tm);
-	} else {
-		this->type_id = DUCKDB_TYPE_TIME;
-		SQL_TIME_STRUCT tm;
-		std::memset(&tm, '\0', sizeof(tm));
-		tm.hour = static_cast<SQLUSMALLINT>(value.hour);
-		tm.minute = static_cast<SQLUSMALLINT>(value.min);
-		tm.second = static_cast<SQLUSMALLINT>(value.sec);
-		this->val.time = tm;
-		this->len_bytes = sizeof(tm);
-	}
-}
-
-ScannerParam::ScannerParam(TimestampNsStruct value) : type_id(DUCKDB_TYPE_TIMESTAMP) {
-	SQL_TIMESTAMP_STRUCT ts;
-	std::memset(&ts, '\0', sizeof(ts));
-	ts.day = static_cast<SQLUSMALLINT>(value.tss_no_micros.date.day);
-	ts.month = static_cast<SQLUSMALLINT>(value.tss_no_micros.date.month);
-	ts.year = static_cast<SQLSMALLINT>(value.tss_no_micros.date.year);
-	ts.hour = static_cast<SQLUSMALLINT>(value.tss_no_micros.time.hour);
-	ts.minute = static_cast<SQLUSMALLINT>(value.tss_no_micros.time.min);
-	ts.second = static_cast<SQLUSMALLINT>(value.tss_no_micros.time.sec);
-	ts.fraction = static_cast<SQLUINTEGER>(value.nanos_fraction);
-	this->val.timestamp = ts;
-	this->len_bytes = sizeof(ts);
-}
-
-void ScannerParam::AssignByType(param_type type_id, InternalValue &val, ScannerParam &other) {
-	switch (type_id) {
-	case DUCKDB_TYPE_SQLNULL:
-		break;
-	case DUCKDB_TYPE_BOOLEAN:
-		val.bool_val = other.Value<bool>();
-		break;
-	case DUCKDB_TYPE_TINYINT:
-		val.int8 = other.Value<int8_t>();
-		break;
-	case DUCKDB_TYPE_UTINYINT:
-		val.uint8 = other.Value<uint8_t>();
-		break;
-	case DUCKDB_TYPE_SMALLINT:
-		val.int16 = other.Value<int16_t>();
-		break;
-	case DUCKDB_TYPE_USMALLINT:
-		val.uint16 = other.Value<uint16_t>();
-		break;
-	case DUCKDB_TYPE_INTEGER:
-		val.int32 = other.Value<int32_t>();
-		break;
-	case DUCKDB_TYPE_UINTEGER:
-		val.uint32 = other.Value<uint32_t>();
-		break;
-	case DUCKDB_TYPE_BIGINT:
-		val.int64 = other.Value<int64_t>();
-		break;
-	case DUCKDB_TYPE_UBIGINT:
-		val.uint64 = other.Value<uint64_t>();
-		break;
-	case DUCKDB_TYPE_FLOAT:
-		val.float_val = other.Value<float>();
-		break;
-	case DUCKDB_TYPE_DOUBLE:
-		val.double_val = other.Value<double>();
-		break;
-	case DUCKDB_TYPE_DECIMAL:
-		val.decimal = other.Value<SQL_NUMERIC_STRUCT>();
-		break;
-	case Params::TYPE_DECIMAL_AS_CHARS:
-		new (&val.decimal_chars) DecimalChars;
-		val.decimal_chars = std::move(other.Value<DecimalChars>());
-		break;
-	case DUCKDB_TYPE_VARCHAR:
-		new (&val.wstr) WideString;
-		val.wstr = std::move(other.Value<WideString>());
-		break;
-	case DUCKDB_TYPE_BLOB:
-		new (&val.blob) OdbcBlob;
-		val.blob = std::move(other.Value<OdbcBlob>());
-		break;
-	case DUCKDB_TYPE_UUID:
-		new (&val.blob) OdbcUuid;
-		val.uuid = std::move(other.Value<OdbcUuid>());
-		break;
-	case DUCKDB_TYPE_DATE:
-		val.date = other.Value<SQL_DATE_STRUCT>();
-		break;
-	case DUCKDB_TYPE_TIME:
-		val.time = other.Value<SQL_TIME_STRUCT>();
-		break;
-	case Params::TYPE_TIME_WITH_NANOS:
-		val.time_with_nanos = other.Value<SQL_SS_TIME2_STRUCT>();
-		break;
-	case DUCKDB_TYPE_TIMESTAMP:
-		val.timestamp = other.Value<SQL_TIMESTAMP_STRUCT>();
-		break;
-	default:
-		throw ScannerException("Unsupported assign parameter type, ID: " + std::to_string(type_id));
-	}
-}
-
-ScannerParam::ScannerParam(ScannerParam &&other)
-    : type_id(other.type_id), len_bytes(other.len_bytes), expected_type(other.expected_type) {
-	AssignByType(type_id, this->val, other);
-}
-
-ScannerParam &ScannerParam::operator=(ScannerParam &&other) {
-	this->type_id = other.type_id;
-	this->len_bytes = other.len_bytes;
-	this->expected_type = other.expected_type;
-	AssignByType(type_id, this->val, other);
-	return *this;
-}
-
-ScannerParam::~ScannerParam() {
-	switch (type_id) {
-	case DUCKDB_TYPE_VARCHAR:
-		this->val.wstr.~WideString();
-		break;
-	case Params::TYPE_DECIMAL_AS_CHARS:
-		this->val.decimal_chars.~DecimalChars();
-		break;
-	default: {
-		// no-op
-	}
-	}
-}
-
-std::string ScannerParam::ToUtf8String(size_t max_len) {
-	WideString &wstr = Value<WideString>();
-	size_t len = std::min(wstr.length<size_t>(), max_len);
-	return WideChar::Narrow(wstr.data(), len);
-}
-
-param_type ScannerParam::ParamType() {
-	return type_id;
-}
-
-duckdb_type ScannerParam::DuckType() {
-	if (Params::TYPE_DECIMAL_AS_CHARS == type_id) {
-		return DUCKDB_TYPE_DECIMAL;
-	}
-	return static_cast<duckdb_type>(type_id);
-}
-
-SQLLEN &ScannerParam::LengthBytes() {
-	return len_bytes;
-}
-
-SQLSMALLINT ScannerParam::ExpectedType() {
-	return expected_type;
-}
-
-void ScannerParam::SetExpectedType(SQLSMALLINT expected_type_in) {
-	if (expected_type != SQL_PARAM_TYPE_UNKNOWN) {
-		throw ScannerException("Parameter expected type is already set, value: " + std::to_string(expected_type));
-	}
-	this->expected_type = expected_type_in;
-}
-
-void ScannerParam::CheckType(param_type expected) {
-	if (type_id != expected) {
-		throw ScannerException("Invalid parameter type, expected: " + std::to_string(expected) +
-		                       ", actual: " + std::to_string(type_id));
-	}
-}
-
-std::vector<ScannerParam> Params::Extract(DbmsQuirks &quirks, duckdb_data_chunk chunk, idx_t col_idx) {
+std::vector<ScannerValue> Params::Extract(DbmsQuirks &quirks, duckdb_data_chunk chunk, idx_t col_idx) {
 	(void)col_idx;
 	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
 	if (col_idx >= col_count) {
@@ -448,7 +54,7 @@ std::vector<ScannerParam> Params::Extract(DbmsQuirks &quirks, duckdb_data_chunk 
 		                       std::to_string(col_idx) + ", columns count: " + std::to_string(col_count));
 	}
 
-	std::vector<ScannerParam> params;
+	std::vector<ScannerValue> params;
 	for (idx_t i = 0; i < params_count; i++) {
 		auto child_vec = duckdb_struct_vector_get_child(vec, i);
 		if (child_vec == nullptr) {
@@ -459,20 +65,20 @@ std::vector<ScannerParam> Params::Extract(DbmsQuirks &quirks, duckdb_data_chunk 
 
 		uint64_t *child_validity = duckdb_vector_get_validity(child_vec);
 		if (child_validity != nullptr && !duckdb_validity_row_is_valid(child_validity, 0)) {
-			params.emplace_back(ScannerParam());
+			params.emplace_back(ScannerValue());
 			continue;
 		}
 
 		auto child_type = LogicalTypePtr(duckdb_struct_type_child_type(struct_type.get(), i), LogicalTypeDeleter);
 		auto child_type_id = duckdb_get_type_id(child_type.get());
-		ScannerParam sp = Types::ExtractNotNullParam(quirks, child_type_id, child_vec, i);
+		ScannerValue sp = Types::ExtractNotNullParam(quirks, child_type_id, child_vec, i);
 		params.emplace_back(std::move(sp));
 	}
 
 	return params;
 }
 
-std::vector<ScannerParam> Params::Extract(DbmsQuirks &quirks, duckdb_value struct_value) {
+std::vector<ScannerValue> Params::Extract(DbmsQuirks &quirks, duckdb_value struct_value) {
 	if (duckdb_is_null_value(struct_value)) {
 		throw ScannerException("Cannot extract parameters from STRUCT: specified STRUCT is NULL");
 	}
@@ -483,15 +89,15 @@ std::vector<ScannerParam> Params::Extract(DbmsQuirks &quirks, duckdb_value struc
 	}
 	idx_t params_count = duckdb_struct_type_child_count(struct_type);
 
-	std::vector<ScannerParam> params;
+	std::vector<ScannerValue> params;
 	for (idx_t i = 0; i < params_count; i++) {
 		auto child_val = ValuePtr(duckdb_get_struct_child(struct_value, i), ValueDeleter);
 		if (duckdb_is_null_value(child_val.get())) {
-			params.emplace_back(ScannerParam());
+			params.emplace_back(ScannerValue());
 			continue;
 		}
 
-		ScannerParam sp = Types::ExtractNotNullParam(quirks, child_val.get(), i);
+		ScannerValue sp = Types::ExtractNotNullParam(quirks, child_val.get(), i);
 		params.emplace_back(std::move(sp));
 	}
 
@@ -529,7 +135,7 @@ std::vector<SQLSMALLINT> Params::CollectTypes(QueryContext &ctx) {
 }
 
 void Params::SetExpectedTypes(QueryContext &ctx, const std::vector<SQLSMALLINT> &expected,
-                              std::vector<ScannerParam> &actual) {
+                              std::vector<ScannerValue> &actual) {
 	if (expected.size() != actual.size()) {
 		throw ScannerException("Incorrect number of parameters specified, query: '" + ctx.query + "', expected: " +
 		                       std::to_string(expected.size()) + ", actual: " + std::to_string(actual.size()));
@@ -541,7 +147,7 @@ void Params::SetExpectedTypes(QueryContext &ctx, const std::vector<SQLSMALLINT> 
 	}
 }
 
-void Params::BindToOdbc(QueryContext &ctx, std::vector<ScannerParam> &params) {
+void Params::BindToOdbc(QueryContext &ctx, std::vector<ScannerValue> &params) {
 	if (params.size() == 0) {
 		return;
 	}
@@ -553,7 +159,7 @@ void Params::BindToOdbc(QueryContext &ctx, std::vector<ScannerParam> &params) {
 	}
 
 	for (size_t i = 0; i < params.size(); i++) {
-		ScannerParam &param = params.at(i);
+		ScannerValue &param = params.at(i);
 		SQLSMALLINT idx = static_cast<SQLSMALLINT>(i + 1);
 		Types::BindOdbcParam(ctx, param, idx);
 	}

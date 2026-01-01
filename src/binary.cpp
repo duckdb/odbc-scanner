@@ -5,6 +5,7 @@
 
 #include "capi_pointers.hpp"
 #include "duckdb_extension_api.hpp"
+#include "odbc_api.hpp"
 #include "scanner_exception.hpp"
 
 namespace odbcscanner {
@@ -28,22 +29,22 @@ char *DecimalChars::data() {
 	return characters.data();
 }
 
-OdbcBlob::OdbcBlob() {
+ScannerBlob::ScannerBlob() {
 }
 
-OdbcBlob::OdbcBlob(std::vector<char> blob_data_in) : blob_data(std::move(blob_data_in)) {
+ScannerBlob::ScannerBlob(std::vector<char> blob_data_in) : blob_data(std::move(blob_data_in)) {
 }
 
-char *OdbcBlob::data() {
+char *ScannerBlob::data() {
 	return blob_data.data();
 }
 
-OdbcUuid::OdbcUuid() {
+ScannerUuid::ScannerUuid() {
 	uuid_data.resize(16);
 }
 
-OdbcUuid::OdbcUuid(duckdb_uhugeint uuid) : OdbcUuid() {
-	MSSQL_GUID guid;
+ScannerUuid::ScannerUuid(duckdb_uhugeint uuid) : ScannerUuid() {
+	SQLGUID guid;
 	guid.Data1 = static_cast<uint32_t>(uuid.upper >> 32);
 	guid.Data2 = static_cast<uint16_t>((uuid.upper >> 16) & 0xffff);
 	guid.Data3 = static_cast<uint16_t>(uuid.upper & 0xffff);
@@ -58,7 +59,7 @@ OdbcUuid::OdbcUuid(duckdb_uhugeint uuid) : OdbcUuid() {
 	std::memcpy(uuid_data.data(), &guid, sizeof(guid));
 }
 
-char *OdbcUuid::data() {
+char *ScannerUuid::data() {
 	return uuid_data.data();
 }
 

@@ -8,7 +8,7 @@ DUCKDB_EXTENSION_EXTERN
 namespace odbcscanner {
 
 template <>
-void TypeSpecific::BindOdbcParam<std::nullptr_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<std::nullptr_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLRETURN ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_DEFAULT, param.ExpectedType(), 1, 0,
 	                                 nullptr, 0, &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {

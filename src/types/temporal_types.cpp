@@ -48,26 +48,26 @@ static int64_t RoundTimestampNanoFraction(DbmsQuirks &quirks, int64_t nanos_frac
 	return nanos_fraction - rem;
 }
 
-static ScannerParam CreateParamFromDate(duckdb_date dt) {
+static ScannerValue CreateParamFromDate(duckdb_date dt) {
 	duckdb_date_struct dts = duckdb_from_date(dt);
-	return ScannerParam(dts);
+	return ScannerValue(dts);
 }
 
-static ScannerParam CreateParamFromTime(DbmsQuirks &quirks, duckdb_time tm) {
+static ScannerValue CreateParamFromTime(DbmsQuirks &quirks, duckdb_time tm) {
 	duckdb_time_struct tms = duckdb_from_time(tm);
-	return ScannerParam(tms, quirks.time_params_as_ss_time2);
+	return ScannerValue(tms, quirks.time_params_as_ss_time2);
 }
 
-static ScannerParam CreateParamFromTimestamp(DbmsQuirks &quirks, duckdb_timestamp ts) {
+static ScannerValue CreateParamFromTimestamp(DbmsQuirks &quirks, duckdb_timestamp ts) {
 	duckdb_timestamp_struct tss = duckdb_from_timestamp(ts);
 	int64_t nanos_fraction = tss.time.micros * 1000;
 	int64_t nanos_fraction_round = RoundTimestampNanoFraction(quirks, nanos_fraction);
 	tss.time.micros = 0;
 	TimestampNsStruct tnss(tss, nanos_fraction_round);
-	return ScannerParam(tnss);
+	return ScannerValue(tnss);
 }
 
-static ScannerParam CreateParamFromTimestampNs(DbmsQuirks &quirks, duckdb_timestamp_ns tns) {
+static ScannerValue CreateParamFromTimestampNs(DbmsQuirks &quirks, duckdb_timestamp_ns tns) {
 	duckdb_timestamp ts;
 	ts.micros = tns.nanos / 1000;
 	int64_t nanos_remainder = tns.nanos % 1000;
@@ -76,59 +76,59 @@ static ScannerParam CreateParamFromTimestampNs(DbmsQuirks &quirks, duckdb_timest
 	int64_t nanos_fraction_round = RoundTimestampNanoFraction(quirks, nanos_fraction);
 	tss.time.micros = 0;
 	TimestampNsStruct tnss(tss, nanos_fraction_round);
-	return ScannerParam(tnss);
+	return ScannerValue(tnss);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(DbmsQuirks &, duckdb_vector vec) {
 	duckdb_date *data = reinterpret_cast<duckdb_date *>(duckdb_vector_get_data(vec));
 	return CreateParamFromDate(data[0]);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_time_struct>(DbmsQuirks &quirks, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_time_struct>(DbmsQuirks &quirks, duckdb_vector vec) {
 	duckdb_time *data = reinterpret_cast<duckdb_time *>(duckdb_vector_get_data(vec));
 	return CreateParamFromTime(quirks, data[0]);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(DbmsQuirks &quirks, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(DbmsQuirks &quirks, duckdb_vector vec) {
 	duckdb_timestamp *data = reinterpret_cast<duckdb_timestamp *>(duckdb_vector_get_data(vec));
 	return CreateParamFromTimestamp(quirks, data[0]);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<TimestampNsStruct>(DbmsQuirks &quirks, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<TimestampNsStruct>(DbmsQuirks &quirks, duckdb_vector vec) {
 	duckdb_timestamp_ns *data = reinterpret_cast<duckdb_timestamp_ns *>(duckdb_vector_get_data(vec));
 	return CreateParamFromTimestampNs(quirks, data[0]);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(DbmsQuirks &, duckdb_value value) {
 	duckdb_date dt = duckdb_get_date(value);
 	return CreateParamFromDate(dt);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_time_struct>(DbmsQuirks &quirks, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_time_struct>(DbmsQuirks &quirks, duckdb_value value) {
 	duckdb_time tm = duckdb_get_time(value);
 	return CreateParamFromTime(quirks, tm);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(DbmsQuirks &quirks, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(DbmsQuirks &quirks, duckdb_value value) {
 	duckdb_timestamp ts = duckdb_get_timestamp(value);
 	return CreateParamFromTimestamp(quirks, ts);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<TimestampNsStruct>(DbmsQuirks &quirks, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<TimestampNsStruct>(DbmsQuirks &quirks, duckdb_value value) {
 	duckdb_timestamp_ns tns = duckdb_get_timestamp_ns(value);
 	return CreateParamFromTimestampNs(quirks, tns);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<duckdb_date_struct>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<duckdb_date_struct>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_TYPE_DATE;
 	SQLRETURN ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_DATE, sqltype, 0, 0,
 	                                 reinterpret_cast<SQLPOINTER>(&param.Value<SQL_DATE_STRUCT>()), param.LengthBytes(),
@@ -142,7 +142,7 @@ void TypeSpecific::BindOdbcParam<duckdb_date_struct>(QueryContext &ctx, ScannerP
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<duckdb_time_struct>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<duckdb_time_struct>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_TYPE_NULL;
 	SQLRETURN ret = SQL_ERROR;
 	if (ctx.quirks.time_params_as_ss_time2) {
@@ -165,7 +165,7 @@ void TypeSpecific::BindOdbcParam<duckdb_time_struct>(QueryContext &ctx, ScannerP
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(QueryContext &ctx, ScannerParam &param,
+void TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(QueryContext &ctx, ScannerValue &param,
                                                           SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_TYPE_TIMESTAMP;
 	if (ctx.quirks.timestamp_params_as_sf_timestamp_ntz) {
@@ -184,19 +184,31 @@ void TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(QueryContext &ctx, Sca
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<duckdb_date_struct>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
-                                                         duckdb_vector vec, idx_t row_idx) {
-	SQL_DATE_STRUCT fetched;
-	std::memset(&fetched, '\0', sizeof(fetched));
-	SQLLEN ind;
-	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_TYPE_DATE, &fetched, sizeof(fetched), &ind);
+void TypeSpecific::BindColumn<duckdb_date_struct>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	SQL_DATE_STRUCT nstruct;
+	std::memset(&nstruct, '\0', sizeof(nstruct));
+	ScannerValue nval(nstruct);
+	ColumnBind nbind(std::move(nval));
+
+	ColumnBind &bind = ctx.BindForColumn(col_idx);
+	bind = std::move(nbind);
+	SQL_DATE_STRUCT &fetched = bind.Value<SQL_DATE_STRUCT>();
+	SQLLEN &ind = bind.Indicator();
+	SQLRETURN ret = SQLBindCol(ctx.hstmt, col_idx, SQL_C_TYPE_DATE, &fetched, sizeof(SQL_DATE_STRUCT), &ind);
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
-		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(SQL_C_TYPE_DATE) +
-		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
-		                       ",  query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
-		                       diag + "'");
+		throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(SQL_C_TYPE_DATE) + ", column index: " +
+		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
+		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
+}
+
+template <>
+void TypeSpecific::FetchAndSetResult<duckdb_date_struct>(QueryContext &ctx, OdbcType &, SQLSMALLINT col_idx,
+                                                         duckdb_vector vec, idx_t row_idx) {
+	ColumnBind &bind = ctx.BindForColumn(col_idx);
+	SQL_DATE_STRUCT &fetched = bind.Value<SQL_DATE_STRUCT>();
+	SQLLEN ind = bind.Indicator();
 
 	if (ind == SQL_NULL_DATA) {
 		Types::SetNullValueToResult(vec, row_idx);
@@ -408,10 +420,6 @@ void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(QueryContext &ctx,
                                                               SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
 	if (odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET) {
 		FetchAndSetResultTimestampOffset(ctx, odbc_type, col_idx, vec, row_idx);
-	} else if (ctx.quirks.timestamp_columns_with_typename_date_as_date && odbc_type.desc_type == SQL_DATE &&
-	           odbc_type.desc_concise_type == SQL_TYPE_TIMESTAMP &&
-	           odbc_type.desc_type_name == Types::SQL_DATE_TYPE_NAME) {
-		FetchAndSetResult<duckdb_date_struct>(ctx, odbc_type, col_idx, vec, row_idx);
 	} else {
 		FetchAndSetResultTimestamp(ctx, odbc_type, col_idx, vec, row_idx);
 	}
@@ -431,10 +439,6 @@ template <>
 duckdb_type TypeSpecific::ResolveColumnType<duckdb_timestamp_struct>(QueryContext &ctx, ResultColumn &col) {
 	if (col.odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET) {
 		return DUCKDB_TYPE_TIMESTAMP_TZ;
-	} else if (ctx.quirks.timestamp_columns_with_typename_date_as_date && col.odbc_type.desc_type == SQL_DATE &&
-	           col.odbc_type.desc_concise_type == SQL_TYPE_TIMESTAMP &&
-	           col.odbc_type.desc_type_name == Types::SQL_DATE_TYPE_NAME) {
-		return DUCKDB_TYPE_DATE;
 	} else if (ctx.quirks.timestamp_columns_as_timestamp_ns) {
 		return DUCKDB_TYPE_TIMESTAMP_NS;
 	} else {

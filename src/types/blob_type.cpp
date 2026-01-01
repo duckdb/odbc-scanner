@@ -16,7 +16,7 @@ namespace odbcscanner {
 static const std::string trunc_diag_code("01004");
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb_vector vec) {
 	duckdb_string_t *data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(vec));
 	duckdb_string_t dstr = data[0];
 	const char *buf_ptr = duckdb_string_t_data(&dstr);
@@ -24,24 +24,24 @@ ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb
 	std::vector<char> buf;
 	buf.resize(len);
 	std::memcpy(buf.data(), buf_ptr, len);
-	OdbcBlob blob(std::move(buf));
-	return ScannerParam(std::move(blob));
+	ScannerBlob blob(std::move(buf));
+	return ScannerValue(std::move(blob));
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb_value value) {
 	duckdb_blob dblob = duckdb_get_blob(value);
 	std::vector<char> buf;
 	buf.resize(dblob.size);
 	std::memcpy(buf.data(), dblob.data, dblob.size);
-	OdbcBlob blob(std::move(buf));
-	return ScannerParam(std::move(blob));
+	ScannerBlob blob(std::move(buf));
+	return ScannerValue(std::move(blob));
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<duckdb_blob>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<duckdb_blob>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_VARBINARY;
-	OdbcBlob &blob = param.Value<OdbcBlob>();
+	ScannerBlob &blob = param.Value<ScannerBlob>();
 	if (blob.size<uint32_t>() > ctx.quirks.var_len_params_long_threshold_bytes) {
 		sqltype = SQL_LONGVARBINARY;
 	}

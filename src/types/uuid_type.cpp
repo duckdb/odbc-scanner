@@ -14,25 +14,25 @@ DUCKDB_EXTENSION_EXTERN
 namespace odbcscanner {
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<OdbcUuid>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<ScannerUuid>(DbmsQuirks &, duckdb_vector vec) {
 	duckdb_uhugeint *data = reinterpret_cast<duckdb_uhugeint *>(duckdb_vector_get_data(vec));
 	duckdb_uhugeint num = data[0];
 	num.upper ^= (std::numeric_limits<int64_t>::min)();
-	OdbcUuid uuid(num);
-	return ScannerParam(std::move(uuid));
+	ScannerUuid uuid(num);
+	return ScannerValue(std::move(uuid));
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<OdbcUuid>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<ScannerUuid>(DbmsQuirks &, duckdb_value value) {
 	duckdb_uhugeint num = duckdb_get_uuid(value);
-	OdbcUuid uuid(num);
-	return ScannerParam(std::move(uuid));
+	ScannerUuid uuid(num);
+	return ScannerValue(std::move(uuid));
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<OdbcUuid>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<ScannerUuid>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_GUID;
-	OdbcUuid &uuid = param.Value<OdbcUuid>();
+	ScannerUuid &uuid = param.Value<ScannerUuid>();
 	SQLRETURN ret =
 	    SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_GUID, sqltype, uuid.size<SQLULEN>(), 0,
 	                     reinterpret_cast<SQLPOINTER>(uuid.data()), param.LengthBytes(), &param.LengthBytes());
@@ -45,9 +45,10 @@ void TypeSpecific::BindOdbcParam<OdbcUuid>(QueryContext &ctx, ScannerParam &para
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<OdbcUuid>(QueryContext &ctx, OdbcType &, SQLSMALLINT col_idx, duckdb_vector vec,
-                                               idx_t row_idx) {
-	MSSQL_GUID guid;
+void TypeSpecific::FetchAndSetResult<ScannerUuid>(QueryContext &ctx, OdbcType &, SQLSMALLINT col_idx, duckdb_vector vec,
+                                                  idx_t row_idx) {
+	SQLGUID guid;
+	std::memset(&guid, '\0', sizeof(SQLGUID));
 	SQLLEN len_bytes = 0;
 	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_GUID, &guid, static_cast<SQLLEN>(sizeof(guid)), &len_bytes);
 
@@ -86,7 +87,7 @@ void TypeSpecific::FetchAndSetResult<OdbcUuid>(QueryContext &ctx, OdbcType &, SQ
 }
 
 template <>
-duckdb_type TypeSpecific::ResolveColumnType<OdbcUuid>(QueryContext &, ResultColumn &) {
+duckdb_type TypeSpecific::ResolveColumnType<ScannerUuid>(QueryContext &, ResultColumn &) {
 	return DUCKDB_TYPE_UUID;
 }
 

@@ -16,9 +16,9 @@ struct ConnectionsRegistry {
 };
 
 struct ParamsRegistry {
-	static int64_t Add(std::unique_ptr<std::vector<ScannerParam>> params);
+	static int64_t Add(std::unique_ptr<std::vector<ScannerValue>> params);
 
-	static std::unique_ptr<std::vector<ScannerParam>> Remove(int64_t params_id);
+	static std::unique_ptr<std::vector<ScannerValue>> Remove(int64_t params_id);
 };
 
 struct Registries {

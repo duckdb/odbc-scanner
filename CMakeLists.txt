@@ -56,6 +56,7 @@ set(EXTENSION_SOURCES
     src/odbc_scanner.cpp
     src/params.cpp
     src/registries.cpp
+    src/scanner_value.cpp
     src/strings.cpp
     src/widechar.cpp
     src/functions/odbc_begin_transaction.cpp

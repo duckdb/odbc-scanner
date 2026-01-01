@@ -14,6 +14,7 @@ struct DbmsQuirks {
 
 	bool decimal_columns_as_chars = false;
 	bool decimal_columns_precision_through_ard = false;
+	bool decimal_columns_bind = false;
 	bool decimal_params_as_chars = false;
 	bool reset_stmt_before_execute = false;
 	bool time_params_as_ss_time2 = false;

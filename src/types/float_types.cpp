@@ -11,36 +11,36 @@ DUCKDB_EXTENSION_EXTERN
 namespace odbcscanner {
 
 template <typename FLOAT_TYPE>
-static ScannerParam ExtractNotNullParamInternal(duckdb_vector vec) {
+static ScannerValue ExtractNotNullParamInternal(duckdb_vector vec) {
 	FLOAT_TYPE *data = reinterpret_cast<FLOAT_TYPE *>(duckdb_vector_get_data(vec));
 	FLOAT_TYPE num = data[0];
-	return ScannerParam(num);
+	return ScannerValue(num);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<float>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<float>(DbmsQuirks &, duckdb_vector vec) {
 	return ExtractNotNullParamInternal<float>(vec);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<double>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<double>(DbmsQuirks &, duckdb_vector vec) {
 	return ExtractNotNullParamInternal<double>(vec);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<float>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<float>(DbmsQuirks &, duckdb_value value) {
 	float val = duckdb_get_float(value);
-	return ScannerParam(val);
+	return ScannerValue(val);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<double>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<double>(DbmsQuirks &, duckdb_value value) {
 	double val = duckdb_get_double(value);
-	return ScannerParam(val);
+	return ScannerValue(val);
 }
 
 template <typename FLOAT_TYPE>
-static void BindOdbcParamInternal(QueryContext &ctx, SQLSMALLINT ctype, SQLSMALLINT sqltype, ScannerParam &param,
+static void BindOdbcParamInternal(QueryContext &ctx, SQLSMALLINT ctype, SQLSMALLINT sqltype, ScannerValue &param,
                                   SQLSMALLINT param_idx) {
 	SQLRETURN ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, ctype, sqltype, 0, 0,
 	                                 reinterpret_cast<SQLPOINTER>(&param.Value<FLOAT_TYPE>()), param.LengthBytes(),
@@ -55,13 +55,13 @@ static void BindOdbcParamInternal(QueryContext &ctx, SQLSMALLINT ctype, SQLSMALL
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<float>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<float>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_FLOAT;
 	BindOdbcParamInternal<float>(ctx, SQL_C_FLOAT, sqltype, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<double>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<double>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_DOUBLE;
 	BindOdbcParamInternal<double>(ctx, SQL_C_DOUBLE, sqltype, param, param_idx);
 }

@@ -31,7 +31,7 @@ const std::string Types::SQL_BLOB_TYPE_NAME = "BLOB";
 const std::string Types::SQL_CLOB_TYPE_NAME = "CLOB";
 const std::string Types::SQL_DB2_DBCLOB_TYPE_NAME = "DBCLOB";
 
-ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec, idx_t param_idx) {
+ScannerValue Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec, idx_t param_idx) {
 	switch (type_id) {
 	case DUCKDB_TYPE_BOOLEAN:
 		return TypeSpecific::ExtractNotNullParam<bool>(quirks, vec);
@@ -62,7 +62,7 @@ ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id,
 	case DUCKDB_TYPE_BLOB:
 		return TypeSpecific::ExtractNotNullParam<duckdb_blob>(quirks, vec);
 	case DUCKDB_TYPE_UUID:
-		return TypeSpecific::ExtractNotNullParam<OdbcUuid>(quirks, vec);
+		return TypeSpecific::ExtractNotNullParam<ScannerUuid>(quirks, vec);
 	case DUCKDB_TYPE_DATE:
 		return TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(quirks, vec);
 	case DUCKDB_TYPE_TIME:
@@ -78,7 +78,7 @@ ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id,
 	}
 }
 
-ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, idx_t param_idx) {
+ScannerValue Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, idx_t param_idx) {
 	duckdb_logical_type ltype = duckdb_get_value_type(value);
 	auto type_id = duckdb_get_type_id(ltype);
 	switch (type_id) {
@@ -111,7 +111,7 @@ ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, 
 	case DUCKDB_TYPE_BLOB:
 		return TypeSpecific::ExtractNotNullParam<duckdb_blob>(quirks, value);
 	case DUCKDB_TYPE_UUID:
-		return TypeSpecific::ExtractNotNullParam<OdbcUuid>(quirks, value);
+		return TypeSpecific::ExtractNotNullParam<ScannerUuid>(quirks, value);
 	case DUCKDB_TYPE_DATE:
 		return TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(quirks, value);
 	case DUCKDB_TYPE_TIME:
@@ -127,7 +127,7 @@ ScannerParam Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, 
 	}
 }
 
-void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void Types::BindOdbcParam(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	switch (param.ParamType()) {
 	case DUCKDB_TYPE_SQLNULL:
 		TypeSpecific::BindOdbcParam<std::nullptr_t>(ctx, param, param_idx);
@@ -178,7 +178,7 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 		TypeSpecific::BindOdbcParam<duckdb_blob>(ctx, param, param_idx);
 		break;
 	case DUCKDB_TYPE_UUID:
-		TypeSpecific::BindOdbcParam<OdbcUuid>(ctx, param, param_idx);
+		TypeSpecific::BindOdbcParam<ScannerUuid>(ctx, param, param_idx);
 		break;
 	case DUCKDB_TYPE_DATE:
 		TypeSpecific::BindOdbcParam<duckdb_date_struct>(ctx, param, param_idx);
@@ -196,13 +196,19 @@ void Types::BindOdbcParam(QueryContext &ctx, ScannerParam &param, SQLSMALLINT pa
 	}
 }
 
-void Types::SetColumnDescriptors(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+void Types::BindColumn(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
 	switch (odbc_type.desc_concise_type) {
+	case SQL_BIT:
+		TypeSpecific::BindColumn<bool>(ctx, odbc_type, col_idx);
+		break;
 	case SQL_DECIMAL:
 	case SQL_NUMERIC:
-		TypeSpecific::SetColumnDescriptors<duckdb_decimal>(ctx, odbc_type, col_idx);
+		TypeSpecific::BindColumn<duckdb_decimal>(ctx, odbc_type, col_idx);
 		break;
-		// default: no-op for all types except NUMERIC
+	case SQL_TYPE_DATE:
+		TypeSpecific::BindColumn<duckdb_date_struct>(ctx, odbc_type, col_idx);
+		break;
+		// default: no-op
 	}
 }
 
@@ -265,7 +271,7 @@ void Types::FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLIN
 		TypeSpecific::FetchAndSetResult<duckdb_blob>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	case SQL_GUID:
-		TypeSpecific::FetchAndSetResult<OdbcUuid>(ctx, odbc_type, col_idx, vec, row_idx);
+		TypeSpecific::FetchAndSetResult<ScannerUuid>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	case SQL_TYPE_DATE:
 		TypeSpecific::FetchAndSetResult<duckdb_date_struct>(ctx, odbc_type, col_idx, vec, row_idx);
@@ -300,6 +306,11 @@ void Types::CoalesceColumnType(QueryContext &ctx, ResultColumn &column) {
 	           odbc_type.desc_type_name == Types::SQL_DB2_DBCLOB_TYPE_NAME) {
 		odbc_type.desc_type = SQL_WLONGVARCHAR;
 		odbc_type.desc_concise_type = SQL_WLONGVARCHAR;
+	} else if (ctx.quirks.timestamp_columns_with_typename_date_as_date && odbc_type.desc_type == SQL_DATE &&
+	           odbc_type.desc_concise_type == SQL_TYPE_TIMESTAMP &&
+	           odbc_type.desc_type_name == Types::SQL_DATE_TYPE_NAME) {
+		odbc_type.desc_type = SQL_TYPE_DATE;
+		odbc_type.desc_concise_type = SQL_TYPE_DATE;
 	}
 }
 
@@ -353,7 +364,7 @@ duckdb_type Types::ResolveColumnType(QueryContext &ctx, ResultColumn &column) {
 	case SQL_LONGVARBINARY:
 		return TypeSpecific::ResolveColumnType<duckdb_blob>(ctx, column);
 	case SQL_GUID:
-		return TypeSpecific::ResolveColumnType<OdbcUuid>(ctx, column);
+		return TypeSpecific::ResolveColumnType<ScannerUuid>(ctx, column);
 	case SQL_TYPE_DATE:
 		return TypeSpecific::ResolveColumnType<duckdb_date_struct>(ctx, column);
 	case SQL_TYPE_TIME:

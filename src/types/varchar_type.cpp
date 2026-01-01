@@ -48,22 +48,22 @@ std::pair<std::string, bool> Types::ExtractFunctionArg<std::string>(duckdb_data_
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<std::string>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<std::string>(DbmsQuirks &, duckdb_vector vec) {
 	duckdb_string_t *data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(vec));
 	duckdb_string_t dstr = data[0];
 	const char *cstr = duckdb_string_t_data(&dstr);
 	uint32_t len = duckdb_string_t_length(dstr);
-	return ScannerParam(cstr, len);
+	return ScannerValue(cstr, len);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<std::string>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<std::string>(DbmsQuirks &, duckdb_value value) {
 	auto str_ptr = VarcharPtr(duckdb_get_varchar(value), VarcharDeleter);
-	return ScannerParam(str_ptr.get());
+	return ScannerValue(str_ptr.get());
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<std::string>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<std::string>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_WVARCHAR;
 	WideString &wstring = param.Value<WideString>();
 	size_t len_bytes = wstring.length<size_t>() * sizeof(SQLWCHAR);

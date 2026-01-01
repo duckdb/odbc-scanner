@@ -43,6 +43,7 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 	} else if (conn.dbms_name == ORACLE_DBMS_NAME) {
 		this->var_len_params_long_threshold_bytes = 4000;
 		this->decimal_columns_precision_through_ard = true;
+		this->decimal_columns_bind = true;
 		this->timestamp_columns_with_typename_date_as_date = true;
 
 	} else if (conn.dbms_name.rfind(DB2_DBMS_NAME_PREFIX, 0) == 0) {

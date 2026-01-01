@@ -187,7 +187,7 @@ if __name__ == "__main__":
   # Records/second: 418
   # count = insert_records_batched_direct_params(cur_reader, cur)
   # Records/second: 566
-  # count = insert_records_one_by_one_params_handle(cur_reader, cur)
+  count = insert_records_one_by_one_params_handle(cur_reader, cur)
   # Records/second: 1703
   # count = insert_records_batched_params_handle(cur_reader, cur)
 

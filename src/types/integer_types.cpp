@@ -53,102 +53,102 @@ std::pair<int64_t, bool> Types::ExtractFunctionArg<int64_t>(duckdb_data_chunk ch
 }
 
 template <typename INT_TYPE>
-static ScannerParam ExtractNotNullParamInternal(duckdb_vector vec) {
+static ScannerValue ExtractNotNullParamInternal(duckdb_vector vec) {
 	INT_TYPE *data = reinterpret_cast<INT_TYPE *>(duckdb_vector_get_data(vec));
 	INT_TYPE num = data[0];
-	return ScannerParam(num);
+	return ScannerValue(num);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<int8_t>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<int8_t>(DbmsQuirks &, duckdb_vector vec) {
 	return ExtractNotNullParamInternal<int8_t>(vec);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<uint8_t>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<uint8_t>(DbmsQuirks &, duckdb_vector vec) {
 	return ExtractNotNullParamInternal<uint8_t>(vec);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<int16_t>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<int16_t>(DbmsQuirks &, duckdb_vector vec) {
 	return ExtractNotNullParamInternal<int16_t>(vec);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<uint16_t>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<uint16_t>(DbmsQuirks &, duckdb_vector vec) {
 	return ExtractNotNullParamInternal<uint16_t>(vec);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<int32_t>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<int32_t>(DbmsQuirks &, duckdb_vector vec) {
 	return ExtractNotNullParamInternal<int32_t>(vec);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<uint32_t>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<uint32_t>(DbmsQuirks &, duckdb_vector vec) {
 	return ExtractNotNullParamInternal<uint32_t>(vec);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<int64_t>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<int64_t>(DbmsQuirks &, duckdb_vector vec) {
 	return ExtractNotNullParamInternal<int64_t>(vec);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<uint64_t>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<uint64_t>(DbmsQuirks &, duckdb_vector vec) {
 	return ExtractNotNullParamInternal<uint64_t>(vec);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<int8_t>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<int8_t>(DbmsQuirks &, duckdb_value value) {
 	int8_t val = duckdb_get_int8(value);
-	return ScannerParam(val);
+	return ScannerValue(val);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<uint8_t>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<uint8_t>(DbmsQuirks &, duckdb_value value) {
 	uint8_t val = duckdb_get_uint8(value);
-	return ScannerParam(val);
+	return ScannerValue(val);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<int16_t>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<int16_t>(DbmsQuirks &, duckdb_value value) {
 	int16_t val = duckdb_get_int16(value);
-	return ScannerParam(val);
+	return ScannerValue(val);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<uint16_t>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<uint16_t>(DbmsQuirks &, duckdb_value value) {
 	uint16_t val = duckdb_get_uint16(value);
-	return ScannerParam(val);
+	return ScannerValue(val);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<int32_t>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<int32_t>(DbmsQuirks &, duckdb_value value) {
 	int32_t val = duckdb_get_int32(value);
-	return ScannerParam(val);
+	return ScannerValue(val);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<uint32_t>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<uint32_t>(DbmsQuirks &, duckdb_value value) {
 	uint32_t val = duckdb_get_uint32(value);
-	return ScannerParam(val);
+	return ScannerValue(val);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<int64_t>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<int64_t>(DbmsQuirks &, duckdb_value value) {
 	int64_t val = duckdb_get_int64(value);
-	return ScannerParam(val);
+	return ScannerValue(val);
 }
 
 template <>
-ScannerParam TypeSpecific::ExtractNotNullParam<uint64_t>(DbmsQuirks &, duckdb_value value) {
+ScannerValue TypeSpecific::ExtractNotNullParam<uint64_t>(DbmsQuirks &, duckdb_value value) {
 	uint64_t val = duckdb_get_uint64(value);
-	return ScannerParam(val);
+	return ScannerValue(val);
 }
 
 template <typename INT_TYPE>
-static void BindOdbcParamInternal(QueryContext &ctx, SQLSMALLINT ctype, SQLSMALLINT sqltype, ScannerParam &param,
+static void BindOdbcParamInternal(QueryContext &ctx, SQLSMALLINT ctype, SQLSMALLINT sqltype, ScannerValue &param,
                                   SQLSMALLINT param_idx) {
 	SQLRETURN ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, ctype, sqltype, 0, 0,
 	                                 reinterpret_cast<SQLPOINTER>(&param.Value<INT_TYPE>()), param.LengthBytes(),
@@ -162,7 +162,7 @@ static void BindOdbcParamInternal(QueryContext &ctx, SQLSMALLINT ctype, SQLSMALL
 	}
 }
 
-static SQLSMALLINT IntegralSQLType(ScannerParam &param, SQLSMALLINT def_sqltype) {
+static SQLSMALLINT IntegralSQLType(ScannerValue &param, SQLSMALLINT def_sqltype) {
 	SQLSMALLINT expected = param.ExpectedType();
 	switch (expected) {
 	case SQL_TINYINT:
@@ -175,49 +175,49 @@ static SQLSMALLINT IntegralSQLType(ScannerParam &param, SQLSMALLINT def_sqltype)
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<int8_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<int8_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_TINYINT);
 	BindOdbcParamInternal<int8_t>(ctx, SQL_C_STINYINT, sqltype, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<uint8_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<uint8_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_TINYINT);
 	BindOdbcParamInternal<uint8_t>(ctx, SQL_C_UTINYINT, sqltype, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<int16_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<int16_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_SMALLINT);
 	BindOdbcParamInternal<int16_t>(ctx, SQL_C_SSHORT, sqltype, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<uint16_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<uint16_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_SMALLINT);
 	BindOdbcParamInternal<uint16_t>(ctx, SQL_C_USHORT, sqltype, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<int32_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<int32_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_INTEGER);
 	BindOdbcParamInternal<int32_t>(ctx, SQL_C_SLONG, sqltype, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<uint32_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<uint32_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_INTEGER);
 	BindOdbcParamInternal<uint32_t>(ctx, SQL_C_ULONG, sqltype, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<int64_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<int64_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_BIGINT);
 	BindOdbcParamInternal<int64_t>(ctx, SQL_C_SBIGINT, sqltype, param, param_idx);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<uint64_t>(QueryContext &ctx, ScannerParam &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<uint64_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_BIGINT);
 	BindOdbcParamInternal<uint64_t>(ctx, SQL_C_UBIGINT, sqltype, param, param_idx);
 }

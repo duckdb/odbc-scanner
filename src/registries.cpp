@@ -36,7 +36,7 @@ static std::shared_ptr<std::set<int64_t>> SharedConnectionsRegistry() {
 static void SharedParamsRegistryDeleter(std::set<int64_t> *reg_ptr) {
 	auto &reg = *reg_ptr;
 	for (int64_t params_id : reg) {
-		std::vector<ScannerParam> *params_ptr = reinterpret_cast<std::vector<ScannerParam> *>(params_id);
+		std::vector<ScannerValue> *params_ptr = reinterpret_cast<std::vector<ScannerValue> *>(params_id);
 		delete params_ptr;
 	}
 	reg.clear();
@@ -89,7 +89,7 @@ std::unique_ptr<OdbcConnection> ConnectionsRegistry::Remove(int64_t conn_id) {
 	return std::unique_ptr<OdbcConnection>(conn_ptr);
 }
 
-int64_t ParamsRegistry::Add(std::unique_ptr<std::vector<ScannerParam>> params) {
+int64_t ParamsRegistry::Add(std::unique_ptr<std::vector<ScannerValue>> params) {
 	if (params.get() == nullptr) {
 		throw ScannerException("Cannot register invalid empty params");
 	}
@@ -113,7 +113,7 @@ int64_t ParamsRegistry::Add(std::unique_ptr<std::vector<ScannerParam>> params) {
 	return params_id;
 }
 
-std::unique_ptr<std::vector<ScannerParam>> ParamsRegistry::Remove(int64_t params_id) {
+std::unique_ptr<std::vector<ScannerValue>> ParamsRegistry::Remove(int64_t params_id) {
 	auto mtx = SharedMutex();
 	std::lock_guard<std::mutex> guard(*mtx);
 
@@ -122,11 +122,11 @@ std::unique_ptr<std::vector<ScannerParam>> ParamsRegistry::Remove(int64_t params
 
 	auto removed_count = shared_reg.erase(params_id);
 	if (removed_count == 0) {
-		return std::unique_ptr<std::vector<ScannerParam>>(nullptr);
+		return std::unique_ptr<std::vector<ScannerValue>>(nullptr);
 	}
 
-	std::vector<ScannerParam> *params_ptr = reinterpret_cast<std::vector<ScannerParam> *>(params_id);
-	return std::unique_ptr<std::vector<ScannerParam>>(params_ptr);
+	std::vector<ScannerValue> *params_ptr = reinterpret_cast<std::vector<ScannerValue> *>(params_id);
+	return std::unique_ptr<std::vector<ScannerValue>>(params_ptr);
 }
 
 void Registries::Initialize() {

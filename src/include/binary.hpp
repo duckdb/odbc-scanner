@@ -28,18 +28,18 @@ struct DecimalChars {
 	char *data();
 };
 
-struct OdbcBlob {
+struct ScannerBlob {
 	std::vector<char> blob_data;
 
-	OdbcBlob();
+	ScannerBlob();
 
-	explicit OdbcBlob(std::vector<char> blob_data_in);
+	explicit ScannerBlob(std::vector<char> blob_data_in);
 
-	OdbcBlob(OdbcBlob &other) = delete;
-	OdbcBlob(OdbcBlob &&other) = default;
+	ScannerBlob(ScannerBlob &other) = delete;
+	ScannerBlob(ScannerBlob &&other) = default;
 
-	OdbcBlob &operator=(const OdbcBlob &other) = delete;
-	OdbcBlob &operator=(OdbcBlob &&other) = default;
+	ScannerBlob &operator=(const ScannerBlob &other) = delete;
+	ScannerBlob &operator=(ScannerBlob &&other) = default;
 
 	template <typename INT_TYPE>
 	INT_TYPE size() {
@@ -49,20 +49,20 @@ struct OdbcBlob {
 	char *data();
 };
 
-struct OdbcUuid {
+struct ScannerUuid {
 	// this can be an std::array<16> but it may be better
 	// to handle it uniformly with blob
 	std::vector<char> uuid_data;
 
-	OdbcUuid();
+	ScannerUuid();
 
-	explicit OdbcUuid(duckdb_uhugeint uuid);
+	explicit ScannerUuid(duckdb_uhugeint uuid);
 
-	OdbcUuid(OdbcUuid &other) = delete;
-	OdbcUuid(OdbcUuid &&other) = default;
+	ScannerUuid(ScannerUuid &other) = delete;
+	ScannerUuid(ScannerUuid &&other) = default;
 
-	OdbcUuid &operator=(const OdbcUuid &other) = delete;
-	OdbcUuid &operator=(OdbcUuid &&other) = default;
+	ScannerUuid &operator=(const ScannerUuid &other) = delete;
+	ScannerUuid &operator=(ScannerUuid &&other) = default;
 
 	template <typename INT_TYPE>
 	INT_TYPE size() {
@@ -70,13 +70,6 @@ struct OdbcUuid {
 	}
 
 	char *data();
-};
-
-struct MSSQL_GUID {
-	uint32_t Data1 = 0;
-	uint16_t Data2 = 0;
-	uint16_t Data3 = 0;
-	uint8_t Data4[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 };
 
 } // namespace odbcscanner
