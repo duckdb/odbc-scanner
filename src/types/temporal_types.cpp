@@ -80,27 +80,30 @@ static ScannerValue CreateParamFromTimestampNs(DbmsQuirks &quirks, duckdb_timest
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_date_struct>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
 	duckdb_date *data = reinterpret_cast<duckdb_date *>(duckdb_vector_get_data(vec));
-	return CreateParamFromDate(data[0]);
+	return CreateParamFromDate(data[row_idx]);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_time_struct>(DbmsQuirks &quirks, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_time_struct>(DbmsQuirks &quirks, duckdb_vector vec,
+                                                                   idx_t row_idx) {
 	duckdb_time *data = reinterpret_cast<duckdb_time *>(duckdb_vector_get_data(vec));
-	return CreateParamFromTime(quirks, data[0]);
+	return CreateParamFromTime(quirks, data[row_idx]);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(DbmsQuirks &quirks, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_timestamp_struct>(DbmsQuirks &quirks, duckdb_vector vec,
+                                                                        idx_t row_idx) {
 	duckdb_timestamp *data = reinterpret_cast<duckdb_timestamp *>(duckdb_vector_get_data(vec));
-	return CreateParamFromTimestamp(quirks, data[0]);
+	return CreateParamFromTimestamp(quirks, data[row_idx]);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<TimestampNsStruct>(DbmsQuirks &quirks, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<TimestampNsStruct>(DbmsQuirks &quirks, duckdb_vector vec,
+                                                                  idx_t row_idx) {
 	duckdb_timestamp_ns *data = reinterpret_cast<duckdb_timestamp_ns *>(duckdb_vector_get_data(vec));
-	return CreateParamFromTimestampNs(quirks, data[0]);
+	return CreateParamFromTimestampNs(quirks, data[row_idx]);
 }
 
 template <>

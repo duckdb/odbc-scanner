@@ -21,7 +21,7 @@ DECIMAL(4,3)
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMERIC(4,3)) FROM dual')
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMBER(4,3)) FROM dual')
 )
 ----
 DECIMAL(4,3)

@@ -1,0 +1,4 @@
+id,code,uic,name_short,name_medium,name_long,slug,country,type,geo_lat,geo_lng
+266,HT,8400319,Den Bosch,'s-Hertogenbosch,'s-Hertogenbosch,s-hertogenbosch,NL,knooppuntIntercitystation,51.69048,5.29362
+269,HTO,8400320,Dn Bosch O,'s-Hertogenb. O.,'s-Hertogenbosch Oost,s-hertogenbosch-oost,NL,stoptreinstation,51.700553894043,5.3183331489563
+227,HDE,8400388,'t Harde,'t Harde,'t Harde,t-harde,NL,stoptreinstation,52.4091682,5.893611

@@ -14,9 +14,9 @@ DUCKDB_EXTENSION_EXTERN
 namespace odbcscanner {
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<ScannerUuid>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<ScannerUuid>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
 	duckdb_uhugeint *data = reinterpret_cast<duckdb_uhugeint *>(duckdb_vector_get_data(vec));
-	duckdb_uhugeint num = data[0];
+	duckdb_uhugeint num = data[row_idx];
 	num.upper ^= (std::numeric_limits<int64_t>::min)();
 	ScannerUuid uuid(num);
 	return ScannerValue(std::move(uuid));

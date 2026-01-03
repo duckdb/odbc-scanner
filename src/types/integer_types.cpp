@@ -53,50 +53,50 @@ std::pair<int64_t, bool> Types::ExtractFunctionArg<int64_t>(duckdb_data_chunk ch
 }
 
 template <typename INT_TYPE>
-static ScannerValue ExtractNotNullParamInternal(duckdb_vector vec) {
+static ScannerValue ExtractNotNullParamInternal(duckdb_vector vec, idx_t row_idx) {
 	INT_TYPE *data = reinterpret_cast<INT_TYPE *>(duckdb_vector_get_data(vec));
-	INT_TYPE num = data[0];
+	INT_TYPE num = data[row_idx];
 	return ScannerValue(num);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<int8_t>(DbmsQuirks &, duckdb_vector vec) {
-	return ExtractNotNullParamInternal<int8_t>(vec);
+ScannerValue TypeSpecific::ExtractNotNullParam<int8_t>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
+	return ExtractNotNullParamInternal<int8_t>(vec, row_idx);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<uint8_t>(DbmsQuirks &, duckdb_vector vec) {
-	return ExtractNotNullParamInternal<uint8_t>(vec);
+ScannerValue TypeSpecific::ExtractNotNullParam<uint8_t>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
+	return ExtractNotNullParamInternal<uint8_t>(vec, row_idx);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<int16_t>(DbmsQuirks &, duckdb_vector vec) {
-	return ExtractNotNullParamInternal<int16_t>(vec);
+ScannerValue TypeSpecific::ExtractNotNullParam<int16_t>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
+	return ExtractNotNullParamInternal<int16_t>(vec, row_idx);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<uint16_t>(DbmsQuirks &, duckdb_vector vec) {
-	return ExtractNotNullParamInternal<uint16_t>(vec);
+ScannerValue TypeSpecific::ExtractNotNullParam<uint16_t>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
+	return ExtractNotNullParamInternal<uint16_t>(vec, row_idx);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<int32_t>(DbmsQuirks &, duckdb_vector vec) {
-	return ExtractNotNullParamInternal<int32_t>(vec);
+ScannerValue TypeSpecific::ExtractNotNullParam<int32_t>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
+	return ExtractNotNullParamInternal<int32_t>(vec, row_idx);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<uint32_t>(DbmsQuirks &, duckdb_vector vec) {
-	return ExtractNotNullParamInternal<uint32_t>(vec);
+ScannerValue TypeSpecific::ExtractNotNullParam<uint32_t>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
+	return ExtractNotNullParamInternal<uint32_t>(vec, row_idx);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<int64_t>(DbmsQuirks &, duckdb_vector vec) {
-	return ExtractNotNullParamInternal<int64_t>(vec);
+ScannerValue TypeSpecific::ExtractNotNullParam<int64_t>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
+	return ExtractNotNullParamInternal<int64_t>(vec, row_idx);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<uint64_t>(DbmsQuirks &, duckdb_vector vec) {
-	return ExtractNotNullParamInternal<uint64_t>(vec);
+ScannerValue TypeSpecific::ExtractNotNullParam<uint64_t>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
+	return ExtractNotNullParamInternal<uint64_t>(vec, row_idx);
 }
 
 template <>

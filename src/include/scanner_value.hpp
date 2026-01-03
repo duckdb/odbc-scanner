@@ -144,6 +144,8 @@ public:
 	template <typename T>
 	T &Value();
 
+	void TransformIntegralToDecimal();
+
 private:
 	void CheckType(param_type expected);
 

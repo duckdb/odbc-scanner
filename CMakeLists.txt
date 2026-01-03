@@ -64,6 +64,7 @@ set(EXTENSION_SOURCES
     src/functions/odbc_bind_params.cpp
     src/functions/odbc_close.cpp
     src/functions/odbc_connect.cpp
+    src/functions/odbc_copy_from.cpp
     src/functions/odbc_create_params.cpp
     src/functions/odbc_list_data_sources.cpp
     src/functions/odbc_list_drivers.cpp

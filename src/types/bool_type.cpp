@@ -11,9 +11,9 @@ DUCKDB_EXTENSION_EXTERN
 namespace odbcscanner {
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<bool>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<bool>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
 	bool *data = reinterpret_cast<bool *>(duckdb_vector_get_data(vec));
-	bool val = data[0];
+	bool val = data[row_idx];
 	return ScannerValue(val);
 }
 

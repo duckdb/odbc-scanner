@@ -24,6 +24,10 @@ struct OdbcConnectFunction {
 	static void Register(duckdb_connection connection);
 };
 
+struct OdbcCopyFromFunction {
+	static void Register(duckdb_connection connection);
+};
+
 struct OdbcCreateParamsFunction {
 	static void Register(duckdb_connection connection);
 };

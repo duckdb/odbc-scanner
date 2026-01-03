@@ -43,7 +43,8 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 	} else if (conn.dbms_name == ORACLE_DBMS_NAME) {
 		this->var_len_params_long_threshold_bytes = 4000;
 		this->decimal_columns_precision_through_ard = true;
-		this->decimal_columns_bind = true;
+		this->decimal_columns_precision_through_ard_bind = true;
+		this->integral_params_as_decimals = true;
 		this->timestamp_columns_with_typename_date_as_date = true;
 
 	} else if (conn.dbms_name.rfind(DB2_DBMS_NAME_PREFIX, 0) == 0) {
@@ -70,6 +71,8 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 			this->timestamp_columns_as_timestamp_ns = duckdb_get_bool(val.get());
 		} else if (en.first == "decimal_columns_precision_through_ard") {
 			this->decimal_columns_precision_through_ard = duckdb_get_bool(val.get());
+		} else if (en.first == "decimal_columns_precision_through_ard_bind") {
+			this->decimal_columns_precision_through_ard_bind = duckdb_get_bool(val.get());
 		} else if (en.first == "decimal_params_as_chars") {
 			this->decimal_params_as_chars = duckdb_get_bool(val.get());
 		} else if (en.first == "reset_stmt_before_execute") {
@@ -108,6 +111,7 @@ const std::vector<std::string> DbmsQuirks::AllNames() {
 	std::vector<std::string> res;
 	res.emplace_back("decimal_columns_as_chars");
 	res.emplace_back("decimal_columns_precision_through_ard");
+	res.emplace_back("decimal_columns_precision_through_ard_bind");
 	res.emplace_back("decimal_params_as_chars");
 	res.emplace_back("reset_stmt_before_execute");
 	res.emplace_back("time_params_as_ss_time2");

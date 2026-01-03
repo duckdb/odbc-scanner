@@ -16,9 +16,9 @@ namespace odbcscanner {
 static const std::string trunc_diag_code("01004");
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
 	duckdb_string_t *data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(vec));
-	duckdb_string_t dstr = data[0];
+	duckdb_string_t dstr = data[row_idx];
 	const char *buf_ptr = duckdb_string_t_data(&dstr);
 	uint32_t len = duckdb_string_t_length(dstr);
 	std::vector<char> buf;

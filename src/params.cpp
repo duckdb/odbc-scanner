@@ -71,7 +71,7 @@ std::vector<ScannerValue> Params::Extract(DbmsQuirks &quirks, duckdb_data_chunk 
 
 		auto child_type = LogicalTypePtr(duckdb_struct_type_child_type(struct_type.get(), i), LogicalTypeDeleter);
 		auto child_type_id = duckdb_get_type_id(child_type.get());
-		ScannerValue sp = Types::ExtractNotNullParam(quirks, child_type_id, child_vec, i);
+		ScannerValue sp = Types::ExtractNotNullParam(quirks, child_type_id, child_vec, 0, i);
 		params.emplace_back(std::move(sp));
 	}
 
@@ -142,7 +142,8 @@ void Params::SetExpectedTypes(QueryContext &ctx, const std::vector<SQLSMALLINT> 
 	}
 	for (size_t i = 0; i < actual.size(); i++) {
 		SQLSMALLINT expected_type = expected.at(i);
-		auto &param = actual.at(i);
+		ScannerValue &param = actual.at(i);
+		Types::CoalesceParameterType(ctx, param);
 		param.SetExpectedType(expected_type);
 	}
 }

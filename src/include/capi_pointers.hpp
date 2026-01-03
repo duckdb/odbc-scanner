@@ -38,6 +38,24 @@ inline void VarcharDeleter(char *val) {
 	duckdb_free(val);
 }
 
+using ConfigPtr = std::unique_ptr<_duckdb_config, void (*)(duckdb_config)>;
+
+inline void ConfigDeleter(duckdb_config config) {
+	duckdb_destroy_config(&config);
+}
+
+using DatabasePtr = std::unique_ptr<_duckdb_database, void (*)(duckdb_database)>;
+
+inline void DatabaseDeleter(duckdb_database db) {
+	duckdb_close(&db);
+}
+
+using ConnectionPtr = std::unique_ptr<_duckdb_connection, void (*)(duckdb_connection)>;
+
+inline void ConnectionDeleter(duckdb_connection conn) {
+	duckdb_disconnect(&conn);
+}
+
 using ResultPtr = std::unique_ptr<duckdb_result, void (*)(duckdb_result *)>;
 
 inline void ResultDeleter(duckdb_result *res) {

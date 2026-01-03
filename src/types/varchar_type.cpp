@@ -48,9 +48,9 @@ std::pair<std::string, bool> Types::ExtractFunctionArg<std::string>(duckdb_data_
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<std::string>(DbmsQuirks &, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<std::string>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
 	duckdb_string_t *data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(vec));
-	duckdb_string_t dstr = data[0];
+	duckdb_string_t dstr = data[row_idx];
 	const char *cstr = duckdb_string_t_data(&dstr);
 	uint32_t len = duckdb_string_t_length(dstr);
 	return ScannerValue(cstr, len);

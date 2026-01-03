@@ -13,6 +13,7 @@ SELECT * FROM odbc_query(
   'SELECT 42',
 	decimal_columns_as_chars=TRUE,
 	decimal_columns_precision_through_ard=TRUE,
+	decimal_columns_precision_through_ard_bind=TRUE,
 	decimal_params_as_chars=TRUE,
 	reset_stmt_before_execute=TRUE,
 	time_params_as_ss_time2=TRUE,

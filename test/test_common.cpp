@@ -180,6 +180,12 @@ int64_t Result::Value<int64_t>(idx_t col_idx, idx_t row_idx) {
 }
 
 template <>
+double Result::Value<double>(idx_t col_idx, idx_t row_idx) {
+	double *data = NotNullData<double>(DUCKDB_TYPE_DOUBLE, chunk, cur_row_idx, col_idx, row_idx);
+	return data[row_idx];
+}
+
+template <>
 std::string Result::Value<std::string>(idx_t col_idx, idx_t row_idx) {
 	duckdb_string_t *data = NotNullData<duckdb_string_t>(DUCKDB_TYPE_VARCHAR, chunk, cur_row_idx, col_idx, row_idx);
 	duckdb_string_t dstr = data[row_idx];

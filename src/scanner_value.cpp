@@ -415,4 +415,58 @@ void ScannerValue::CheckType(param_type expected) {
 	}
 }
 
+void ScannerValue::TransformIntegralToDecimal() {
+	if (!(type_id == DUCKDB_TYPE_TINYINT || type_id == DUCKDB_TYPE_UTINYINT || type_id == DUCKDB_TYPE_SMALLINT ||
+	      type_id == DUCKDB_TYPE_USMALLINT || type_id == DUCKDB_TYPE_INTEGER || type_id == DUCKDB_TYPE_UINTEGER ||
+	      type_id == DUCKDB_TYPE_BIGINT || type_id == DUCKDB_TYPE_UBIGINT)) {
+		return;
+	}
+
+	duckdb_decimal dec;
+	dec.width = 0;
+	dec.scale = 0;
+	dec.value.lower = 0;
+	dec.value.upper = 0;
+
+	switch (type_id) {
+	case DUCKDB_TYPE_TINYINT:
+		dec.width = 4;
+		dec.value.lower = static_cast<uint64_t>(Value<int8_t>());
+		break;
+	case DUCKDB_TYPE_UTINYINT:
+		dec.width = 4;
+		dec.value.lower = static_cast<uint64_t>(Value<uint8_t>());
+		break;
+	case DUCKDB_TYPE_SMALLINT:
+		dec.width = 9;
+		dec.value.lower = static_cast<uint64_t>(Value<int16_t>());
+		break;
+	case DUCKDB_TYPE_USMALLINT:
+		dec.width = 9;
+		dec.value.lower = static_cast<uint64_t>(Value<uint16_t>());
+		break;
+	case DUCKDB_TYPE_INTEGER:
+		dec.width = 18;
+		dec.value.lower = static_cast<uint64_t>(Value<int32_t>());
+		break;
+	case DUCKDB_TYPE_UINTEGER:
+		dec.width = 18;
+		dec.value.lower = static_cast<uint64_t>(Value<uint32_t>());
+		break;
+	case DUCKDB_TYPE_BIGINT:
+		dec.width = 38;
+		dec.value.lower = static_cast<uint64_t>(Value<int64_t>());
+		break;
+	case DUCKDB_TYPE_UBIGINT:
+		dec.width = 38;
+		dec.value.lower = static_cast<uint64_t>(Value<uint64_t>());
+		break;
+	default:
+		throw ScannerException("Invalid integral param type: " + std::to_string(type_id));
+	}
+
+	// invoke move assignment operator
+	*this = ScannerValue(dec, false);
+}
+
 } // namespace odbcscanner

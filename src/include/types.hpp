@@ -59,7 +59,7 @@ struct Types {
 
 	// Type-dispatched functions
 
-	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec,
+	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec, idx_t row_idx,
 	                                        idx_t param_idx);
 
 	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, idx_t param_idx);
@@ -70,6 +70,8 @@ struct Types {
 
 	static void FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
 	                              idx_t row_idx);
+
+	static void CoalesceParameterType(QueryContext &ctx, ScannerValue &param);
 
 	static void CoalesceColumnType(QueryContext &ctx, ResultColumn &column);
 
@@ -87,7 +89,7 @@ class TypeSpecific {
 	friend struct Types;
 
 	template <typename T>
-	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_vector vec);
+	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_vector vec, idx_t row_idx);
 
 	template <typename T>
 	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value);

@@ -15,7 +15,7 @@ DUCKDB_EXTENSION_EXTERN
 namespace odbcscanner {
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_decimal>(DbmsQuirks &quirks, duckdb_vector vec) {
+ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_decimal>(DbmsQuirks &quirks, duckdb_vector vec, idx_t row_idx) {
 	auto ltype = LogicalTypePtr(duckdb_vector_get_column_type(vec), LogicalTypeDeleter);
 
 	duckdb_decimal dec;
@@ -27,28 +27,28 @@ ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_decimal>(DbmsQuirks &quirk
 	switch (type_id) {
 	case DUCKDB_TYPE_SMALLINT: {
 		int16_t *data = reinterpret_cast<int16_t *>(duckdb_vector_get_data(vec));
-		int16_t val = data[0];
+		int16_t val = data[row_idx];
 		dec.value.lower = static_cast<uint64_t>(val);
 		dec.value.upper = val >= 0 ? 0 : -1;
 		break;
 	}
 	case DUCKDB_TYPE_INTEGER: {
 		int32_t *data = reinterpret_cast<int32_t *>(duckdb_vector_get_data(vec));
-		int32_t val = data[0];
+		int32_t val = data[row_idx];
 		dec.value.lower = static_cast<uint64_t>(val);
 		dec.value.upper = val >= 0 ? 0 : -1;
 		break;
 	}
 	case DUCKDB_TYPE_BIGINT: {
 		int64_t *data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
-		int64_t val = data[0];
+		int64_t val = data[row_idx];
 		dec.value.lower = static_cast<uint64_t>(val);
 		dec.value.upper = val >= 0 ? 0 : -1;
 		break;
 	}
 	case DUCKDB_TYPE_HUGEINT: {
 		duckdb_hugeint *data = reinterpret_cast<duckdb_hugeint *>(duckdb_vector_get_data(vec));
-		dec.value = data[0];
+		dec.value = data[row_idx];
 		break;
 	}
 	default:
@@ -230,7 +230,7 @@ static std::pair<duckdb_hugeint, bool> FetchDecimal(QueryContext &ctx, OdbcType 
 	SQL_NUMERIC_STRUCT *fetched_ptr = nullptr;
 	SQLLEN ind = 0;
 
-	if (ctx.quirks.decimal_columns_bind) {
+	if (ctx.quirks.decimal_columns_precision_through_ard_bind) {
 		// get the value that is bound to the column
 		ColumnBind &bind = ctx.BindForColumn(col_idx);
 		SQL_NUMERIC_STRUCT &fetched = bind.Value<SQL_NUMERIC_STRUCT>();
@@ -321,7 +321,7 @@ void TypeSpecific::BindColumn<duckdb_decimal>(QueryContext &ctx, OdbcType &odbc_
 		SetDescriptorFields(ctx, odbc_type, col_idx);
 	}
 
-	if (!ctx.quirks.decimal_columns_as_chars && ctx.quirks.decimal_columns_bind) {
+	if (!ctx.quirks.decimal_columns_as_chars && ctx.quirks.decimal_columns_precision_through_ard_bind) {
 		SQL_NUMERIC_STRUCT nstruct;
 		std::memset(&nstruct, '\0', sizeof(nstruct));
 		ScannerValue nval(nstruct);

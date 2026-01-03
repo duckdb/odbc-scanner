@@ -11,20 +11,20 @@ DUCKDB_EXTENSION_EXTERN
 namespace odbcscanner {
 
 template <typename FLOAT_TYPE>
-static ScannerValue ExtractNotNullParamInternal(duckdb_vector vec) {
+static ScannerValue ExtractNotNullParamInternal(duckdb_vector vec, idx_t row_idx) {
 	FLOAT_TYPE *data = reinterpret_cast<FLOAT_TYPE *>(duckdb_vector_get_data(vec));
-	FLOAT_TYPE num = data[0];
+	FLOAT_TYPE num = data[row_idx];
 	return ScannerValue(num);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<float>(DbmsQuirks &, duckdb_vector vec) {
-	return ExtractNotNullParamInternal<float>(vec);
+ScannerValue TypeSpecific::ExtractNotNullParam<float>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
+	return ExtractNotNullParamInternal<float>(vec, row_idx);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<double>(DbmsQuirks &, duckdb_vector vec) {
-	return ExtractNotNullParamInternal<double>(vec);
+ScannerValue TypeSpecific::ExtractNotNullParam<double>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
+	return ExtractNotNullParamInternal<double>(vec, row_idx);
 }
 
 template <>

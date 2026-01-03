@@ -9,6 +9,7 @@ endif ()
 add_executable(test_${EXTENSION_NAME}
     test_basic.cpp
     test_common.cpp
+    test_copy.cpp
     test_dates.cpp
     test_decimal.cpp
     test_list_env.cpp
