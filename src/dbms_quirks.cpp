@@ -4,60 +4,61 @@
 
 namespace odbcscanner {
 
-static const std::string MSSQL_DBMS_NAME = "Microsoft SQL Server";
-static const std::string MARIADB_DBMS_NAME = "MariaDB";
-static const std::string MYSQL_DBMS_NAME = "MySQL";
-static const std::string SPARK_DBMS_NAME = "Spark SQL";
-static const std::string CLICKHOUSE_DBMS_NAME = "ClickHouse";
-static const std::string ORACLE_DBMS_NAME = "Oracle";
-static const std::string DB2_DBMS_NAME_PREFIX = "DB2/";
-static const std::string SNOWFLAKE_DBMS_NAME = "Snowflake";
-static const std::string FLIGTHSQL_DRIVER_NAME = "Arrow Flight ODBC Driver";
-
 DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePtr> &user_quirks) {
 
 	// Quirks assigned based on DBMS name reported by the driver
 
-	if (conn.dbms_name == MSSQL_DBMS_NAME) {
+	switch (conn.driver) {
+	case DbmsDriver::ORACLE:
+		this->var_len_params_long_threshold_bytes = 4000;
+		this->decimal_columns_precision_through_ard = true;
+		this->decimal_columns_precision_through_ard_bind = true;
+		this->integral_params_as_decimals = true;
+		this->timestamp_columns_with_typename_date_as_date = true;
+		break;
+	case DbmsDriver::MSSQL:
 		this->var_len_params_long_threshold_bytes = 8000;
 		this->decimal_columns_precision_through_ard = true;
 		this->decimal_params_as_chars = true;
 		this->time_params_as_ss_time2 = true;
 		this->timestamp_max_fraction_precision = 7;
 		this->timestamptz_params_as_ss_timestampoffset = true;
-
-	} else if (conn.dbms_name == MARIADB_DBMS_NAME || conn.dbms_name == MYSQL_DBMS_NAME) {
+		break;
+	case DbmsDriver::DB2:
 		this->decimal_params_as_chars = true;
 		this->decimal_columns_as_chars = true;
+		break;
 
-	} else if (conn.dbms_name == SPARK_DBMS_NAME) {
+	case DbmsDriver::MARIADB:
+	case DbmsDriver::MYSQL:
 		this->decimal_params_as_chars = true;
 		this->decimal_columns_as_chars = true;
+		break;
+	case DbmsDriver::POSTGRESQL:
+		break;
 
-	} else if (conn.dbms_name == CLICKHOUSE_DBMS_NAME) {
+	case DbmsDriver::SNOWFLAKE:
+		this->decimal_columns_precision_through_ard = true;
+		this->decimal_params_as_chars = true;
+		this->timestamp_params_as_sf_timestamp_ntz = true;
+		break;
+	case DbmsDriver::SPARK:
+		this->decimal_params_as_chars = true;
+		this->decimal_columns_as_chars = true;
+		break;
+	case DbmsDriver::CLICKHOUSE:
 		this->decimal_params_as_chars = true;
 		this->decimal_columns_as_chars = true;
 		this->reset_stmt_before_execute = true;
 		this->var_len_data_single_part = true;
-
-	} else if (conn.dbms_name == ORACLE_DBMS_NAME) {
-		this->var_len_params_long_threshold_bytes = 4000;
-		this->decimal_columns_precision_through_ard = true;
-		this->decimal_columns_precision_through_ard_bind = true;
-		this->integral_params_as_decimals = true;
-		this->timestamp_columns_with_typename_date_as_date = true;
-
-	} else if (conn.dbms_name.rfind(DB2_DBMS_NAME_PREFIX, 0) == 0) {
-		this->decimal_params_as_chars = true;
+		break;
+	case DbmsDriver::FLIGTHSQL:
 		this->decimal_columns_as_chars = true;
+		break;
 
-	} else if (conn.dbms_name == SNOWFLAKE_DBMS_NAME) {
-		this->decimal_columns_precision_through_ard = true;
-		this->decimal_params_as_chars = true;
-		this->timestamp_params_as_sf_timestamp_ntz = true;
-
-	} else if (conn.driver_name == FLIGTHSQL_DRIVER_NAME) {
-		this->decimal_columns_as_chars = true;
+	case DbmsDriver::GENERIC:
+		break;
+		// default: no-op
 	}
 
 	// Quirks explicitly requested by user

@@ -9,6 +9,32 @@
 
 namespace odbcscanner {
 
+static DbmsDriver ResolveDbmsDriver(const std::string &dbms_name, const std::string &driver_name) {
+	if (dbms_name == "Oracle") {
+		return DbmsDriver::ORACLE;
+	} else if (dbms_name == "Microsoft SQL Server") {
+		return DbmsDriver::MSSQL;
+	} else if (dbms_name.rfind("DB2/", 0) == 0) {
+		return DbmsDriver::DB2;
+
+	} else if (dbms_name == "MariaDB") {
+		return DbmsDriver::MARIADB;
+	} else if (dbms_name == "MySQL") {
+		return DbmsDriver::MYSQL;
+
+	} else if (dbms_name == "Snowflake") {
+		return DbmsDriver::SNOWFLAKE;
+	} else if (dbms_name == "Spark SQL") {
+		return DbmsDriver::SPARK;
+	} else if (dbms_name == "ClickHouse") {
+		return DbmsDriver::CLICKHOUSE;
+	} else if (driver_name == "Arrow Flight ODBC Driver") {
+		return DbmsDriver::FLIGTHSQL;
+	} else {
+		return DbmsDriver::GENERIC;
+	}
+}
+
 OdbcConnection::OdbcConnection(const std::string &url) {
 	{
 		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, nullptr, &env);
@@ -45,6 +71,7 @@ OdbcConnection::OdbcConnection(const std::string &url) {
 		}
 	}
 
+	std::string dbms_name;
 	{
 		std::vector<char> buf;
 		buf.resize(256);
@@ -55,9 +82,10 @@ OdbcConnection::OdbcConnection(const std::string &url) {
 			throw ScannerException("'SQLGetInfo' failed for SQL_DBMS_NAME, url: '" + url +
 			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 		}
-		this->dbms_name = std::string(buf.data(), len);
+		dbms_name = std::string(buf.data(), len);
 	}
 
+	std::string driver_name;
 	{
 		std::vector<char> buf;
 		buf.resize(256);
@@ -68,8 +96,10 @@ OdbcConnection::OdbcConnection(const std::string &url) {
 			throw ScannerException("'SQLGetInfo' failed for SQL_DRIVER_NAME, url: '" + url +
 			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 		}
-		this->driver_name = std::string(buf.data(), len);
+		driver_name = std::string(buf.data(), len);
 	}
+
+	this->driver = ResolveDbmsDriver(dbms_name, driver_name);
 }
 
 OdbcConnection::~OdbcConnection() noexcept {
