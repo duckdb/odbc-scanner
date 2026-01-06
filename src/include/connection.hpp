@@ -7,11 +7,27 @@
 
 namespace odbcscanner {
 
+enum class DbmsDriver {
+	ORACLE,
+	MSSQL,
+	DB2,
+
+	MARIADB,
+	MYSQL,
+	POSTGRESQL,
+
+	SNOWFLAKE,
+	SPARK,
+	CLICKHOUSE,
+	FLIGTHSQL,
+
+	GENERIC
+};
+
 struct OdbcConnection {
 	SQLHANDLE env = nullptr;
 	SQLHANDLE dbc = nullptr;
-	std::string dbms_name;
-	std::string driver_name;
+	DbmsDriver driver;
 
 	OdbcConnection(const std::string &url);
 	~OdbcConnection() noexcept;

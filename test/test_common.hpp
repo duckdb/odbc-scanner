@@ -71,3 +71,5 @@ std::string CastAsBigintSQL(const std::string& value, const std::string &alias =
 std::string CastAsDateSQL(const std::string& value, const std::string &alias = "");
 
 std::string CastAsDecimalSQL(const std::string& value, uint8_t precision, uint8_t scale, const std::string &alias = "");
+
+std::string ProjectRootDir();

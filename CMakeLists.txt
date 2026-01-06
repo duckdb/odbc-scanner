@@ -70,6 +70,9 @@ set(EXTENSION_SOURCES
     src/functions/odbc_list_drivers.cpp
     src/functions/odbc_query.cpp
     src/functions/odbc_rollback.cpp
+    src/mappings/generic_mapping.cpp
+    src/mappings/mappings.cpp
+    src/mappings/oracle_mapping.cpp
     src/types/blob_type.cpp
     src/types/bool_type.cpp
     src/types/decimal_type.cpp

@@ -25,6 +25,7 @@ bool OdbcType::Equals(OdbcType &other) {
 	       decimal_precision == other.decimal_precision && decimal_scale == other.decimal_scale;
 }
 
+const std::string Types::UNKNOWN_DUCKDB_TYPE_NAME = "DUCKDB_TYPE_UNKNOWN";
 const std::string Types::MSSQL_DATETIME2_TYPE_NAME = "datetime2";
 const std::string Types::SQL_DATE_TYPE_NAME = "DATE";
 const std::string Types::SQL_BLOB_TYPE_NAME = "BLOB";
@@ -383,6 +384,167 @@ duckdb_type Types::ResolveColumnType(QueryContext &ctx, ResultColumn &column) {
 	default:
 		throw ScannerException("Unsupported ODBC column type: " + odbc_type.ToString() + ", query: '" + ctx.query +
 		                       "', column name: '" + column.name + "'");
+	}
+}
+
+std::string Types::ToString(duckdb_type type_id) {
+	switch (type_id) {
+	case DUCKDB_TYPE_INVALID:
+		return "DUCKDB_TYPE_INVALID";
+	case DUCKDB_TYPE_BOOLEAN:
+		return "DUCKDB_TYPE_BOOLEAN";
+	case DUCKDB_TYPE_TINYINT:
+		return "DUCKDB_TYPE_TINYINT";
+	case DUCKDB_TYPE_SMALLINT:
+		return "DUCKDB_TYPE_SMALLINT";
+	case DUCKDB_TYPE_INTEGER:
+		return "DUCKDB_TYPE_INTEGER";
+	case DUCKDB_TYPE_BIGINT:
+		return "DUCKDB_TYPE_BIGINT";
+	case DUCKDB_TYPE_UTINYINT:
+		return "DUCKDB_TYPE_UTINYINT";
+	case DUCKDB_TYPE_USMALLINT:
+		return "DUCKDB_TYPE_USMALLINT";
+	case DUCKDB_TYPE_UINTEGER:
+		return "DUCKDB_TYPE_UINTEGER";
+	case DUCKDB_TYPE_UBIGINT:
+		return "DUCKDB_TYPE_UBIGINT";
+	case DUCKDB_TYPE_FLOAT:
+		return "DUCKDB_TYPE_FLOAT";
+	case DUCKDB_TYPE_DOUBLE:
+		return "DUCKDB_TYPE_DOUBLE";
+	case DUCKDB_TYPE_TIMESTAMP:
+		return "DUCKDB_TYPE_TIMESTAMP";
+	case DUCKDB_TYPE_DATE:
+		return "DUCKDB_TYPE_DATE";
+	case DUCKDB_TYPE_TIME:
+		return "DUCKDB_TYPE_TIME";
+	case DUCKDB_TYPE_INTERVAL:
+		return "DUCKDB_TYPE_INTERVAL";
+	case DUCKDB_TYPE_HUGEINT:
+		return "DUCKDB_TYPE_HUGEINT";
+	case DUCKDB_TYPE_UHUGEINT:
+		return "DUCKDB_TYPE_UHUGEINT";
+	case DUCKDB_TYPE_VARCHAR:
+		return "DUCKDB_TYPE_VARCHAR";
+	case DUCKDB_TYPE_BLOB:
+		return "DUCKDB_TYPE_BLOB";
+	case DUCKDB_TYPE_DECIMAL:
+		return "DUCKDB_TYPE_DECIMAL";
+	case DUCKDB_TYPE_TIMESTAMP_S:
+		return "DUCKDB_TYPE_TIMESTAMP_S";
+	case DUCKDB_TYPE_TIMESTAMP_MS:
+		return "DUCKDB_TYPE_TIMESTAMP_MS";
+	case DUCKDB_TYPE_TIMESTAMP_NS:
+		return "DUCKDB_TYPE_TIMESTAMP_NS";
+	case DUCKDB_TYPE_ENUM:
+		return "DUCKDB_TYPE_ENUM";
+	case DUCKDB_TYPE_LIST:
+		return "DUCKDB_TYPE_LIST";
+	case DUCKDB_TYPE_STRUCT:
+		return "DUCKDB_TYPE_STRUCT";
+	case DUCKDB_TYPE_MAP:
+		return "DUCKDB_TYPE_MAP";
+	case DUCKDB_TYPE_ARRAY:
+		return "DUCKDB_TYPE_ARRAY";
+	case DUCKDB_TYPE_UUID:
+		return "DUCKDB_TYPE_UUID";
+	case DUCKDB_TYPE_UNION:
+		return "DUCKDB_TYPE_UNION";
+	case DUCKDB_TYPE_BIT:
+		return "DUCKDB_TYPE_BIT";
+	case DUCKDB_TYPE_TIME_TZ:
+		return "DUCKDB_TYPE_TIME_TZ";
+	case DUCKDB_TYPE_TIMESTAMP_TZ:
+		return "DUCKDB_TYPE_TIMESTAMP_TZ";
+	case DUCKDB_TYPE_ANY:
+		return "DUCKDB_TYPE_ANY";
+	case DUCKDB_TYPE_VARINT:
+		return "DUCKDB_TYPE_VARINT";
+	case DUCKDB_TYPE_SQLNULL:
+		return "DUCKDB_TYPE_SQLNULL";
+	default:
+		return UNKNOWN_DUCKDB_TYPE_NAME;
+	}
+}
+
+duckdb_type Types::FromString(const std::string &type_name) {
+	if (type_name == "DUCKDB_TYPE_INVALID") {
+		return DUCKDB_TYPE_INVALID;
+	} else if (type_name == "DUCKDB_TYPE_BOOLEAN") {
+		return DUCKDB_TYPE_BOOLEAN;
+	} else if (type_name == "DUCKDB_TYPE_TINYINT") {
+		return DUCKDB_TYPE_TINYINT;
+	} else if (type_name == "DUCKDB_TYPE_SMALLINT") {
+		return DUCKDB_TYPE_SMALLINT;
+	} else if (type_name == "DUCKDB_TYPE_INTEGER") {
+		return DUCKDB_TYPE_INTEGER;
+	} else if (type_name == "DUCKDB_TYPE_BIGINT") {
+		return DUCKDB_TYPE_BIGINT;
+	} else if (type_name == "DUCKDB_TYPE_UTINYINT") {
+		return DUCKDB_TYPE_UTINYINT;
+	} else if (type_name == "DUCKDB_TYPE_USMALLINT") {
+		return DUCKDB_TYPE_USMALLINT;
+	} else if (type_name == "DUCKDB_TYPE_UINTEGER") {
+		return DUCKDB_TYPE_UINTEGER;
+	} else if (type_name == "DUCKDB_TYPE_UBIGINT") {
+		return DUCKDB_TYPE_UBIGINT;
+	} else if (type_name == "DUCKDB_TYPE_FLOAT") {
+		return DUCKDB_TYPE_FLOAT;
+	} else if (type_name == "DUCKDB_TYPE_DOUBLE") {
+		return DUCKDB_TYPE_DOUBLE;
+	} else if (type_name == "DUCKDB_TYPE_TIMESTAMP") {
+		return DUCKDB_TYPE_TIMESTAMP;
+	} else if (type_name == "DUCKDB_TYPE_DATE") {
+		return DUCKDB_TYPE_DATE;
+	} else if (type_name == "DUCKDB_TYPE_TIME") {
+		return DUCKDB_TYPE_TIME;
+	} else if (type_name == "DUCKDB_TYPE_INTERVAL") {
+		return DUCKDB_TYPE_INTERVAL;
+	} else if (type_name == "DUCKDB_TYPE_HUGEINT") {
+		return DUCKDB_TYPE_HUGEINT;
+	} else if (type_name == "DUCKDB_TYPE_UHUGEINT") {
+		return DUCKDB_TYPE_UHUGEINT;
+	} else if (type_name == "DUCKDB_TYPE_VARCHAR") {
+		return DUCKDB_TYPE_VARCHAR;
+	} else if (type_name == "DUCKDB_TYPE_BLOB") {
+		return DUCKDB_TYPE_BLOB;
+	} else if (type_name == "DUCKDB_TYPE_DECIMAL") {
+		return DUCKDB_TYPE_DECIMAL;
+	} else if (type_name == "DUCKDB_TYPE_TIMESTAMP_S") {
+		return DUCKDB_TYPE_TIMESTAMP_S;
+	} else if (type_name == "DUCKDB_TYPE_TIMESTAMP_MS") {
+		return DUCKDB_TYPE_TIMESTAMP_MS;
+	} else if (type_name == "DUCKDB_TYPE_TIMESTAMP_NS") {
+		return DUCKDB_TYPE_TIMESTAMP_NS;
+	} else if (type_name == "DUCKDB_TYPE_ENUM") {
+		return DUCKDB_TYPE_ENUM;
+	} else if (type_name == "DUCKDB_TYPE_LIST") {
+		return DUCKDB_TYPE_LIST;
+	} else if (type_name == "DUCKDB_TYPE_STRUCT") {
+		return DUCKDB_TYPE_STRUCT;
+	} else if (type_name == "DUCKDB_TYPE_MAP") {
+		return DUCKDB_TYPE_MAP;
+	} else if (type_name == "DUCKDB_TYPE_ARRAY") {
+		return DUCKDB_TYPE_ARRAY;
+	} else if (type_name == "DUCKDB_TYPE_UUID") {
+		return DUCKDB_TYPE_UUID;
+	} else if (type_name == "DUCKDB_TYPE_UNION") {
+		return DUCKDB_TYPE_UNION;
+	} else if (type_name == "DUCKDB_TYPE_BIT") {
+		return DUCKDB_TYPE_BIT;
+	} else if (type_name == "DUCKDB_TYPE_TIME_TZ") {
+		return DUCKDB_TYPE_TIME_TZ;
+	} else if (type_name == "DUCKDB_TYPE_TIMESTAMP_TZ") {
+		return DUCKDB_TYPE_TIMESTAMP_TZ;
+	} else if (type_name == "DUCKDB_TYPE_ANY") {
+		return DUCKDB_TYPE_ANY;
+	} else if (type_name == "DUCKDB_TYPE_VARINT") {
+		return DUCKDB_TYPE_VARINT;
+	} else if (type_name == "DUCKDB_TYPE_SQLNULL") {
+		return DUCKDB_TYPE_SQLNULL;
+	} else {
+		throw ScannerException("Unknown DuckDB type name specified: '" + type_name + "'");
 	}
 }
 

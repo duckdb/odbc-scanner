@@ -40,6 +40,8 @@ struct OdbcType {
 
 struct Types {
 
+	static const std::string UNKNOWN_DUCKDB_TYPE_NAME;
+
 	static const SQLSMALLINT SQL_SS_TIME2 = -154;
 	static const SQLSMALLINT SQL_SS_TIMESTAMPOFFSET = -155;
 
@@ -83,6 +85,10 @@ struct Types {
 	static std::pair<T, bool> ExtractFunctionArg(duckdb_data_chunk chunk, idx_t col_idx);
 
 	static void SetNullValueToResult(duckdb_vector vec, idx_t row_idx);
+
+	static std::string ToString(duckdb_type type_id);
+
+	static duckdb_type FromString(const std::string &type_name);
 };
 
 class TypeSpecific {

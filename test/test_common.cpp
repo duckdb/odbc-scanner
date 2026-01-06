@@ -3,6 +3,10 @@
 
 #include <cstring>
 
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif // __APPLE__
+
 #define SCANNER_QUOTE(value)                 #value
 #define SCANNER_STR(value)                   SCANNER_QUOTE(value)
 #define ODBC_SCANNER_EXTENSION_FILE_PATH_STR SCANNER_STR(ODBC_SCANNER_EXTENSION_FILE_PATH)
@@ -319,4 +323,79 @@ std::string CastAsDecimalSQL(const std::string &value, uint8_t precision, uint8_
 		postfix = " FROM sysibm.sysdummy1";
 	}
 	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
+}
+
+#if defined(__linux__)
+static std::string CurrentExecutablePathLinux() {
+	std::string res;
+	ssize_t size = 64;
+	for (;;) {
+		res.resize(size);
+		ssize_t res_size = readlink("/proc/self/exe", std::addressof(res.front()), size);
+		REQUIRE(res_size >= 0);
+		if (res_size < size) {
+			res.resize(res_size);
+			break;
+		}
+		size = size * 2;
+	}
+	return res;
+}
+#endif // Linux
+
+#if defined(_WIN32)
+static std::string CurrentExecutablePathWindows() {
+	DWORD size = 64;
+	std::string out;
+	for (;;) {
+		out.resize(size);
+		auto path = std::addressof(out.front());
+		auto res_size = GetModuleFileNameA(NULL, path, size);
+		REQUIRE(res_size >= 0);
+		if (res_size < size) {
+			out.resize(res_size);
+			return out;
+		}
+		size = size * 2;
+	}
+}
+#endif // !_WIN32
+
+#if defined(__APPLE__)
+static std::string CurrentExecutablePathMac() {
+	std::string out;
+	uint32_t size = 64;
+	out.resize(size);
+	char *path = std::addressof(out.front());
+	int res = _NSGetExecutablePath(path, &size);
+	REQUIRE(-1 != res);
+	if (0 == res) {
+		// trim null terminated buffer
+		return std::string(out.c_str());
+	} else {
+		out.resize(size);
+		path = std::addressof(out.front());
+		res = _NSGetExecutablePath(path, &size);
+		REQUIRE(0 == res);
+		// trim null terminated buffer
+		return std::string(out.c_str());
+	}
+}
+#endif // __APPLE__
+
+std::string ProjectRootDir() {
+	std::string exec_path =
+#if defined(__linux__)
+	    CurrentExecutablePathLinux();
+#elif defined(_WIN32)
+	    CurrentExecutablePathWindows();
+#elif defined(__APPLE__)
+	    CurrentExecutablePathMac();
+#else
+	    REQUIRE(false);
+#endif
+	std::replace(exec_path.begin(), exec_path.end(), '\\', '/');
+	size_t slash_pos = exec_path.find_last_of('/');
+	std::string exec_dir = exec_path.substr(0, slash_pos);
+	return exec_dir + "/../../..";
 }
