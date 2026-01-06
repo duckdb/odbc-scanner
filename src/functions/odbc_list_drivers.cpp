@@ -5,6 +5,7 @@
 
 #include "capi_pointers.hpp"
 #include "diagnostics.hpp"
+#include "make_unique.hpp"
 #include "odbc_api.hpp"
 #include "scanner_exception.hpp"
 #include "strings.hpp"
@@ -73,7 +74,7 @@ static void GlobalInit(duckdb_init_info info) {
 }
 
 static void LocalInit(duckdb_init_info info) {
-	auto ldata_ptr = std::unique_ptr<LocalInitData>(new LocalInitData());
+	auto ldata_ptr = std_make_unique<LocalInitData>();
 	duckdb_init_set_init_data(info, ldata_ptr.release(), LocalInitData::Destroy);
 }
 

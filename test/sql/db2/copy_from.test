@@ -1,0 +1,35 @@
+# name: test/sql/copy_from.test
+# description: test odbc_copy_from() function
+# group: [sql_copy_from]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"', ignore_exec_failure=TRUE)
+
+query II
+SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+  create_table=TRUE,
+  source_queries=[
+    'CREATE TABLE tmp1(col1 SMALLINT, col2 INTEGER)',
+    'INSERT INTO tmp1 VALUES (41, 42)',
+    'INSERT INTO tmp1 VALUES (43, 44)',
+    'SELECT * FROM tmp1'
+    ])
+----
+1	2
+
+query II
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+----
+41	42
+43	44
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

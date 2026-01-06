@@ -10,6 +10,7 @@
 #include "dbms_quirks.hpp"
 #include "defer.hpp"
 #include "diagnostics.hpp"
+#include "make_unique.hpp"
 #include "odbc_api.hpp"
 #include "params.hpp"
 #include "query_context.hpp"
@@ -226,12 +227,12 @@ static void GlobalInit(duckdb_init_info info) {
 	// Keep the connection in global data while the function is running
 	// to not allow other threads operate on it or close it.
 	auto conn_ptr = ConnectionsRegistry::Remove(bdata.conn_id);
-	auto gdata_ptr = std::unique_ptr<GlobalInitData>(new GlobalInitData(bdata.conn_id, std::move(conn_ptr)));
+	auto gdata_ptr = std_make_unique<GlobalInitData>(bdata.conn_id, std::move(conn_ptr));
 	duckdb_init_set_init_data(info, gdata_ptr.release(), GlobalInitData::Destroy);
 }
 
 static void LocalInit(duckdb_init_info info) {
-	auto ldata_ptr = std::unique_ptr<LocalInitData>(new LocalInitData());
+	auto ldata_ptr = std_make_unique<LocalInitData>();
 	duckdb_init_set_init_data(info, ldata_ptr.release(), LocalInitData::Destroy);
 }
 
