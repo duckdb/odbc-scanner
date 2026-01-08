@@ -49,9 +49,13 @@ struct InsertOptions {
 
 	uint32_t batch_size = 0;
 	bool use_insert_all = false;
+	bool insert_in_transaction = false;
+	uint64_t max_records_in_transaction = 0;
 
-	InsertOptions(uint32_t batch_size_in, bool use_insert_all_in)
-	    : batch_size(batch_size_in), use_insert_all(use_insert_all_in) {
+	InsertOptions(uint32_t batch_size_in, bool use_insert_all_in, bool insert_in_transaction_in,
+	              uint64_t max_records_in_transaction_in)
+	    : batch_size(batch_size_in), use_insert_all(use_insert_all_in), insert_in_transaction(insert_in_transaction_in),
+	      max_records_in_transaction(max_records_in_transaction_in) {
 	}
 };
 
@@ -226,6 +230,8 @@ struct LocalInitData {
 	uint64_t copy_start_moment = 0;
 	uint64_t chunk_start_moment = 0;
 	uint32_t last_prepared_batch_size = 0;
+	SQLUINTEGER orig_transaction_mode = SQL_AUTOCOMMIT_DEFAULT;
+	uint64_t inserted_in_transaction = 0;
 
 	LocalInitData() {
 	}
@@ -369,7 +375,8 @@ static std::unordered_map<duckdb_type, std::string> ExtractTypeMapping(duckdb_va
 }
 
 static InsertOptions ExtractInsertOptions(DbmsDriver driver, duckdb_value batch_size_val,
-                                          duckdb_value use_insert_all_val) {
+                                          duckdb_value use_insert_all_val, duckdb_value insert_in_transaction_val,
+                                          duckdb_value max_records_in_transaction_val) {
 	uint32_t batch_size = InsertOptions::default_batch_size;
 	if (batch_size_val != nullptr && !duckdb_is_null_value(batch_size_val)) {
 		batch_size = duckdb_get_uint32(batch_size_val);
@@ -380,7 +387,17 @@ static InsertOptions ExtractInsertOptions(DbmsDriver driver, duckdb_value batch_
 		use_insert_all = duckdb_get_bool(use_insert_all_val);
 	}
 
-	return InsertOptions(batch_size, use_insert_all);
+	bool insert_in_transaction = true;
+	if (insert_in_transaction_val != nullptr && !duckdb_is_null_value(insert_in_transaction_val)) {
+		insert_in_transaction = duckdb_get_bool(insert_in_transaction_val);
+	}
+
+	uint64_t max_records_in_transaction = 0;
+	if (max_records_in_transaction_val != nullptr && !duckdb_is_null_value(max_records_in_transaction_val)) {
+		max_records_in_transaction = duckdb_get_uint64(max_records_in_transaction_val);
+	}
+
+	return InsertOptions(batch_size, use_insert_all, insert_in_transaction, max_records_in_transaction);
 }
 
 static CreateTableOptions ExtractCreateTableOptions(DbmsDriver driver, DbmsQuirks &quirks,
@@ -435,7 +452,13 @@ static void Bind(duckdb_bind_info info) {
 
 	auto batch_size_val = ValuePtr(duckdb_bind_get_named_parameter(info, "batch_size"), ValueDeleter);
 	auto use_insert_all_val = ValuePtr(duckdb_bind_get_named_parameter(info, "use_insert_all"), ValueDeleter);
-	InsertOptions insert_options = ExtractInsertOptions(conn.driver, batch_size_val.get(), use_insert_all_val.get());
+	auto insert_in_transaction_val =
+	    ValuePtr(duckdb_bind_get_named_parameter(info, "insert_in_transaction"), ValueDeleter);
+	auto max_records_in_transaction_val =
+	    ValuePtr(duckdb_bind_get_named_parameter(info, "max_records_in_transaction"), ValueDeleter);
+	InsertOptions insert_options =
+	    ExtractInsertOptions(conn.driver, batch_size_val.get(), use_insert_all_val.get(),
+	                         insert_in_transaction_val.get(), max_records_in_transaction_val.get());
 
 	auto create_table_val = ValuePtr(duckdb_bind_get_named_parameter(info, "create_table"), ValueDeleter);
 	auto column_types_val = ValuePtr(duckdb_bind_get_named_parameter(info, "column_types"), ValueDeleter);
@@ -702,18 +725,54 @@ static std::string PrepareInsert(HSTMT hstmt, BindData &bdata, const std::vector
 	return query;
 }
 
-static void CopyFrom(duckdb_function_info info, duckdb_data_chunk output) {
+static void SetTransactionMode(OdbcConnection &conn, SQLUINTEGER mode) {
+	SQLRETURN ret =
+	    SQLSetConnectAttr(conn.dbc, SQL_ATTR_AUTOCOMMIT, reinterpret_cast<SQLPOINTER>(static_cast<uint64_t>(mode)), 0);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(conn.dbc, SQL_HANDLE_DBC);
+		throw ScannerException("'SQLSetConnectAttr' failed for SQL_ATTR_AUTOCOMMIT, return: " + std::to_string(ret) +
+		                       ", diagnostics: '" + diag + "'");
+	}
+}
+
+static SQLUINTEGER BeginTransaction(OdbcConnection &conn) {
+	SQLUINTEGER mode = 0;
+	SQLRETURN ret =
+	    SQLGetConnectAttr(conn.dbc, SQL_ATTR_AUTOCOMMIT, reinterpret_cast<SQLPOINTER>(&mode), sizeof(mode), nullptr);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(conn.dbc, SQL_HANDLE_DBC);
+		throw ScannerException("'SQLGetConnectAttr' failed for SQL_ATTR_AUTOCOMMIT, return: " + std::to_string(ret) +
+		                       ", diagnostics: '" + diag + "'");
+	}
+	SetTransactionMode(conn, SQL_AUTOCOMMIT_OFF);
+	return mode;
+}
+
+static void Commit(OdbcConnection &conn) {
+	SQLRETURN ret = SQLEndTran(SQL_HANDLE_DBC, conn.dbc, SQL_COMMIT);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(conn.dbc, SQL_HANDLE_DBC);
+		throw ScannerException("'SQLEndTran' failed for SQL_COMMIT, return: " + std::to_string(ret) +
+		                       ", diagnostics: '" + diag + "'");
+	}
+}
+
+static void Rollback(OdbcConnection &conn) {
+	SQLRETURN ret = SQLEndTran(SQL_HANDLE_DBC, conn.dbc, SQL_ROLLBACK);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(conn.dbc, SQL_HANDLE_DBC);
+		throw ScannerException("'SQLEndTran' failed for SQL_ROLLBACK, return: " + std::to_string(ret) +
+		                       ", diagnostics: '" + diag + "'");
+	}
+}
+
+static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk output) {
 	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_function_get_bind_data(info));
 	GlobalInitData &gdata = *reinterpret_cast<GlobalInitData *>(duckdb_function_get_init_data(info));
 	LocalInitData &ldata = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
-
-	if (ldata.state == ExecState::EXHAUSTED) {
-		duckdb_data_chunk_set_size(output, 0);
-		return;
-	}
+	OdbcConnection &conn = *gdata.conn_ptr;
 
 	if (ldata.state == ExecState::UNINITIALIZED) {
-		OdbcConnection &conn = *gdata.conn_ptr;
 		ldata.reader = OpenReader(bdata.reader_options);
 		SourceReader &reader = *ldata.reader;
 
@@ -815,7 +874,14 @@ static void CopyFrom(duckdb_function_info info, duckdb_data_chunk output) {
 		}
 
 		ldata.records_inserted += row_idx;
+		ldata.inserted_in_transaction += row_idx;
 		row_idx = 0;
+
+		if (bdata.insert_options.insert_in_transaction && bdata.insert_options.max_records_in_transaction > 0 &&
+		    ldata.inserted_in_transaction > bdata.insert_options.max_records_in_transaction) {
+			Commit(conn);
+			ldata.inserted_in_transaction = 0;
+		}
 
 		if (!has_row) {
 			break;
@@ -843,6 +909,36 @@ static void CopyFrom(duckdb_function_info info, duckdb_data_chunk output) {
 	}
 }
 
+static void CopyFrom(duckdb_function_info info, duckdb_data_chunk output) {
+	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_function_get_bind_data(info));
+	GlobalInitData &gdata = *reinterpret_cast<GlobalInitData *>(duckdb_function_get_init_data(info));
+	LocalInitData &ldata = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
+
+	OdbcConnection &conn = *gdata.conn_ptr;
+
+	if (ldata.state == ExecState::EXHAUSTED) {
+		duckdb_data_chunk_set_size(output, 0);
+		return;
+	}
+
+	if (bdata.insert_options.insert_in_transaction && ldata.state == ExecState::UNINITIALIZED) {
+		ldata.orig_transaction_mode = BeginTransaction(conn);
+	}
+
+	try {
+		CopyInTransaction(info, output);
+		if (bdata.insert_options.insert_in_transaction) {
+			Commit(conn);
+		}
+	} catch (const std::exception &e) {
+		if (bdata.insert_options.insert_in_transaction) {
+			Rollback(conn);
+			SetTransactionMode(conn, ldata.orig_transaction_mode);
+		}
+		throw ScannerException(e.what());
+	}
+}
+
 void OdbcCopyFromFunction::Register(duckdb_connection conn) {
 	auto fun = TableFunctionPtr(duckdb_create_table_function(), TableFunctionDeleter);
 	duckdb_table_function_set_name(fun.get(), "odbc_copy_from");
@@ -851,6 +947,7 @@ void OdbcCopyFromFunction::Register(duckdb_connection conn) {
 	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
 	auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
 	auto uint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER), LogicalTypeDeleter);
+	auto ubigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_UBIGINT), LogicalTypeDeleter);
 	auto bool_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN), LogicalTypeDeleter);
 	auto map_type = LogicalTypePtr(duckdb_create_map_type(varchar_type.get(), varchar_type.get()), LogicalTypeDeleter);
 	auto list_type = LogicalTypePtr(duckdb_create_list_type(varchar_type.get()), LogicalTypeDeleter);
@@ -864,6 +961,8 @@ void OdbcCopyFromFunction::Register(duckdb_connection conn) {
 	// insert options
 	duckdb_table_function_add_named_parameter(fun.get(), "batch_size", uint_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "use_insert_all", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "insert_in_transaction", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "max_records_in_transaction", ubigint_type.get());
 	// create table options
 	duckdb_table_function_add_named_parameter(fun.get(), "create_table", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "column_types", map_type.get());
