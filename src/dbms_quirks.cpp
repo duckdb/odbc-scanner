@@ -76,6 +76,8 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 			this->decimal_columns_precision_through_ard_bind = duckdb_get_bool(val.get());
 		} else if (en.first == "decimal_params_as_chars") {
 			this->decimal_params_as_chars = duckdb_get_bool(val.get());
+		} else if (en.first == "integral_params_as_decimals") {
+			this->integral_params_as_decimals = duckdb_get_bool(val.get());
 		} else if (en.first == "reset_stmt_before_execute") {
 			this->reset_stmt_before_execute = duckdb_get_bool(val.get());
 		} else if (en.first == "time_params_as_ss_time2") {
@@ -114,6 +116,7 @@ const std::vector<std::string> DbmsQuirks::AllNames() {
 	res.emplace_back("decimal_columns_precision_through_ard");
 	res.emplace_back("decimal_columns_precision_through_ard_bind");
 	res.emplace_back("decimal_params_as_chars");
+	res.emplace_back("integral_params_as_decimals");
 	res.emplace_back("reset_stmt_before_execute");
 	res.emplace_back("time_params_as_ss_time2");
 	res.emplace_back("timestamp_columns_as_timestamp_ns");

@@ -15,6 +15,7 @@ SELECT * FROM odbc_query(
 	decimal_columns_precision_through_ard=TRUE,
 	decimal_columns_precision_through_ard_bind=TRUE,
 	decimal_params_as_chars=TRUE,
+	integral_params_as_decimals=TRUE,
 	reset_stmt_before_execute=TRUE,
 	time_params_as_ss_time2=TRUE,
 	timestamp_columns_as_timestamp_ns=TRUE,

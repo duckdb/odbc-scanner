@@ -16,6 +16,7 @@ struct DbmsQuirks {
 	bool decimal_columns_precision_through_ard = false;
 	bool decimal_columns_precision_through_ard_bind = false;
 	bool decimal_params_as_chars = false;
+	bool integral_params_as_decimals = false;
 	bool reset_stmt_before_execute = false;
 	bool time_params_as_ss_time2 = false;
 	bool timestamp_columns_as_timestamp_ns = false;
@@ -25,8 +26,6 @@ struct DbmsQuirks {
 	bool timestamptz_params_as_ss_timestampoffset = false;
 	bool var_len_data_single_part = false;
 	uint32_t var_len_params_long_threshold_bytes = 4000;
-
-	bool integral_params_as_decimals = false;
 
 	explicit DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePtr> &user_quirks);
 
