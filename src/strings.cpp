@@ -28,4 +28,15 @@ std::vector<std::string> Strings::Split(const std::string &str, char delim) {
 	return res;
 }
 
+std::string Strings::ReplaceAll(std::string &str, const std::string &snippet, const std::string &replacement) {
+	if (snippet.empty()) {
+		return str;
+	}
+	auto pos = std::string::npos;
+	while (std::string::npos != (pos = str.find(snippet))) {
+		str.replace(pos, snippet.length(), replacement);
+	}
+	return str;
+}
+
 } // namespace odbcscanner

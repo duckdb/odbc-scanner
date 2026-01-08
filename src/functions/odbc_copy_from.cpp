@@ -112,14 +112,16 @@ struct GlobalInitData {
 struct SourceColumn {
 	std::string name;
 	duckdb_type type_id;
+	std::vector<uint32_t> typmods;
 
 	SourceColumn();
 
-	SourceColumn(std::string name_in, duckdb_type type_id_in) : name(std::move(name_in)), type_id(type_id_in) {
+	SourceColumn(std::string name_in, duckdb_type type_id_in, std::vector<uint32_t> typmods_in)
+	    : name(std::move(name_in)), type_id(type_id_in), typmods(std::move(typmods_in)) {
 	}
 };
 
-struct FileReader {
+struct SourceReader {
 	DatabasePtr db;
 	ConnectionPtr conn;
 	ResultPtr result;
@@ -130,7 +132,7 @@ struct FileReader {
 	std::vector<duckdb_vector> vectors;
 	std::vector<uint64_t *> validities;
 
-	FileReader(DatabasePtr db_in, ConnectionPtr conn_in, ResultPtr result_in)
+	SourceReader(DatabasePtr db_in, ConnectionPtr conn_in, ResultPtr result_in)
 	    : db(std::move(db_in)), conn(std::move(conn_in)), result(std::move(result_in)),
 	      chunk(nullptr, DataChunkDeleter) {
 		this->NextChunkInternal();
@@ -144,7 +146,19 @@ struct FileReader {
 			}
 			std::string name(name_cstr);
 			duckdb_type type_id = duckdb_column_type(result.get(), col_idx);
-			SourceColumn col(std::move(name), type_id);
+			std::vector<uint32_t> typmods;
+			if (type_id == DUCKDB_TYPE_DECIMAL) {
+				LogicalTypePtr ltype(duckdb_column_logical_type(result.get(), col_idx), LogicalTypeDeleter);
+				if (ltype.get() == nullptr) {
+					throw ScannerException("'odbc_copy_from' error: cannot access logica type for column, index: " +
+					                       std::to_string(col_idx));
+				}
+				uint8_t width = duckdb_decimal_width(ltype.get());
+				typmods.push_back(static_cast<uint32_t>(width));
+				uint8_t scale = duckdb_decimal_scale(ltype.get());
+				typmods.push_back(static_cast<uint32_t>(scale));
+			}
+			SourceColumn col(std::move(name), type_id, std::move(typmods));
 			this->columns.emplace_back(std::move(col));
 		}
 		vectors.resize(columns.size());
@@ -204,7 +218,7 @@ struct FileReader {
 
 struct LocalInitData {
 	ExecState state = ExecState::UNINITIALIZED;
-	std::unique_ptr<FileReader> reader;
+	std::unique_ptr<SourceReader> reader;
 	std::unique_ptr<QueryContext> ctx;
 	std::vector<SQLSMALLINT> param_types;
 	std::string create_table_query;
@@ -464,7 +478,7 @@ static void CheckSuccess(duckdb_state st, const std::string &msg) {
 	}
 }
 
-static std::unique_ptr<FileReader> OpenReader(const ReaderOptions &options) {
+static std::unique_ptr<SourceReader> OpenReader(const ReaderOptions &options) {
 	duckdb_config config_bare = nullptr;
 	duckdb_state state_config_create = duckdb_create_config(&config_bare);
 	CheckSuccess(state_config_create, "'duckdb_create_config' failed");
@@ -510,17 +524,24 @@ static std::unique_ptr<FileReader> OpenReader(const ReaderOptions &options) {
 		                       err + "'");
 	}
 
-	return std_make_unique<FileReader>(std::move(db), std::move(conn), std::move(result));
+	return std_make_unique<SourceReader>(std::move(db), std::move(conn), std::move(result));
 }
 
-static const std::string &LookupMapping(std::unordered_map<duckdb_type, std::string> &mapping, duckdb_type type_id) {
-	auto it = mapping.find(type_id);
+static std::string LookupMapping(std::unordered_map<duckdb_type, std::string> &mapping, const SourceColumn &col) {
+	auto it = mapping.find(col.type_id);
 	if (it == mapping.end()) {
-		std::string dtype_name = Types::ToString(type_id);
-		throw ScannerException("'odbc_copy_from' error: column type not recognized, id: " + std::to_string(type_id) +
-		                       ", name: '" + dtype_name + "'");
+		std::string dtype_name = Types::ToString(col.type_id);
+		throw ScannerException("'odbc_copy_from' error: column type not recognized, id: " +
+		                       std::to_string(col.type_id) + ", name: '" + dtype_name + "'");
 	}
-	return it->second;
+	std::string res = it->second;
+	for (size_t i = 0; i < col.typmods.size(); i++) {
+		uint32_t tm = col.typmods.at(i);
+		std::string snippet = "{typmod" + std::to_string(i + 1) + "}";
+		std::string replacement = std::to_string(tm);
+		Strings::ReplaceAll(res, snippet, replacement);
+	}
+	return res;
 }
 
 static std::string BuildCreateTableQuery(const std::string &table_name, const std::vector<SourceColumn> &columns,
@@ -536,7 +557,7 @@ static std::string BuildCreateTableQuery(const std::string &table_name, const st
 		query.append(col.name);
 		query.append("\"");
 		query.append(" ");
-		const std::string &type_name = LookupMapping(options.column_types, col.type_id);
+		const std::string &type_name = LookupMapping(options.column_types, col);
 		query.append(type_name);
 		if (i < columns.size() - 1) {
 			query.append(",");
@@ -694,7 +715,7 @@ static void CopyFrom(duckdb_function_info info, duckdb_data_chunk output) {
 	if (ldata.state == ExecState::UNINITIALIZED) {
 		OdbcConnection &conn = *gdata.conn_ptr;
 		ldata.reader = OpenReader(bdata.reader_options);
-		FileReader &reader = *ldata.reader;
+		SourceReader &reader = *ldata.reader;
 
 		HSTMT hstmt = SQL_NULL_HSTMT;
 		{
@@ -733,7 +754,7 @@ static void CopyFrom(duckdb_function_info info, duckdb_data_chunk output) {
 	}
 
 	QueryContext &ctx = *ldata.ctx;
-	FileReader &reader = *ldata.reader;
+	SourceReader &reader = *ldata.reader;
 
 	std::vector<ScannerValue> row;
 	row.resize(reader.columns.size());
