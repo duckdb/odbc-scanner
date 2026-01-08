@@ -12,6 +12,8 @@ struct Strings {
 	static std::string Trim(const std::string &str);
 
 	static std::vector<std::string> Split(const std::string &str, char delim);
+
+	static std::string ReplaceAll(std::string &str, const std::string &snippet, const std::string &replacement);
 };
 
 } // namespace odbcscanner

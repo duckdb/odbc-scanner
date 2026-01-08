@@ -23,8 +23,7 @@ std::unordered_map<duckdb_type, std::string> Mappings::Oracle(const DbmsQuirks &
 	        // { DUCKDB_TYPE_INTERVAL, "TODO"},
 	        {DUCKDB_TYPE_VARCHAR, "NVARCHAR2(2000)"},
 	        {DUCKDB_TYPE_BLOB, "BLOB"},
-	        // TODO: type attributes
-	        {DUCKDB_TYPE_DECIMAL, "NUMBER(38,19)"},
+	        {DUCKDB_TYPE_DECIMAL, "NUMBER({typmod1},{typmod2})"},
 	        {DUCKDB_TYPE_TIMESTAMP_S, "TIMESTAMP(0)"},
 	        {DUCKDB_TYPE_TIMESTAMP_MS, "TIMESTAMP(3)"},
 	        {DUCKDB_TYPE_TIMESTAMP_NS, "TIMESTAMP(9)"},
