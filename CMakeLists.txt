@@ -111,6 +111,7 @@ set(EXTENSION_SOURCES
 add_library(${EXTENSION_NAME} SHARED ${EXTENSION_SOURCES})
 
 if(DEFINED ${EXTENSION_NAME}_CMAKE_ONLY_BUILD)
+    add_dependencies(${EXTENSION_NAME} duckdb_platform)
     add_custom_command(
         TARGET odbc_scanner
         POST_BUILD
@@ -125,7 +126,6 @@ if(DEFINED ${EXTENSION_NAME}_CMAKE_ONLY_BUILD)
             -DEXTENSION_VERSION=${${EXTENSION_NAME}_GIT_COMMIT_HASH}
             -DNULL_FILE=${DUCKDB_MODULE_BASE_DIR}/scripts/null.txt
             -P ${DUCKDB_MODULE_BASE_DIR}/scripts/append_metadata.cmake
-        DEPENDS duckdb_platform
     )
 endif()
 
