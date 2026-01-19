@@ -132,7 +132,7 @@ typedef enum DUCKDB_TYPE {
 	// ANY type
 	DUCKDB_TYPE_ANY = 34,
 	// duckdb_varint
-	DUCKDB_TYPE_VARINT = 35,
+	DUCKDB_TYPE_BIGNUM = 35,
 	// SQLNULL type
 	DUCKDB_TYPE_SQLNULL = 36,
 } duckdb_type;

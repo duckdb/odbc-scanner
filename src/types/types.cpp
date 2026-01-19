@@ -459,8 +459,8 @@ std::string Types::ToString(duckdb_type type_id) {
 		return "DUCKDB_TYPE_TIMESTAMP_TZ";
 	case DUCKDB_TYPE_ANY:
 		return "DUCKDB_TYPE_ANY";
-	case DUCKDB_TYPE_VARINT:
-		return "DUCKDB_TYPE_VARINT";
+	case DUCKDB_TYPE_BIGNUM:
+		return "DUCKDB_TYPE_BIGNUM";
 	case DUCKDB_TYPE_SQLNULL:
 		return "DUCKDB_TYPE_SQLNULL";
 	default:
@@ -539,8 +539,8 @@ duckdb_type Types::FromString(const std::string &type_name) {
 		return DUCKDB_TYPE_TIMESTAMP_TZ;
 	} else if (type_name == "DUCKDB_TYPE_ANY") {
 		return DUCKDB_TYPE_ANY;
-	} else if (type_name == "DUCKDB_TYPE_VARINT") {
-		return DUCKDB_TYPE_VARINT;
+	} else if (type_name == "DUCKDB_TYPE_BIGNUM") {
+		return DUCKDB_TYPE_BIGNUM;
 	} else if (type_name == "DUCKDB_TYPE_SQLNULL") {
 		return DUCKDB_TYPE_SQLNULL;
 	} else {
