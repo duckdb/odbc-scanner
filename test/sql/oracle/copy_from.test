@@ -15,8 +15,7 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
   create_table=TRUE,
   source_queries=[
     'CREATE TABLE tmp1(col1 SMALLINT, col2 INTEGER)',
-    'INSERT INTO tmp1 VALUES (41, 42)',
-    'INSERT INTO tmp1 VALUES (43, 44)',
+    'INSERT INTO tmp1 VALUES (41, 42), (43, 44)',
     'SELECT * FROM tmp1'
     ])
 ----

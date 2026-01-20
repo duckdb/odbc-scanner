@@ -68,6 +68,13 @@ struct CreateTableOptions {
 	}
 };
 
+struct GeneralOptions {
+	bool close_connection = false;
+
+	GeneralOptions(bool close_connection_in) : close_connection(close_connection_in) {
+	}
+};
+
 struct BindData {
 	int64_t conn_id = 0;
 	std::string table_name;
@@ -75,12 +82,14 @@ struct BindData {
 	ReaderOptions reader_options;
 	InsertOptions insert_options;
 	CreateTableOptions create_table_options;
+	GeneralOptions general_options;
 
 	BindData(int64_t conn_id_in, std::string table_name_in, DbmsQuirks quirks_in, ReaderOptions reader_options_in,
-	         InsertOptions insert_options_in, CreateTableOptions create_table_options_in)
+	         InsertOptions insert_options_in, CreateTableOptions create_table_options_in,
+	         GeneralOptions general_options_in)
 	    : conn_id(conn_id_in), table_name(std::move(table_name_in)), quirks(quirks_in),
 	      reader_options(std::move(reader_options_in)), insert_options(insert_options_in),
-	      create_table_options(std::move(create_table_options_in)) {
+	      create_table_options(std::move(create_table_options_in)), general_options(general_options_in) {
 	}
 
 	static void Destroy(void *bdata_in) noexcept {
@@ -92,9 +101,10 @@ struct BindData {
 struct GlobalInitData {
 	int64_t conn_id;
 	std::unique_ptr<OdbcConnection> conn_ptr;
+	bool close_connection = false;
 
-	GlobalInitData(int64_t conn_id, std::unique_ptr<OdbcConnection> conn_ptr_in)
-	    : conn_id(conn_id), conn_ptr(std::move(conn_ptr_in)) {
+	GlobalInitData(int64_t conn_id, std::unique_ptr<OdbcConnection> conn_ptr_in, bool close_connection_in)
+	    : conn_id(conn_id), conn_ptr(std::move(conn_ptr_in)), close_connection(close_connection_in) {
 		if (!conn_ptr) {
 			throw ScannerException("'odbc_copy_from' error: ODBC connection not found on global init, id: " +
 			                       std::to_string(conn_id));
@@ -102,9 +112,11 @@ struct GlobalInitData {
 	}
 
 	~GlobalInitData() {
-		// We are not closing the connection, even in case of error,
-		// so need to return connection to registry
-		ConnectionsRegistry::Add(std::move(conn_ptr));
+		if (!close_connection) {
+			// We are not closing the connection, even in case of error,
+			// so need to return connection to registry
+			ConnectionsRegistry::Add(std::move(conn_ptr));
+		}
 	}
 
 	static void Destroy(void *gdata_in) noexcept {
@@ -419,6 +431,14 @@ static CreateTableOptions ExtractCreateTableOptions(DbmsDriver driver, DbmsQuirk
 	return CreateTableOptions(create_table, std::move(column_types));
 }
 
+static GeneralOptions ExtractGeneralOptions(duckdb_value close_connection_val) {
+	bool close_connection = false;
+	if (close_connection_val != nullptr && !duckdb_is_null_value(close_connection_val)) {
+		close_connection = duckdb_get_bool(close_connection_val);
+	}
+	return GeneralOptions(close_connection);
+}
+
 static void Bind(duckdb_bind_info info) {
 	auto conn_id_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
 	if (duckdb_is_null_value(conn_id_val.get())) {
@@ -465,8 +485,11 @@ static void Bind(duckdb_bind_info info) {
 	CreateTableOptions create_table_options =
 	    ExtractCreateTableOptions(conn.driver, quirks, create_table_val.get(), column_types_val.get());
 
+	auto close_connection_val = ValuePtr(duckdb_bind_get_named_parameter(info, "close_connection"), ValueDeleter);
+	GeneralOptions general_options = ExtractGeneralOptions(close_connection_val.get());
+
 	auto bdata_ptr = std_make_unique<BindData>(conn_id, std::move(table_name), quirks, std::move(reader_options),
-	                                           insert_options, std::move(create_table_options));
+	                                           insert_options, std::move(create_table_options), general_options);
 	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
 
 	auto bool_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN), LogicalTypeDeleter);
@@ -486,7 +509,8 @@ static void GlobalInit(duckdb_init_info info) {
 	// Keep the connection in global data while the function is running
 	// to not allow other threads operate on it or close it.
 	auto conn_ptr = ConnectionsRegistry::Remove(bdata.conn_id);
-	auto gdata_ptr = std_make_unique<GlobalInitData>(bdata.conn_id, std::move(conn_ptr));
+	auto gdata_ptr =
+	    std_make_unique<GlobalInitData>(bdata.conn_id, std::move(conn_ptr), bdata.general_options.close_connection);
 	duckdb_init_set_init_data(info, gdata_ptr.release(), GlobalInitData::Destroy);
 }
 
@@ -966,6 +990,8 @@ void OdbcCopyFromFunction::Register(duckdb_connection conn) {
 	// create table options
 	duckdb_table_function_add_named_parameter(fun.get(), "create_table", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "column_types", map_type.get());
+	// general options
+	duckdb_table_function_add_named_parameter(fun.get(), "close_connection", bool_type.get());
 
 	// callbacks
 	duckdb_table_function_set_bind(fun.get(), odbc_copy_from_bind);

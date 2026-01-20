@@ -36,23 +36,32 @@ enum class ExecState { UNINITIALIZED, EXECUTED, EXHAUSTED };
 // return status of the SQLExecute call
 enum class SqlExecStatus { SUCCESS, FAILURE };
 
+struct QueryOptions {
+	bool ignore_exec_failure = false;
+	bool close_connection = false;
+
+	QueryOptions(bool ignore_exec_failure_in, bool close_connection_in)
+	    : ignore_exec_failure(ignore_exec_failure_in), close_connection(close_connection_in) {
+	}
+};
+
 struct BindData {
 	int64_t conn_id = 0;
 	QueryContext ctx;
 
 	std::vector<ResultColumn> columns;
 
-	bool ignore_exec_failure = false;
+	QueryOptions query_options;
 
 	std::vector<SQLSMALLINT> param_types;
 	std::vector<ScannerValue> params;
 	int64_t params_handle = 0;
 
-	BindData(int64_t conn_id_in, QueryContext ctx_in, std::vector<ResultColumn> columns_in, bool ignore_exec_failure_in,
-	         std::vector<SQLSMALLINT> param_types_in, std::vector<ScannerValue> params_in, int64_t params_handle_in)
-	    : conn_id(conn_id_in), ctx(std::move(ctx_in)), columns(std::move(columns_in)),
-	      ignore_exec_failure(ignore_exec_failure_in), param_types(std::move(param_types_in)),
-	      params(std::move(params_in)), params_handle(params_handle_in) {
+	BindData(int64_t conn_id_in, QueryContext ctx_in, std::vector<ResultColumn> columns_in,
+	         QueryOptions query_options_in, std::vector<SQLSMALLINT> param_types_in,
+	         std::vector<ScannerValue> params_in, int64_t params_handle_in)
+	    : conn_id(conn_id_in), ctx(std::move(ctx_in)), columns(std::move(columns_in)), query_options(query_options_in),
+	      param_types(std::move(param_types_in)), params(std::move(params_in)), params_handle(params_handle_in) {
 	}
 
 	BindData(const BindData &other) = delete;
@@ -80,9 +89,10 @@ struct BindData {
 struct GlobalInitData {
 	int64_t conn_id;
 	std::unique_ptr<OdbcConnection> conn_ptr;
+	bool close_connection = false;
 
-	GlobalInitData(int64_t conn_id, std::unique_ptr<OdbcConnection> conn_ptr_in)
-	    : conn_id(conn_id), conn_ptr(std::move(conn_ptr_in)) {
+	GlobalInitData(int64_t conn_id, std::unique_ptr<OdbcConnection> conn_ptr_in, bool close_connection_in)
+	    : conn_id(conn_id), conn_ptr(std::move(conn_ptr_in)), close_connection(close_connection_in) {
 		if (!conn_ptr) {
 			throw ScannerException("'odbc_query' error: ODBC connection not found on global init, id: " +
 			                       std::to_string(conn_id));
@@ -90,9 +100,11 @@ struct GlobalInitData {
 	}
 
 	~GlobalInitData() {
-		// We are not closing the connection, even in case of error,
-		// so need to return connection to registry
-		ConnectionsRegistry::Add(std::move(conn_ptr));
+		if (!close_connection) {
+			// We are not closing the connection, even in case of error,
+			// so need to return connection to registry
+			ConnectionsRegistry::Add(std::move(conn_ptr));
+		}
 	}
 
 	static void Destroy(void *gdata_in) noexcept {
@@ -122,6 +134,18 @@ static std::map<std::string, ValuePtr> ExtractUserQuirks(duckdb_bind_info info) 
 		res.emplace(name, std::move(val));
 	}
 	return res;
+}
+
+static QueryOptions ExtractQueryOptions(duckdb_value ignore_exec_failure_val, duckdb_value close_connection_val) {
+	bool ignore_exec_failure = false;
+	if (ignore_exec_failure_val != nullptr && !duckdb_is_null_value(ignore_exec_failure_val)) {
+		ignore_exec_failure = duckdb_get_bool(ignore_exec_failure_val);
+	}
+	bool close_connection = false;
+	if (close_connection_val != nullptr && !duckdb_is_null_value(close_connection_val)) {
+		close_connection = duckdb_get_bool(close_connection_val);
+	}
+	return QueryOptions(ignore_exec_failure, close_connection);
 }
 
 static void Bind(duckdb_bind_info info) {
@@ -165,11 +189,9 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 
-	bool ignore_exec_failure = false;
 	auto ignore_exec_failure_val = ValuePtr(duckdb_bind_get_named_parameter(info, "ignore_exec_failure"), ValueDeleter);
-	if (ignore_exec_failure_val.get() != nullptr && !duckdb_is_null_value(ignore_exec_failure_val.get())) {
-		ignore_exec_failure = duckdb_get_bool(ignore_exec_failure_val.get());
-	}
+	auto close_connection_val = ValuePtr(duckdb_bind_get_named_parameter(info, "close_connection"), ValueDeleter);
+	QueryOptions query_options = ExtractQueryOptions(ignore_exec_failure_val.get(), close_connection_val.get());
 
 	std::map<std::string, ValuePtr> user_quirks = ExtractUserQuirks(info);
 	DbmsQuirks quirks(conn, user_quirks);
@@ -216,9 +238,8 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 
-	auto bdata_ptr =
-	    std::unique_ptr<BindData>(new BindData(conn_id, std::move(ctx), std::move(columns), ignore_exec_failure,
-	                                           std::move(param_types), std::move(params), params_handle));
+	auto bdata_ptr = std::unique_ptr<BindData>(new BindData(conn_id, std::move(ctx), std::move(columns), query_options,
+	                                                        std::move(param_types), std::move(params), params_handle));
 	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
 }
 
@@ -227,7 +248,8 @@ static void GlobalInit(duckdb_init_info info) {
 	// Keep the connection in global data while the function is running
 	// to not allow other threads operate on it or close it.
 	auto conn_ptr = ConnectionsRegistry::Remove(bdata.conn_id);
-	auto gdata_ptr = std_make_unique<GlobalInitData>(bdata.conn_id, std::move(conn_ptr));
+	auto gdata_ptr =
+	    std_make_unique<GlobalInitData>(bdata.conn_id, std::move(conn_ptr), bdata.query_options.close_connection);
 	duckdb_init_set_init_data(info, gdata_ptr.release(), GlobalInitData::Destroy);
 }
 
@@ -264,7 +286,7 @@ static SqlExecStatus BindParamsAndExecute(BindData &bdata) {
 	{
 		SQLRETURN ret = SQLExecute(ctx.hstmt);
 		if (!SQL_SUCCEEDED(ret)) {
-			if (bdata.ignore_exec_failure) {
+			if (bdata.query_options.ignore_exec_failure) {
 				return SqlExecStatus::FAILURE;
 			}
 			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
@@ -396,6 +418,7 @@ void OdbcQueryFunction::Register(duckdb_connection conn) {
 	duckdb_table_function_add_parameter(fun.get(), varchar_type.get());
 	// named args
 	duckdb_table_function_add_named_parameter(fun.get(), "ignore_exec_failure", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "close_connection", bool_type.get());
 	// query params
 	duckdb_table_function_add_named_parameter(fun.get(), "params", any_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "params_handle", bigint_type.get());
