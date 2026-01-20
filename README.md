@@ -317,6 +317,14 @@ Optional named parameters that can change types mapping:
 Other optional named parameters:
 
  - `ignore_exec_failure` (`BOOLEAN`, default: `false`): when a query, that is run in remote DB, can be prepared successfully, but may or may not fail at execution time (for example, because of schema state like table existence), then this flag an be used to not thow an error when query execution fails. Empty result set is returned if query execution fails.
+ - `close_connection` (`BOOLEAN`, default: `false`): closes the passed connection after the function call is completed, intended to be used with one-shot invocations of the `odbc_query`, example:
+
+ ```sql
+ FROM odbc_query(
+    odbc_connect('Driver={Oracle Driver};DBQ=//127.0.0.1:1521/XE;UID=system;PWD=tiger;'),
+    'SELECT 42 FROM dual',
+    close_connection=TRUE);
+ ```
 
 #### Returns:
 

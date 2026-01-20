@@ -1,0 +1,23 @@
+# name: test/sql/duckdb/ignore_exec_failure.test
+# description: test for 'ignore_exec_failure' option of odbc_query() function
+# group: [duckdb_ignore_exec_failure]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), "SELECT ?::INT",
+  params=row('foo'))
+----
+'SQLExecute' failed
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), "SELECT ?::INT",
+  params=row('foo'),
+  ignore_exec_failure=TRUE)
+----
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

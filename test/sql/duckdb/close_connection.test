@@ -1,0 +1,39 @@
+# name: test/sql/duckdb/close_connection.test
+# description: test for 'close_connection' option of odbc_query() function
+# group: [duckdb_close_connection]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn1 = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn1'), "SELECT 42::INT",
+  close_connection=TRUE)
+----
+42
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn1'), "SELECT 42::INT")
+----
+ODBC connection not found on bind
+
+statement ok
+SET VARIABLE conn2 = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query II
+SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn2'), 'duckdb_test_copy_from',
+  create_table=TRUE,
+  source_queries=[
+    'CREATE TABLE tmp1(col1 SMALLINT, col2 INTEGER)',
+    'INSERT INTO tmp1 VALUES (41, 42), (43, 44)',
+    'SELECT * FROM tmp1'
+    ],
+  close_connection=TRUE)
+----
+1	2
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn2'), "SELECT 42::INT")
+----
+ODBC connection not found on bind
