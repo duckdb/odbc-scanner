@@ -1,0 +1,70 @@
+# name: test/sql/oracle/13_interval_day_to_second.test
+# description: test for Oracle INTERVAL DAY TO SECOND type
+# group: [oracle_13_interval_day_to_second]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(to_dsinterval(''1 02:03:04'') AS VARCHAR2(64)) FROM dual')
+----
++000000001 02:03:04.000000000
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT to_dsinterval(''1 02:03:04'') FROM dual')
+----
+Binder Error: 'SQLNumResultCols' failed
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(to_dsinterval(?) AS VARCHAR2(64)) FROM dual',
+  params=row('1 02:03:04'))
+----
+INTERVAL'+000000001 02:03:04.000000000'DAY(9)TO SECOND(9)
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT to_dsinterval(?) FROM dual',
+  params=row('1 02:03:04'))
+----
+Binder Error: 'SQLNumResultCols' failed
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(to_dsinterval(?) AS VARCHAR2(64)) FROM dual',
+  params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind('1 02:03:04'::VARCHAR)
+
+query I
+EXECUTE p1
+----
+INTERVAL'+000000001 02:03:04.000000000'DAY(9)TO SECOND(9)
+
+statement ok
+EXECUTE p1_bind('2 03:04:05'::VARCHAR)
+
+query I
+EXECUTE p1
+----
+INTERVAL'+000000002 03:04:05.000000000'DAY(9)TO SECOND(9)
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

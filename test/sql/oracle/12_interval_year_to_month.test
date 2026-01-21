@@ -1,0 +1,70 @@
+# name: test/sql/oracle/12_interval_year_to_month.test
+# description: test for Oracle INTERVAL YEAR TO MONTH type
+# group: [oracle_12_interval_year_to_month]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(to_yminterval(''01-02'') AS VARCHAR2(64)) FROM dual')
+----
++000000001-02
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT to_yminterval(''01-02'') FROM dual')
+----
+Binder Error: 'SQLNumResultCols' failed
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(to_yminterval(?) AS VARCHAR2(64)) FROM dual',
+  params=row('01-02'::VARCHAR))
+----
+INTERVAL'+000000001-02'YEAR(9)TO MONTH
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT to_yminterval(?) FROM dual',
+  params=row('01-02'::VARCHAR))
+----
+Binder Error: 'SQLNumResultCols' failed
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(to_yminterval(?) AS VARCHAR2(64)) FROM dual',
+  params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind('01-02'::VARCHAR)
+
+query I
+EXECUTE p1
+----
+INTERVAL'+000000001-02'YEAR(9)TO MONTH
+
+statement ok
+EXECUTE p1_bind('03-04'::VARCHAR)
+
+query I
+EXECUTE p1
+----
+INTERVAL'+000000003-04'YEAR(9)TO MONTH
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

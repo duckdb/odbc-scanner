@@ -14,8 +14,8 @@ Reference: [link](https://docs.oracle.com/en/database/oracle/oracle-database/19/
  - [x] TIMESTAMP
  - [x] TIMESTAMP WITH TIME ZONE
  - [x] TIMESTAMP WITH LOCAL TIME ZONE
- - [ ] **INTERVAL YEAR TO MONTH**
- - [ ] **INTERVAL DAY TO SECOND**
+ - [x] INTERVAL YEAR TO MONTH
+ - [x] INTERVAL DAY TO SECOND
  - [x] RAW
  - [ ] **LONG RAW**
  - [ ] **ROWID**
