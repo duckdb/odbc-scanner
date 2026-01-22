@@ -333,7 +333,7 @@ static std::unordered_map<duckdb_type, std::string> ExtractTypeMapping(duckdb_va
 		return std::unordered_map<duckdb_type, std::string>();
 	}
 
-	if (!duckdb_is_null_value(column_types_val)) {
+	if (duckdb_is_null_value(column_types_val)) {
 		throw ScannerException("'odbc_copy_from' error: specified 'column_types' map must be not NULL");
 	}
 
@@ -953,6 +953,7 @@ static void CopyFrom(duckdb_function_info info, duckdb_data_chunk output) {
 		CopyInTransaction(info, output);
 		if (bdata.insert_options.insert_in_transaction) {
 			Commit(conn);
+			SetTransactionMode(conn, ldata.orig_transaction_mode);
 		}
 	} catch (const std::exception &e) {
 		if (bdata.insert_options.insert_in_transaction) {
