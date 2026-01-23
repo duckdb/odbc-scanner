@@ -25,9 +25,14 @@ SELECT * FROM odbc_query(getvariable('fail'), 'SELECT 42')
 Binder Error: 'odbc_query' error: specified ODBC connection must be not NULL
 
 statement error
-SELECT * FROM odbc_query(42, 'SELECT 42')
+SELECT * FROM odbc_query(42::BIGINT, 'SELECT 42')
 ----
 Binder Error: 'odbc_query' error: ODBC connection not found on bind, id: 42
+
+statement error
+SELECT * FROM odbc_query(42::FLOAT, 'SELECT 42')
+----
+Binder Error: 'odbc_query' error: invalid first argument specified, type ID: 10
 
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')

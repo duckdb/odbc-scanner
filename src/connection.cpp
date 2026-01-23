@@ -3,7 +3,10 @@
 #include <cstdint>
 #include <vector>
 
+#include "capi_pointers.hpp"
 #include "diagnostics.hpp"
+#include "make_unique.hpp"
+#include "registries.hpp"
 #include "scanner_exception.hpp"
 #include "widechar.hpp"
 
@@ -106,6 +109,44 @@ OdbcConnection::~OdbcConnection() noexcept {
 	SQLDisconnect(dbc);
 	SQLFreeHandle(SQL_HANDLE_DBC, dbc);
 	SQLFreeHandle(SQL_HANDLE_ENV, env);
+}
+
+ExtractedConnection OdbcConnection::ExtractOrOpen(const std::string &function_name, duckdb_value conn_id_or_str_val) {
+	if (duckdb_is_null_value(conn_id_or_str_val)) {
+		throw ScannerException("'" + function_name + "' error: specified ODBC connection must be not NULL");
+	}
+
+	duckdb_logical_type ltype = duckdb_get_value_type(conn_id_or_str_val);
+	duckdb_type type_id = duckdb_get_type_id(ltype);
+
+	int64_t conn_id = -1;
+	bool must_be_closed = false;
+	if (type_id == DUCKDB_TYPE_VARCHAR) {
+		auto conn_cstr = VarcharPtr(duckdb_get_varchar(conn_id_or_str_val), VarcharDeleter);
+		if (conn_cstr == nullptr) {
+			throw ScannerException("'" + function_name + "' error: extracted ODBC connection must be not NULL");
+		}
+		std::string conn_str(conn_cstr.get());
+		auto oc_ptr = std_make_unique<OdbcConnection>(conn_str);
+		conn_id = ConnectionsRegistry::Add(std::move(oc_ptr));
+		must_be_closed = true;
+	} else if (type_id == DUCKDB_TYPE_BIGINT) {
+		conn_id = duckdb_get_int64(conn_id_or_str_val);
+	} else {
+		throw ScannerException("'" + function_name +
+		                       "' error: invalid first argument specified, type ID: " + std::to_string(type_id) +
+		                       ", must be either 'BIGINT' as an output of 'odbc_connect()' (example: 'FROM "
+		                       "odbc_query(getvariable('conn'), ...)')" +
+		                       " or an ODBC connection string (for one-off queries)");
+	}
+
+	auto conn_ptr = ConnectionsRegistry::Remove(conn_id);
+	if (conn_ptr.get() == nullptr) {
+		throw ScannerException("'" + function_name +
+		                       "' error: ODBC connection not found on bind, id: " + std::to_string(conn_id));
+	}
+
+	return ExtractedConnection(conn_id, std::move(conn_ptr), must_be_closed);
 }
 
 } // namespace odbcscanner

@@ -136,34 +136,29 @@ static std::map<std::string, ValuePtr> ExtractUserQuirks(duckdb_bind_info info) 
 	return res;
 }
 
-static QueryOptions ExtractQueryOptions(duckdb_value ignore_exec_failure_val, duckdb_value close_connection_val) {
+static QueryOptions ExtractQueryOptions(duckdb_value ignore_exec_failure_val, duckdb_value close_connection_val,
+                                        bool conn_must_be_closed) {
 	bool ignore_exec_failure = false;
 	if (ignore_exec_failure_val != nullptr && !duckdb_is_null_value(ignore_exec_failure_val)) {
 		ignore_exec_failure = duckdb_get_bool(ignore_exec_failure_val);
 	}
-	bool close_connection = false;
+	bool close_connection = conn_must_be_closed;
 	if (close_connection_val != nullptr && !duckdb_is_null_value(close_connection_val)) {
 		close_connection = duckdb_get_bool(close_connection_val);
+		if (conn_must_be_closed && !close_connection) {
+			throw ScannerException("'odbc_query' error: 'close_connection=FALSE' option cannot be specified along with "
+			                       "a connection string");
+		}
 	}
 	return QueryOptions(ignore_exec_failure, close_connection);
 }
 
 static void Bind(duckdb_bind_info info) {
-	auto conn_id_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
-	if (duckdb_is_null_value(conn_id_val.get())) {
-		throw ScannerException("'odbc_query' error: specified ODBC connection must be not NULL");
-	}
-	int64_t conn_id = duckdb_get_int64(conn_id_val.get());
-	auto conn_ptr = ConnectionsRegistry::Remove(conn_id);
-
-	if (conn_ptr.get() == nullptr) {
-		throw ScannerException("'odbc_query' error: ODBC connection not found on bind, id: " + std::to_string(conn_id));
-	}
-
+	auto conn_id_or_str_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
+	auto extracted_conn = OdbcConnection::ExtractOrOpen("odbc_query", conn_id_or_str_val.get());
 	// Return the connection to registry at the end of the block
-	auto deferred = Defer([&conn_ptr] { ConnectionsRegistry::Add(std::move(conn_ptr)); });
-
-	OdbcConnection &conn = *conn_ptr;
+	auto deferred = Defer([&extracted_conn] { ConnectionsRegistry::Add(std::move(extracted_conn.ptr)); });
+	OdbcConnection &conn = *extracted_conn.ptr;
 
 	auto query_val = ValuePtr(duckdb_bind_get_parameter(info, 1), ValueDeleter);
 	if (duckdb_is_null_value(query_val.get())) {
@@ -191,7 +186,8 @@ static void Bind(duckdb_bind_info info) {
 
 	auto ignore_exec_failure_val = ValuePtr(duckdb_bind_get_named_parameter(info, "ignore_exec_failure"), ValueDeleter);
 	auto close_connection_val = ValuePtr(duckdb_bind_get_named_parameter(info, "close_connection"), ValueDeleter);
-	QueryOptions query_options = ExtractQueryOptions(ignore_exec_failure_val.get(), close_connection_val.get());
+	QueryOptions query_options =
+	    ExtractQueryOptions(ignore_exec_failure_val.get(), close_connection_val.get(), extracted_conn.must_be_closed);
 
 	std::map<std::string, ValuePtr> user_quirks = ExtractUserQuirks(info);
 	DbmsQuirks quirks(conn, user_quirks);
@@ -238,8 +234,9 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 
-	auto bdata_ptr = std::unique_ptr<BindData>(new BindData(conn_id, std::move(ctx), std::move(columns), query_options,
-	                                                        std::move(param_types), std::move(params), params_handle));
+	auto bdata_ptr =
+	    std::unique_ptr<BindData>(new BindData(extracted_conn.id, std::move(ctx), std::move(columns), query_options,
+	                                           std::move(param_types), std::move(params), params_handle));
 	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
 }
 
@@ -414,7 +411,7 @@ void OdbcQueryFunction::Register(duckdb_connection conn) {
 	auto bool_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN), LogicalTypeDeleter);
 	auto utinyint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_UTINYINT), LogicalTypeDeleter);
 	auto uint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER), LogicalTypeDeleter);
-	duckdb_table_function_add_parameter(fun.get(), bigint_type.get());
+	duckdb_table_function_add_parameter(fun.get(), any_type.get());
 	duckdb_table_function_add_parameter(fun.get(), varchar_type.get());
 	// named args
 	duckdb_table_function_add_named_parameter(fun.get(), "ignore_exec_failure", bool_type.get());

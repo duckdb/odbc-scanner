@@ -282,12 +282,17 @@ SELECT * FROM odbc_list_drivers()
 ```sql
 odbc_query(conn_handle BIGINT, query VARCHAR[, <optional named parameters>]) -> TABLE
 ```
+```sql
+odbc_query(conn_string VARCHAR, query VARCHAR[, <optional named parameters>]) -> TABLE
+```
 
 Runs specified query in a remote DBMS and returns the query results table.
 
 #### Parameters:
 
- - `conn_handle` (`BIGINT`): ODBC connection handle created with [odbc_connect](#odbc_connect)
+ - `conn_handle_or_string` (`BIGINT` or `VARCHAR`), one of:
+   - ODBC connection handle created with [odbc_connect](#odbc_connect)
+   - ODBC connection string, intended for for one-off queries, in this case new ODBC connection will be opened and will be closed automatically after the query is complete
  - `query` (`VARCHAR`): SQL query, passed to the remote DBMS
 
 Optional named parameters that can be used to pass query parameters:

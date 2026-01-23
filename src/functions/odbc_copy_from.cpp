@@ -431,27 +431,24 @@ static CreateTableOptions ExtractCreateTableOptions(DbmsDriver driver, DbmsQuirk
 	return CreateTableOptions(create_table, std::move(column_types));
 }
 
-static GeneralOptions ExtractGeneralOptions(duckdb_value close_connection_val) {
-	bool close_connection = false;
+static GeneralOptions ExtractGeneralOptions(duckdb_value close_connection_val, bool conn_must_be_closed) {
+	bool close_connection = conn_must_be_closed;
 	if (close_connection_val != nullptr && !duckdb_is_null_value(close_connection_val)) {
 		close_connection = duckdb_get_bool(close_connection_val);
+		if (conn_must_be_closed && !close_connection) {
+			throw ScannerException(
+			    "'odbc_copy_from' error: 'close_connection=FALSE' option cannot be specified along with "
+			    "a connection string");
+		}
 	}
 	return GeneralOptions(close_connection);
 }
 
 static void Bind(duckdb_bind_info info) {
-	auto conn_id_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
-	if (duckdb_is_null_value(conn_id_val.get())) {
-		throw ScannerException("'odbc_copy_from' error: specified ODBC connection must be not NULL");
-	}
-	int64_t conn_id = duckdb_get_int64(conn_id_val.get());
-	auto conn_ptr = ConnectionsRegistry::Remove(conn_id);
-	if (conn_ptr.get() == nullptr) {
-		throw ScannerException("'odbc_copy_from' error: ODBC connection not found on bind, id: " +
-		                       std::to_string(conn_id));
-	}
+	auto conn_id_or_str_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
+	auto extracted_conn = OdbcConnection::ExtractOrOpen("odbc_copy_from", conn_id_or_str_val.get());
 	// Return the connection to registry at the end of the block
-	auto deferred = Defer([&conn_ptr] { ConnectionsRegistry::Add(std::move(conn_ptr)); });
+	auto deferred = Defer([&extracted_conn] { ConnectionsRegistry::Add(std::move(extracted_conn.ptr)); });
 
 	auto table_name_val = ValuePtr(duckdb_bind_get_parameter(info, 1), ValueDeleter);
 	if (duckdb_is_null_value(table_name_val.get())) {
@@ -467,7 +464,7 @@ static void Bind(duckdb_bind_info info) {
 	ReaderOptions reader_options = ExtractReaderOptions(duckdb_conn_string_val.get(), file_path_val.get(),
 	                                                    source_query_val.get(), source_queries_val.get());
 
-	OdbcConnection &conn = *conn_ptr;
+	OdbcConnection &conn = *extracted_conn.ptr;
 	DbmsQuirks quirks(conn, std::map<std::string, ValuePtr>());
 
 	auto batch_size_val = ValuePtr(duckdb_bind_get_named_parameter(info, "batch_size"), ValueDeleter);
@@ -486,10 +483,11 @@ static void Bind(duckdb_bind_info info) {
 	    ExtractCreateTableOptions(conn.driver, quirks, create_table_val.get(), column_types_val.get());
 
 	auto close_connection_val = ValuePtr(duckdb_bind_get_named_parameter(info, "close_connection"), ValueDeleter);
-	GeneralOptions general_options = ExtractGeneralOptions(close_connection_val.get());
+	GeneralOptions general_options = ExtractGeneralOptions(close_connection_val.get(), extracted_conn.must_be_closed);
 
-	auto bdata_ptr = std_make_unique<BindData>(conn_id, std::move(table_name), quirks, std::move(reader_options),
-	                                           insert_options, std::move(create_table_options), general_options);
+	auto bdata_ptr =
+	    std_make_unique<BindData>(extracted_conn.id, std::move(table_name), quirks, std::move(reader_options),
+	                              insert_options, std::move(create_table_options), general_options);
 	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
 
 	auto bool_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN), LogicalTypeDeleter);
@@ -976,7 +974,8 @@ void OdbcCopyFromFunction::Register(duckdb_connection conn) {
 	auto bool_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN), LogicalTypeDeleter);
 	auto map_type = LogicalTypePtr(duckdb_create_map_type(varchar_type.get(), varchar_type.get()), LogicalTypeDeleter);
 	auto list_type = LogicalTypePtr(duckdb_create_list_type(varchar_type.get()), LogicalTypeDeleter);
-	duckdb_table_function_add_parameter(fun.get(), bigint_type.get());  // connection handle
+	auto any_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_ANY), LogicalTypeDeleter);
+	duckdb_table_function_add_parameter(fun.get(), any_type.get());     // connection handle or string
 	duckdb_table_function_add_parameter(fun.get(), varchar_type.get()); // destination table name
 	// reader options
 	duckdb_table_function_add_named_parameter(fun.get(), "duckdb_conn_string", varchar_type.get());

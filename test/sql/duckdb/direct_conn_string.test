@@ -1,0 +1,22 @@
+# name: test/sql/duckdb/direct_conn_string.test
+# description: testing support for one-off connections in odbc_query() and odbc_copy_from()
+# group: [duckdb_direct_conn_string]
+
+require odbc_scanner
+
+query II
+SELECT * FROM odbc_query('Driver={DuckDB Driver};', 'SELECT 42, ''foo'' UNION ALL SELECT 43, ''bar'' ORDER BY 1')
+----
+42	foo
+43	bar
+
+query II
+SELECT completed, records_inserted FROM odbc_copy_from('Driver={DuckDB Driver};', 'duckdb_test_copy_from',
+  create_table=TRUE,
+  source_queries=[
+    'CREATE TABLE copy_test_basic(col1 SMALLINT, col2 INTEGER)',
+    'INSERT INTO copy_test_basic VALUES (41, 42), (43, 44)',
+    'SELECT * FROM copy_test_basic'
+    ])
+----
+1	2
