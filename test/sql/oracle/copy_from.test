@@ -313,5 +313,43 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_f
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
 
+# explicit dest query
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'),
+  'CREATE TABLE "duckdb_test_copy_from" (
+    col1 NUMBER(10,0),
+    col2 VARCHAR2(10),
+    col3 NUMBER(10,0),
+    col4 NVARCHAR2(10)
+  )')
+
+query II
+SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+  create_table=FALSE,
+  batch_size=2,
+  source_queries=[
+    'CREATE TABLE copy_test_dest_query(
+      col1 INTEGER,
+      col2 VARCHAR
+    )',
+    'INSERT INTO copy_test_dest_query VALUES 
+      (42, ''foo''),
+      (43, ''🌌'')
+    ',
+    'SELECT * FROM copy_test_dest_query'
+    ],
+  dest_query='INSERT INTO "duckdb_test_copy_from" VALUES(?,?,?,?)')
+----
+1	2
+
+query IIII
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+----
+42	foo	43	🌌
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))
