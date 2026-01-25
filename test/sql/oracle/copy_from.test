@@ -351,5 +351,16 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_f
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
 
+# error when copying, make sure the hang on driver unload is not happening
+# note: use the incorrect error message to trigger the hanging
+
+statement error
+SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+  create_table=TRUE,
+  source_query='SELECT * FROM fail'
+)
+----
+Table with name fail does not exist
+
 statement ok
 SELECT odbc_close(getvariable('conn'))

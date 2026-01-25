@@ -23,4 +23,11 @@ inline void EnvHandleDeleter(SQLHANDLE env) {
 	SQLFreeHandle(SQL_HANDLE_ENV, env);
 }
 
+using StmtHandlePtr = std::unique_ptr<void, void (*)(HSTMT)>;
+
+inline void StmtHandleDeleter(HSTMT hstmt) {
+	SQLFreeStmt(hstmt, SQL_CLOSE);
+	SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+}
+
 } // namespace odbcscanner

@@ -133,11 +133,11 @@ ScannerValue TypeSpecific::ExtractNotNullParam<TimestampNsStruct>(DbmsQuirks &qu
 template <>
 void TypeSpecific::BindOdbcParam<duckdb_date_struct>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_TYPE_DATE;
-	SQLRETURN ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_DATE, sqltype, 0, 0,
+	SQLRETURN ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_DATE, sqltype, 0, 0,
 	                                 reinterpret_cast<SQLPOINTER>(&param.Value<SQL_DATE_STRUCT>()), param.LengthBytes(),
 	                                 &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
 		                       ", index: " + std::to_string(param_idx) + ", query: '" + ctx.query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
@@ -150,17 +150,17 @@ void TypeSpecific::BindOdbcParam<duckdb_time_struct>(QueryContext &ctx, ScannerV
 	SQLRETURN ret = SQL_ERROR;
 	if (ctx.quirks.time_params_as_ss_time2) {
 		sqltype = Types::SQL_SS_TIME2;
-		ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_BINARY, sqltype, 0, 6,
+		ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_BINARY, sqltype, 0, 6,
 		                       reinterpret_cast<SQLPOINTER>(&param.Value<SQL_SS_TIME2_STRUCT>()), param.LengthBytes(),
 		                       &param.LengthBytes());
 	} else {
 		sqltype = SQL_TYPE_TIME;
-		ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_TIME, sqltype, 0, 0,
+		ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_TIME, sqltype, 0, 0,
 		                       reinterpret_cast<SQLPOINTER>(&param.Value<SQL_TIME_STRUCT>()), param.LengthBytes(),
 		                       &param.LengthBytes());
 	}
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
 		                       ", index: " + std::to_string(param_idx) + ", query: '" + ctx.query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
@@ -174,12 +174,12 @@ void TypeSpecific::BindOdbcParam<duckdb_timestamp_struct>(QueryContext &ctx, Sca
 	if (ctx.quirks.timestamp_params_as_sf_timestamp_ntz) {
 		sqltype = Types::SQL_SF_TIMESTAMP_NTZ;
 	}
-	SQLRETURN ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_TIMESTAMP, sqltype, 0,
+	SQLRETURN ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_TYPE_TIMESTAMP, sqltype, 0,
 	                                 static_cast<SQLSMALLINT>(ctx.quirks.timestamp_max_fraction_precision),
 	                                 reinterpret_cast<SQLPOINTER>(&param.Value<SQL_TIMESTAMP_STRUCT>()),
 	                                 param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
 		                       ", index: " + std::to_string(param_idx) + ", query: '" + ctx.query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
@@ -197,9 +197,9 @@ void TypeSpecific::BindColumn<duckdb_date_struct>(QueryContext &ctx, OdbcType &o
 	bind = std::move(nbind);
 	SQL_DATE_STRUCT &fetched = bind.Value<SQL_DATE_STRUCT>();
 	SQLLEN &ind = bind.Indicator();
-	SQLRETURN ret = SQLBindCol(ctx.hstmt, col_idx, SQL_C_TYPE_DATE, &fetched, sizeof(SQL_DATE_STRUCT), &ind);
+	SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, SQL_C_TYPE_DATE, &fetched, sizeof(SQL_DATE_STRUCT), &ind);
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(SQL_C_TYPE_DATE) + ", column index: " +
 		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
 		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
@@ -235,9 +235,9 @@ static void FetchAndSetResultTime(QueryContext &ctx, OdbcType &odbc_type, SQLSMA
 	SQL_TIME_STRUCT fetched;
 	std::memset(&fetched, '\0', sizeof(fetched));
 	SQLLEN ind;
-	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_TYPE_TIME, &fetched, sizeof(fetched), &ind);
+	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_TYPE_TIME, &fetched, sizeof(fetched), &ind);
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(SQL_C_TYPE_TIME) +
 		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
 		                       ",  query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
@@ -266,9 +266,9 @@ static void FetchAndSetResultSSTime2(QueryContext &ctx, OdbcType &odbc_type, SQL
 	SQL_SS_TIME2_STRUCT fetched;
 	std::memset(&fetched, '\0', sizeof(fetched));
 	SQLLEN ind;
-	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_BINARY, &fetched, sizeof(fetched), &ind);
+	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_BINARY, &fetched, sizeof(fetched), &ind);
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(Types::SQL_SS_TIME2) +
 		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
 		                       ",  query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
@@ -343,9 +343,9 @@ static void FetchAndSetResultTimestamp(QueryContext &ctx, OdbcType &odbc_type, S
 	SQL_TIMESTAMP_STRUCT fetched;
 	std::memset(&fetched, '\0', sizeof(fetched));
 	SQLLEN ind;
-	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_TYPE_TIMESTAMP, &fetched, sizeof(fetched), &ind);
+	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_TYPE_TIMESTAMP, &fetched, sizeof(fetched), &ind);
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(SQL_C_TYPE_TIMESTAMP) +
 		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
 		                       ",  query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
@@ -385,9 +385,9 @@ static void FetchAndSetResultTimestampOffset(QueryContext &ctx, OdbcType &odbc_t
 	SQL_SS_TIMESTAMPOFFSET_STRUCT fetched;
 	std::memset(&fetched, '\0', sizeof(fetched));
 	SQLLEN ind;
-	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_BINARY, &fetched, sizeof(fetched), &ind);
+	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_BINARY, &fetched, sizeof(fetched), &ind);
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(SQL_C_BINARY) + ", column index: " +
 		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
 		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");

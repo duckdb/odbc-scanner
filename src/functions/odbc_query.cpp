@@ -71,9 +71,6 @@ struct BindData {
 	BindData &operator=(BindData &&other) = delete;
 
 	~BindData() noexcept {
-		SQLFreeStmt(ctx.hstmt, SQL_CLOSE);
-		SQLFreeHandle(SQL_HANDLE_STMT, ctx.hstmt);
-
 		if (params_handle != 0) {
 			auto params_ptr = ParamsRegistry::Remove(params_handle);
 			(void)params_ptr;
@@ -167,18 +164,20 @@ static void Bind(duckdb_bind_info info) {
 	auto query_ptr = VarcharPtr(duckdb_get_varchar(query_val.get()), VarcharDeleter);
 	std::string query(query_ptr.get());
 
-	HSTMT hstmt = SQL_NULL_HSTMT;
+	StmtHandlePtr hstmt(nullptr, StmtHandleDeleter);
 	{
-		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_STMT, conn.dbc, &hstmt);
+		HSTMT hstmt_out = SQL_NULL_HSTMT;
+		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_STMT, conn.dbc, &hstmt_out);
 		if (!SQL_SUCCEEDED(ret)) {
 			throw ScannerException("'SQLAllocHandle' failed for STMT handle, return: " + std::to_string(ret));
 		}
+		hstmt.reset(hstmt_out);
 	}
 	{
 		auto wquery = WideChar::Widen(query.data(), query.length());
-		SQLRETURN ret = SQLPrepareW(hstmt, wquery.data(), wquery.length<SQLINTEGER>());
+		SQLRETURN ret = SQLPrepareW(hstmt.get(), wquery.data(), wquery.length<SQLINTEGER>());
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(hstmt.get(), SQL_HANDLE_STMT);
 			throw ScannerException("'SQLPrepare' failed, query: '" + query + "', return: " + std::to_string(ret) +
 			                       ", diagnostics: '" + diag + "'");
 		}
@@ -191,7 +190,7 @@ static void Bind(duckdb_bind_info info) {
 
 	std::map<std::string, ValuePtr> user_quirks = ExtractUserQuirks(info);
 	DbmsQuirks quirks(conn, user_quirks);
-	QueryContext ctx(query, hstmt, quirks);
+	QueryContext ctx(query, std::move(hstmt), quirks);
 
 	std::vector<ScannerValue> params;
 	auto params_val = ValuePtr(duckdb_bind_get_named_parameter(info, "params"), ValueDeleter);
@@ -272,21 +271,21 @@ static SqlExecStatus BindParamsAndExecute(BindData &bdata) {
 	}
 
 	if (ctx.quirks.reset_stmt_before_execute) {
-		SQLRETURN ret = SQLFreeStmt(ctx.hstmt, SQL_CLOSE);
+		SQLRETURN ret = SQLFreeStmt(ctx.hstmt(), SQL_CLOSE);
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException("'SQLFreeStmt' with SQL_CLOSE (reset_stmt_before_execute) failed, query: '" +
 			                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 		}
 	}
 
 	{
-		SQLRETURN ret = SQLExecute(ctx.hstmt);
+		SQLRETURN ret = SQLExecute(ctx.hstmt());
 		if (!SQL_SUCCEEDED(ret)) {
 			if (bdata.query_options.ignore_exec_failure) {
 				return SqlExecStatus::FAILURE;
 			}
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException("'SQLExecute' failed, query: '" + ctx.query + "', return: " + std::to_string(ret) +
 			                       ", diagnostics: '" + diag + "'");
 		}
@@ -325,9 +324,9 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 
 		if (bdata.columns.size() == 0) {
 			SQLLEN count = -1;
-			SQLRETURN ret = SQLRowCount(ctx.hstmt, &count);
+			SQLRETURN ret = SQLRowCount(ctx.hstmt(), &count);
 			if (!SQL_SUCCEEDED(ret)) {
-				std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+				std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 				throw ScannerException("'SQLRowCount' failed, DDL/DML query: '" + ctx.query +
 				                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 			}
@@ -371,16 +370,16 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 	idx_t row_idx = 0;
 	for (; row_idx < duckdb_vector_size(); row_idx++) {
 		{
-			SQLRETURN ret = SQLFetch(ctx.hstmt);
+			SQLRETURN ret = SQLFetch(ctx.hstmt());
 			if (!SQL_SUCCEEDED(ret)) {
 				if (ret != SQL_NO_DATA) {
-					std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+					std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 					throw ScannerException("'SQLFetch' failed, query: '" + ctx.query +
 					                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 				}
-				SQLRETURN ret_close = SQLFreeStmt(ctx.hstmt, SQL_CLOSE);
+				SQLRETURN ret_close = SQLFreeStmt(ctx.hstmt(), SQL_CLOSE);
 				if (!SQL_SUCCEEDED(ret_close)) {
-					std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+					std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 					throw ScannerException("'SQLFreeStmt' with SQL_CLOSE failed, query: '" + ctx.query +
 					                       "', return: " + std::to_string(ret_close) + ", diagnostics: '" + diag + "'");
 				}

@@ -107,9 +107,9 @@ std::vector<ScannerValue> Params::Extract(DbmsQuirks &quirks, duckdb_value struc
 std::vector<SQLSMALLINT> Params::CollectTypes(QueryContext &ctx) {
 	SQLSMALLINT count = -1;
 	{
-		SQLRETURN ret = SQLNumParams(ctx.hstmt, &count);
+		SQLRETURN ret = SQLNumParams(ctx.hstmt(), &count);
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException("'SQLNumParams' failed, query: '" + ctx.query + "', return: " + std::to_string(ret) +
 			                       ", diagnostics: '" + diag + "'");
 		}
@@ -123,7 +123,7 @@ std::vector<SQLSMALLINT> Params::CollectTypes(QueryContext &ctx) {
 		SQLULEN size_out = 0;
 		SQLSMALLINT dec_digits_out = 0;
 		SQLSMALLINT nullable_out = 0;
-		SQLRETURN ret = SQLDescribeParam(ctx.hstmt, param_idx, &ptype, &size_out, &dec_digits_out, &nullable_out);
+		SQLRETURN ret = SQLDescribeParam(ctx.hstmt(), param_idx, &ptype, &size_out, &dec_digits_out, &nullable_out);
 		if (!SQL_SUCCEEDED(ret)) { // SQLDescribeParam may or may not be supported
 			ptype = SQL_TYPE_NULL;
 		}
@@ -153,9 +153,9 @@ void Params::BindToOdbc(QueryContext &ctx, std::vector<ScannerValue> &params) {
 		return;
 	}
 
-	SQLRETURN ret = SQLFreeStmt(ctx.hstmt, SQL_RESET_PARAMS);
+	SQLRETURN ret = SQLFreeStmt(ctx.hstmt(), SQL_RESET_PARAMS);
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLFreeStmt' SQL_RESET_PARAMS failed, diagnostics: '" + diag + "'");
 	}
 

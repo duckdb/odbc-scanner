@@ -68,11 +68,11 @@ template <>
 void TypeSpecific::BindOdbcParam<SQL_NUMERIC_STRUCT>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_NUMERIC;
 	SQL_NUMERIC_STRUCT &ns = param.Value<SQL_NUMERIC_STRUCT>();
-	SQLRETURN ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_NUMERIC, sqltype,
+	SQLRETURN ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_NUMERIC, sqltype,
 	                                 static_cast<SQLULEN>(ns.precision), static_cast<SQLSMALLINT>(ns.scale),
 	                                 reinterpret_cast<SQLPOINTER>(&ns), param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
 		                       ", index: " + std::to_string(param_idx) + ", query: '" + ctx.query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
@@ -84,10 +84,10 @@ void TypeSpecific::BindOdbcParam<DecimalChars>(QueryContext &ctx, ScannerValue &
 	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_NUMERIC;
 	DecimalChars &dc = param.Value<DecimalChars>();
 	SQLRETURN ret =
-	    SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, param.LengthBytes(), 0,
+	    SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, param.LengthBytes(), 0,
 	                     reinterpret_cast<SQLPOINTER>(dc.data()), param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
 		                       ", index: " + std::to_string(param_idx) + ", query: '" + ctx.query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
@@ -97,9 +97,9 @@ void TypeSpecific::BindOdbcParam<DecimalChars>(QueryContext &ctx, ScannerValue &
 static void SetDescriptorFields(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
 	SQLHDESC hdesc = nullptr;
 	{
-		SQLRETURN ret = SQLGetStmtAttr(ctx.hstmt, SQL_ATTR_APP_ROW_DESC, &hdesc, 0, NULL);
+		SQLRETURN ret = SQLGetStmtAttr(ctx.hstmt(), SQL_ATTR_APP_ROW_DESC, &hdesc, 0, NULL);
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException(
 			    "'SQLGetStmtAttr' for SQL_ATTR_APP_ROW_DESC failed, C type: " + std::to_string(SQL_C_NUMERIC) +
 			    ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
@@ -110,7 +110,7 @@ static void SetDescriptorFields(QueryContext &ctx, OdbcType &odbc_type, SQLSMALL
 	{
 		SQLRETURN ret = SQLSetDescField(hdesc, col_idx, SQL_DESC_TYPE, reinterpret_cast<SQLPOINTER>(SQL_C_NUMERIC), 0);
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException(
 			    "'SQLSetDescField' for SQL_DESC_TYPE failed, C type: " + std::to_string(SQL_C_NUMERIC) +
 			    ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
@@ -122,7 +122,7 @@ static void SetDescriptorFields(QueryContext &ctx, OdbcType &odbc_type, SQLSMALL
 		SQLSMALLINT precision = odbc_type.decimal_precision;
 		SQLRETURN ret = SQLSetDescField(hdesc, col_idx, SQL_DESC_PRECISION, reinterpret_cast<SQLPOINTER>(precision), 0);
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException(
 			    "'SQLSetDescField' for SQL_DESC_PRECISION failed, C type: " + std::to_string(SQL_C_NUMERIC) +
 			    ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
@@ -134,7 +134,7 @@ static void SetDescriptorFields(QueryContext &ctx, OdbcType &odbc_type, SQLSMALL
 		SQLSMALLINT scale = odbc_type.decimal_scale;
 		SQLRETURN ret = SQLSetDescField(hdesc, col_idx, SQL_DESC_SCALE, reinterpret_cast<SQLPOINTER>(scale), 0);
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException(
 			    "'SQLSetDescField' for SQL_DESC_SCALE failed, C type: " + std::to_string(SQL_C_NUMERIC) +
 			    ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
@@ -246,9 +246,9 @@ static std::pair<duckdb_hugeint, bool> FetchDecimal(QueryContext &ctx, OdbcType 
 
 		SQL_NUMERIC_STRUCT fetched;
 		std::memset(&fetched, '\0', sizeof(fetched));
-		SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, ctype, &fetched, sizeof(fetched), &ind);
+		SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, ctype, &fetched, sizeof(fetched), &ind);
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(SQL_C_NUMERIC) +
 			                       ", column index: " + std::to_string(col_idx) +
 			                       ", column type: " + odbc_type.ToString() + ",  query: '" + ctx.query +
@@ -279,10 +279,11 @@ static std::pair<duckdb_hugeint, bool> FetchVarchar(QueryContext &ctx, OdbcType 
 	std::vector<char> buf;
 	buf.resize(128);
 	SQLLEN len_bytes = 0;
-	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_CHAR, buf.data(), static_cast<SQLLEN>(buf.size()), &len_bytes);
+	SQLRETURN ret =
+	    SQLGetData(ctx.hstmt(), col_idx, SQL_C_CHAR, buf.data(), static_cast<SQLLEN>(buf.size()), &len_bytes);
 
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for DECIMAL VARCHAR failed, column index: " + std::to_string(col_idx) +
 		                       ", query: '" + ctx.query + "', column type: " + odbc_type.ToString() +
 		                       ",  return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
@@ -331,9 +332,9 @@ void TypeSpecific::BindColumn<duckdb_decimal>(QueryContext &ctx, OdbcType &odbc_
 		bind = std::move(nbind);
 		SQL_NUMERIC_STRUCT &fetched = bind.Value<SQL_NUMERIC_STRUCT>();
 		SQLLEN &ind = bind.Indicator();
-		SQLRETURN ret = SQLBindCol(ctx.hstmt, col_idx, SQL_C_NUMERIC, &fetched, sizeof(SQL_NUMERIC_STRUCT), &ind);
+		SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, SQL_C_NUMERIC, &fetched, sizeof(SQL_NUMERIC_STRUCT), &ind);
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(SQL_C_NUMERIC) +
 			                       ", column index: " + std::to_string(col_idx) +
 			                       ", column type: " + odbc_type.ToString() + ",  query: '" + ctx.query +
