@@ -394,6 +394,17 @@ static InsertOptions ExtractInsertOptions(DbmsDriver driver, duckdb_value batch_
 	if (batch_size_val != nullptr && !duckdb_is_null_value(batch_size_val)) {
 		batch_size = duckdb_get_uint32(batch_size_val);
 	}
+	idx_t engine_vector_size = duckdb_vector_size();
+	if (batch_size > engine_vector_size || engine_vector_size % batch_size != 0) {
+		std::string msg;
+		if (engine_vector_size == 2048) { // default size
+			msg = "supported values: 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048";
+		} else {
+			msg = "must be a divisor of the engine vector size: " + std::to_string(engine_vector_size);
+		}
+		throw ScannerException("'odbc_copy_from' error: invalid value specified for the 'batch_size' parameter: " +
+		                       std::to_string(batch_size) + ", " + msg);
+	}
 
 	bool use_insert_all = driver == DbmsDriver::ORACLE;
 	if (use_insert_all_val != nullptr && !duckdb_is_null_value(use_insert_all_val)) {
