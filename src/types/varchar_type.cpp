@@ -71,10 +71,10 @@ void TypeSpecific::BindOdbcParam<std::string>(QueryContext &ctx, ScannerValue &p
 		sqltype = SQL_WLONGVARCHAR;
 	}
 	SQLRETURN ret =
-	    SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, sqltype, wstring.length<SQLULEN>(), 0,
+	    SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, sqltype, wstring.length<SQLULEN>(), 0,
 	                     reinterpret_cast<SQLPOINTER>(wstring.data()), param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' VARCHAR failed, expected type: " + std::to_string(sqltype) +
 		                       ", value: '" + param.ToUtf8String(1 << 10) + "', index: " + std::to_string(param_idx) +
 		                       ", query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
@@ -96,10 +96,10 @@ static std::pair<std::string, bool> FetchTail(QueryContext &ctx, SQLSMALLINT col
 	size_t buf_tail_size = buf.size() - head_size;
 	SQLLEN len_tail_bytes = 0;
 
-	SQLRETURN ret_tail = SQLGetData(ctx.hstmt, col_idx, SQL_C_WCHAR, buf_tail_ptr,
+	SQLRETURN ret_tail = SQLGetData(ctx.hstmt(), col_idx, SQL_C_WCHAR, buf_tail_ptr,
 	                                static_cast<SQLLEN>(buf_tail_size * sizeof(SQLWCHAR)), &len_tail_bytes);
 	if (!SQL_SUCCEEDED(ret_tail)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' tail for VARCHAR failed, column index: " + std::to_string(col_idx) +
 		                       ", query: '" + ctx.query + "', return: " + std::to_string(ret_tail) +
 		                       ", diagnostics: '" + diag + "'");
@@ -132,11 +132,11 @@ static std::pair<std::string, bool> FetchMultiReads(QueryContext &ctx, SQLSMALLI
 
 		SQLWCHAR *buf_ptr = buf.data() + prev_written;
 		size_t buf_size = buf.size() - prev_written;
-		SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_WCHAR, buf_ptr,
+		SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_WCHAR, buf_ptr,
 		                           static_cast<SQLLEN>(buf_size * sizeof(SQLWCHAR)), &len_bytes);
 
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException("'SQLGetData' multi for VARCHAR failed, read number: " + std::to_string(i) +
 			                       " column index: " + std::to_string(col_idx) + ", query: '" + ctx.query +
 			                       "', return: " + std::to_string(ret) +
@@ -145,7 +145,7 @@ static std::pair<std::string, bool> FetchMultiReads(QueryContext &ctx, SQLSMALLI
 
 		std::string diag_code;
 		if (ret == SQL_SUCCESS_WITH_INFO) {
-			diag_code = Diagnostics::ReadCode(ctx.hstmt, SQL_HANDLE_STMT);
+			diag_code = Diagnostics::ReadCode(ctx.hstmt(), SQL_HANDLE_STMT);
 		}
 
 		if (ret == SQL_SUCCESS || diag_code != trunc_diag_code) {
@@ -169,10 +169,10 @@ static std::pair<std::string, bool> FetchSinglePart(QueryContext &ctx, SQLSMALLI
 	buf.resize(len + 1);
 	SQLLEN len_read_bytes = 0;
 
-	SQLRETURN ret_tail = SQLGetData(ctx.hstmt, col_idx, SQL_C_WCHAR, buf.data(),
+	SQLRETURN ret_tail = SQLGetData(ctx.hstmt(), col_idx, SQL_C_WCHAR, buf.data(),
 	                                static_cast<SQLLEN>(buf.size() * sizeof(SQLWCHAR)), &len_read_bytes);
 	if (!SQL_SUCCEEDED(ret_tail)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException(
 		    "'SQLGetData' single part for VARCHAR tail failed, column index: " + std::to_string(col_idx) +
 		    ", query: '" + ctx.query + "', return: " + std::to_string(ret_tail) + ", diagnostics: '" + diag + "'");
@@ -198,11 +198,11 @@ static std::pair<std::string, bool> FetchInternal(QueryContext &ctx, SQLSMALLINT
 	std::vector<SQLWCHAR> buf;
 	buf.resize(4096);
 	SQLLEN len_bytes = 0;
-	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_WCHAR, buf.data(),
+	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_WCHAR, buf.data(),
 	                           static_cast<SQLLEN>(buf.size() * sizeof(SQLWCHAR)), &len_bytes);
 
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for VARCHAR failed, column index: " + std::to_string(col_idx) +
 		                       ", query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
 		                       diag + "'");
@@ -210,7 +210,7 @@ static std::pair<std::string, bool> FetchInternal(QueryContext &ctx, SQLSMALLINT
 
 	std::string diag_code;
 	if (ret == SQL_SUCCESS_WITH_INFO) {
-		diag_code = Diagnostics::ReadCode(ctx.hstmt, SQL_HANDLE_STMT);
+		diag_code = Diagnostics::ReadCode(ctx.hstmt(), SQL_HANDLE_STMT);
 	}
 
 	// single read

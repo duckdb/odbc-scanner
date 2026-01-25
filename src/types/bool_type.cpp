@@ -27,10 +27,10 @@ template <>
 void TypeSpecific::BindOdbcParam<bool>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_BIT;
 	bool &val = param.Value<bool>();
-	SQLRETURN ret = SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_BIT, sqltype, 0, 0,
+	SQLRETURN ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_BIT, sqltype, 0, 0,
 	                                 reinterpret_cast<SQLPOINTER>(&val), param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
 		                       ", value: " + std::to_string(param.Value<bool>()) +
 		                       ", index: " + std::to_string(param_idx) + ", query: '" + ctx.query +
@@ -47,9 +47,9 @@ void TypeSpecific::BindColumn<bool>(QueryContext &ctx, OdbcType &odbc_type, SQLS
 	bind = std::move(nbind);
 	bool &fetched = bind.Value<bool>();
 	SQLLEN &ind = bind.Indicator();
-	SQLRETURN ret = SQLBindCol(ctx.hstmt, col_idx, SQL_C_BIT, &fetched, sizeof(bool), &ind);
+	SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, SQL_C_BIT, &fetched, sizeof(bool), &ind);
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(SQL_C_BIT) + ", column index: " +
 		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
 		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");

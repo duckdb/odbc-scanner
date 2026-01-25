@@ -812,20 +812,22 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 		ldata.reader = OpenReader(bdata.reader_options);
 		SourceReader &reader = *ldata.reader;
 
-		HSTMT hstmt = SQL_NULL_HSTMT;
+		StmtHandlePtr hstmt(nullptr, StmtHandleDeleter);
 		{
-			SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_STMT, conn.dbc, &hstmt);
+			HSTMT hstmt_out = SQL_NULL_HSTMT;
+			SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_STMT, conn.dbc, &hstmt_out);
 			if (!SQL_SUCCEEDED(ret)) {
 				throw ScannerException("'SQLAllocHandle' failed for STMT handle, return: " + std::to_string(ret));
 			}
+			hstmt.reset(hstmt_out);
 		}
 
 		if (bdata.create_table_options.do_create_table) {
 			std::string query = BuildCreateTableQuery(bdata.table_name, reader.columns, bdata.create_table_options);
 			auto wquery = WideChar::Widen(query.data(), query.length());
-			SQLRETURN ret = SQLExecDirectW(hstmt, wquery.data(), wquery.length<SQLINTEGER>());
+			SQLRETURN ret = SQLExecDirectW(hstmt.get(), wquery.data(), wquery.length<SQLINTEGER>());
 			if (!SQL_SUCCEEDED(ret)) {
-				std::string diag = Diagnostics::Read(hstmt, SQL_HANDLE_STMT);
+				std::string diag = Diagnostics::Read(hstmt.get(), SQL_HANDLE_STMT);
 				throw ScannerException("'SQLExecDirectW' failed, query: '" + query +
 				                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 			}
@@ -836,10 +838,10 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 		if (batch_size > reader.chunk_size) {
 			batch_size = static_cast<uint32_t>(reader.chunk_size);
 		}
-		std::string insert_query = PrepareInsert(hstmt, bdata, reader.columns, batch_size);
+		std::string insert_query = PrepareInsert(hstmt.get(), bdata, reader.columns, batch_size);
 		ldata.last_prepared_batch_size = batch_size;
 
-		ldata.ctx = std_make_unique<QueryContext>(insert_query, hstmt, bdata.quirks);
+		ldata.ctx = std_make_unique<QueryContext>(insert_query, std::move(hstmt), bdata.quirks);
 		QueryContext &ctx = *ldata.ctx;
 		ldata.param_types = Params::CollectTypes(ctx);
 		ldata.copy_start_moment = CurrentTimeMillis();
@@ -882,7 +884,7 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 		if (row_idx < ldata.last_prepared_batch_size) {
 			flat_batch.resize(row_idx * row.size());
 			uint32_t batch_size = static_cast<uint32_t>(row_idx);
-			ctx.query = PrepareInsert(ctx.hstmt, bdata, reader.columns, batch_size);
+			ctx.query = PrepareInsert(ctx.hstmt(), bdata, reader.columns, batch_size);
 			ldata.param_types.resize(flat_batch.size());
 			ldata.last_prepared_batch_size = batch_size;
 		}
@@ -891,9 +893,9 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 		Params::BindToOdbc(ctx, flat_batch);
 
 		if (ctx.quirks.reset_stmt_before_execute) {
-			SQLRETURN ret = SQLFreeStmt(ctx.hstmt, SQL_CLOSE);
+			SQLRETURN ret = SQLFreeStmt(ctx.hstmt(), SQL_CLOSE);
 			if (!SQL_SUCCEEDED(ret)) {
-				std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+				std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 				throw ScannerException("'SQLFreeStmt' with SQL_CLOSE (reset_stmt_before_execute) failed, query: '" +
 				                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
 				                       "'");
@@ -901,9 +903,9 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 		}
 
 		{
-			SQLRETURN ret = SQLExecute(ctx.hstmt);
+			SQLRETURN ret = SQLExecute(ctx.hstmt());
 			if (!SQL_SUCCEEDED(ret)) {
-				std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+				std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 				throw ScannerException("'SQLExecute' failed, query: '" + ctx.query +
 				                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 			}
@@ -938,7 +940,7 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 			batch_size = static_cast<uint32_t>(reader.chunk_size);
 		}
 		if (batch_size != ldata.last_prepared_batch_size) {
-			ctx.query = PrepareInsert(ctx.hstmt, bdata, reader.columns, batch_size);
+			ctx.query = PrepareInsert(ctx.hstmt(), bdata, reader.columns, batch_size);
 			ldata.param_types = Params::CollectTypes(ctx);
 			ldata.last_prepared_batch_size = batch_size;
 		}

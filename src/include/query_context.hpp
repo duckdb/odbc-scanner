@@ -11,12 +11,12 @@ namespace odbcscanner {
 
 struct QueryContext {
 	std::string query;
-	HSTMT hstmt;
+	StmtHandlePtr hstmt_ptr;
 	DbmsQuirks quirks;
 	std::vector<ColumnBind> col_binds;
 
-	explicit QueryContext(std::string query_in, HSTMT hstmt_in, DbmsQuirks quirks_in)
-	    : query(std::move(query_in)), hstmt(hstmt_in), quirks(std::move(quirks_in)) {
+	explicit QueryContext(std::string query_in, StmtHandlePtr hstmt_ptr_in, DbmsQuirks quirks_in)
+	    : query(std::move(query_in)), hstmt_ptr(std::move(hstmt_ptr_in)), quirks(std::move(quirks_in)) {
 	}
 
 	QueryContext(QueryContext &other) = delete;
@@ -28,6 +28,10 @@ struct QueryContext {
 	ColumnBind &BindForColumn(SQLSMALLINT col_idx) {
 		size_t col_idxz = static_cast<size_t>(col_idx - 1);
 		return col_binds.at(col_idxz);
+	}
+
+	HSTMT hstmt() {
+		return hstmt_ptr.get();
 	}
 };
 

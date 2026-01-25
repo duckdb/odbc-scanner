@@ -108,9 +108,9 @@ std::vector<ResultColumn> Columns::Collect(QueryContext &ctx) {
 
 	SQLSMALLINT cols_count = -1;
 	{
-		SQLRETURN ret = SQLNumResultCols(ctx.hstmt, &cols_count);
+		SQLRETURN ret = SQLNumResultCols(ctx.hstmt(), &cols_count);
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException("'SQLNumResultCols' failed, query: '" + ctx.query +
 			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 		}
@@ -124,10 +124,10 @@ std::vector<ResultColumn> Columns::Collect(QueryContext &ctx) {
 		SQLSMALLINT len_bytes = 0;
 		{
 			SQLRETURN ret =
-			    SQLColAttributeW(ctx.hstmt, col_idx, SQL_DESC_NAME, buf.data(),
+			    SQLColAttributeW(ctx.hstmt(), col_idx, SQL_DESC_NAME, buf.data(),
 			                     static_cast<SQLSMALLINT>(buf.size() * sizeof(SQLWCHAR)), &len_bytes, nullptr);
 			if (!SQL_SUCCEEDED(ret)) {
-				std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+				std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 				throw ScannerException(
 				    "'SQLColAttribute' for SQL_DESC_NAME failed, column index: " + std::to_string(col_idx) +
 				    ", columns count: " + std::to_string(cols_count) + ", query: '" + ctx.query +
@@ -135,7 +135,7 @@ std::vector<ResultColumn> Columns::Collect(QueryContext &ctx) {
 			}
 		}
 		std::string name = WideChar::Narrow(buf.data(), len_bytes / sizeof(SQLWCHAR));
-		OdbcType odbc_type = GetTypeAttributes(ctx.query, cols_count, ctx.hstmt, col_idx);
+		OdbcType odbc_type = GetTypeAttributes(ctx.query, cols_count, ctx.hstmt(), col_idx);
 		ResultColumn col(std::move(name), std::move(odbc_type));
 		vec.emplace_back(std::move(col));
 	}

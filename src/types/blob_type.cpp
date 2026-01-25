@@ -46,10 +46,10 @@ void TypeSpecific::BindOdbcParam<duckdb_blob>(QueryContext &ctx, ScannerValue &p
 		sqltype = SQL_LONGVARBINARY;
 	}
 	SQLRETURN ret =
-	    SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_BINARY, sqltype, blob.size<SQLULEN>(), 0,
+	    SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_BINARY, sqltype, blob.size<SQLULEN>(), 0,
 	                     reinterpret_cast<SQLPOINTER>(blob.data()), param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' VARBINARY failed, expected type: " + std::to_string(sqltype) +
 		                       "', index: " + std::to_string(param_idx) + ", query: '" + ctx.query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
@@ -64,10 +64,10 @@ static void FetchTail(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLCHA
 	size_t buf_tail_size = buf.size() - head_size;
 	SQLLEN len_tail_bytes = 0;
 
-	SQLRETURN ret_tail =
-	    SQLGetData(ctx.hstmt, col_idx, SQL_C_BINARY, buf_tail_ptr, static_cast<SQLLEN>(buf_tail_size), &len_tail_bytes);
+	SQLRETURN ret_tail = SQLGetData(ctx.hstmt(), col_idx, SQL_C_BINARY, buf_tail_ptr,
+	                                static_cast<SQLLEN>(buf_tail_size), &len_tail_bytes);
 	if (!SQL_SUCCEEDED(ret_tail)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' tail for VARBINARY failed, column index: " + std::to_string(col_idx) +
 		                       ", query: '" + ctx.query + "', return: " + std::to_string(ret_tail) +
 		                       ", diagnostics: '" + diag + "'");
@@ -93,10 +93,10 @@ static void FetchMultiReads(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<
 		SQLCHAR *buf_ptr = buf.data() + prev_len;
 		size_t buf_size = buf.size() - prev_len;
 		SQLRETURN ret =
-		    SQLGetData(ctx.hstmt, col_idx, SQL_C_BINARY, buf_ptr, static_cast<SQLLEN>(buf_size), &len_bytes);
+		    SQLGetData(ctx.hstmt(), col_idx, SQL_C_BINARY, buf_ptr, static_cast<SQLLEN>(buf_size), &len_bytes);
 
 		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException("'SQLGetData' multi for VARBINARY failed, read number: " + std::to_string(i) +
 			                       " column index: " + std::to_string(col_idx) + ", query: '" + ctx.query +
 			                       "', return: " + std::to_string(ret) + ", prev written: " + std::to_string(prev_len) +
@@ -105,7 +105,7 @@ static void FetchMultiReads(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<
 
 		std::string diag_code;
 		if (ret == SQL_SUCCESS_WITH_INFO) {
-			diag_code = Diagnostics::ReadCode(ctx.hstmt, SQL_HANDLE_STMT);
+			diag_code = Diagnostics::ReadCode(ctx.hstmt(), SQL_HANDLE_STMT);
 		}
 
 		if (ret == SQL_SUCCESS || diag_code != trunc_diag_code) {
@@ -121,9 +121,9 @@ static void FetchSinglePart(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<
 	SQLLEN len_read_bytes = 0;
 
 	SQLRETURN ret_tail =
-	    SQLGetData(ctx.hstmt, col_idx, SQL_C_BINARY, buf.data(), static_cast<SQLLEN>(buf.size()), &len_read_bytes);
+	    SQLGetData(ctx.hstmt(), col_idx, SQL_C_BINARY, buf.data(), static_cast<SQLLEN>(buf.size()), &len_read_bytes);
 	if (!SQL_SUCCEEDED(ret_tail)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException(
 		    "'SQLGetData' single part for VARBINARY tail failed, column index: " + std::to_string(col_idx) +
 		    ", query: '" + ctx.query + "', return: " + std::to_string(ret_tail) + ", diagnostics: '" + diag + "'");
@@ -144,10 +144,10 @@ static std::pair<std::vector<SQLCHAR>, bool> FetchInternal(QueryContext &ctx, SQ
 	buf.resize(8192);
 	SQLLEN len_bytes = 0;
 	SQLRETURN ret =
-	    SQLGetData(ctx.hstmt, col_idx, SQL_C_BINARY, buf.data(), static_cast<SQLLEN>(buf.size()), &len_bytes);
+	    SQLGetData(ctx.hstmt(), col_idx, SQL_C_BINARY, buf.data(), static_cast<SQLLEN>(buf.size()), &len_bytes);
 
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for VARBINARY failed, column index: " + std::to_string(col_idx) +
 		                       ", query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
 		                       diag + "'");
@@ -155,7 +155,7 @@ static std::pair<std::vector<SQLCHAR>, bool> FetchInternal(QueryContext &ctx, SQ
 
 	std::string diag_code;
 	if (ret == SQL_SUCCESS_WITH_INFO) {
-		diag_code = Diagnostics::ReadCode(ctx.hstmt, SQL_HANDLE_STMT);
+		diag_code = Diagnostics::ReadCode(ctx.hstmt(), SQL_HANDLE_STMT);
 	}
 
 	// single read

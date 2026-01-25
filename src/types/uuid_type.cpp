@@ -34,10 +34,10 @@ void TypeSpecific::BindOdbcParam<ScannerUuid>(QueryContext &ctx, ScannerValue &p
 	SQLSMALLINT sqltype = SQL_GUID;
 	ScannerUuid &uuid = param.Value<ScannerUuid>();
 	SQLRETURN ret =
-	    SQLBindParameter(ctx.hstmt, param_idx, SQL_PARAM_INPUT, SQL_C_GUID, sqltype, uuid.size<SQLULEN>(), 0,
+	    SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_GUID, sqltype, uuid.size<SQLULEN>(), 0,
 	                     reinterpret_cast<SQLPOINTER>(uuid.data()), param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindParameter' UUID failed, expected type: " + std::to_string(sqltype) +
 		                       "', index: " + std::to_string(param_idx) + ", query: '" + ctx.query +
 		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
@@ -50,10 +50,10 @@ void TypeSpecific::FetchAndSetResult<ScannerUuid>(QueryContext &ctx, OdbcType &,
 	SQLGUID guid;
 	std::memset(&guid, '\0', sizeof(SQLGUID));
 	SQLLEN len_bytes = 0;
-	SQLRETURN ret = SQLGetData(ctx.hstmt, col_idx, SQL_C_GUID, &guid, static_cast<SQLLEN>(sizeof(guid)), &len_bytes);
+	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_GUID, &guid, static_cast<SQLLEN>(sizeof(guid)), &len_bytes);
 
 	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt, SQL_HANDLE_STMT);
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLGetData' for UUID failed, column index: " + std::to_string(col_idx) + ", query: '" +
 		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
