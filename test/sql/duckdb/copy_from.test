@@ -1,0 +1,20 @@
+# name: test/sql/duckdb/copy_from.test
+# description: test for 'copy_from()' function
+# group: [duckdb_copy_from]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement error
+SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+  create_table=TRUE,
+  batch_size=3,
+  source_query='SELECT 42::INTEGER'
+)
+----
+supported values: 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
