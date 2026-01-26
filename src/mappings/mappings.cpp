@@ -9,7 +9,9 @@ std::unordered_map<duckdb_type, std::string> Mappings::Resolve(DbmsDriver driver
 	case DbmsDriver::ORACLE:
 		return Oracle(quirks);
 	case DbmsDriver::MSSQL:
+		return MSSQL(quirks);
 	case DbmsDriver::DB2:
+		return DB2(quirks);
 
 	case DbmsDriver::MARIADB:
 	case DbmsDriver::MYSQL:

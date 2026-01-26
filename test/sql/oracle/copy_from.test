@@ -1,6 +1,6 @@
-# name: test/sql/copy_from.test
-# description: test odbc_copy_from() function
-# group: [sql_copy_from]
+# name: test/sql/oracle/copy_from.test
+# description: test odbc_copy_from() function with Oracle
+# group: [oracle_copy_from]
 
 require odbc_scanner
 
@@ -9,6 +9,18 @@ SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CON
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"', ignore_exec_failure=TRUE)
+
+# no destination
+
+statement error
+SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+  source_queries=[
+    'CREATE TABLE copy_test_basic(col1 SMALLINT, col2 INTEGER)',
+    'INSERT INTO copy_test_basic VALUES (41, 42), (43, 44)',
+    'SELECT * FROM copy_test_basic'
+    ])
+----
+ORA-00942: table or view does not exist
 
 # basic
 
@@ -39,11 +51,11 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
   create_table=TRUE,
   source_queries=[
     'CREATE TABLE copy_test_boolean(col1 BOOLEAN)',
-    'INSERT INTO copy_test_boolean VALUES (TRUE), (FALSE)',
+    'INSERT INTO copy_test_boolean VALUES (TRUE), (NULL), (FALSE)',
     'SELECT * FROM copy_test_boolean'
     ])
 ----
-1	2
+1	3
 
 query I
 SELECT column_type from (
@@ -57,6 +69,7 @@ query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
 ----
 1
+NULL
 0
 
 statement ok
