@@ -187,8 +187,13 @@ SELECT odbc_commit(getvariable('conn'))
 ```sql
 odbc_connect(conn_string VARCHAR) -> BIGINT
 ```
+```sql
+odbc_connect(conn_string VARCHAR, username VARCHAR, password VARCHAR) -> BIGINT
+```
 
 Opens an ODBC connection to a remote DBMS.
+
+If `username` and `password` parameters are specified, they are appended to the connection string as `UID` and `PWD`.
 
 #### Parameters:
 

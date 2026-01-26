@@ -1,6 +1,7 @@
 #include "connection.hpp"
 
 #include <cstdint>
+#include <regex>
 #include <vector>
 
 #include "capi_pointers.hpp"
@@ -38,6 +39,14 @@ static DbmsDriver ResolveDbmsDriver(const std::string &dbms_name, const std::str
 	}
 }
 
+static std::string FilterPwd(const std::string url) {
+	std::regex uid_pattern("UID=[^;]+", std::regex_constants::icase);
+	auto uid_filtered = std::regex_replace(url, uid_pattern, "UID=***");
+	std::regex pwd_pattern("PWD=[^;]+", std::regex_constants::icase);
+	return std::regex_replace(uid_filtered, pwd_pattern, "PWD=***");
+	return uid_filtered;
+}
+
 OdbcConnection::OdbcConnection(const std::string &url) {
 	{
 		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, nullptr, &env);
@@ -69,8 +78,8 @@ OdbcConnection::OdbcConnection(const std::string &url) {
 		                                  SQL_DRIVER_NOPROMPT);
 		if (!SQL_SUCCEEDED(ret)) {
 			std::string diag = Diagnostics::Read(dbc, SQL_HANDLE_DBC);
-			throw ScannerException("'SQLDriverConnect' failed, url: '" + url + "', return: " + std::to_string(ret) +
-			                       ", diagnostics: '" + diag + "'");
+			throw ScannerException("'SQLDriverConnect' failed, connection string: '" + FilterPwd(url) +
+			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 		}
 	}
 
@@ -82,7 +91,7 @@ OdbcConnection::OdbcConnection(const std::string &url) {
 		SQLRETURN ret = SQLGetInfo(dbc, SQL_DBMS_NAME, buf.data(), static_cast<SQLSMALLINT>(buf.size()), &len);
 		if (!SQL_SUCCEEDED(ret)) {
 			std::string diag = Diagnostics::Read(dbc, SQL_HANDLE_DBC);
-			throw ScannerException("'SQLGetInfo' failed for SQL_DBMS_NAME, url: '" + url +
+			throw ScannerException("'SQLGetInfo' failed for SQL_DBMS_NAME, connection string: '" + FilterPwd(url) +
 			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 		}
 		dbms_name = std::string(buf.data(), len);
@@ -96,7 +105,7 @@ OdbcConnection::OdbcConnection(const std::string &url) {
 		SQLRETURN ret = SQLGetInfo(dbc, SQL_DRIVER_NAME, buf.data(), static_cast<SQLSMALLINT>(buf.size()), &len);
 		if (!SQL_SUCCEEDED(ret)) {
 			std::string diag = Diagnostics::Read(dbc, SQL_HANDLE_DBC);
-			throw ScannerException("'SQLGetInfo' failed for SQL_DRIVER_NAME, url: '" + url +
+			throw ScannerException("'SQLGetInfo' failed for SQL_DRIVER_NAME, connection string: '" + FilterPwd(url) +
 			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 		}
 		driver_name = std::string(buf.data(), len);

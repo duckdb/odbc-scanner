@@ -39,4 +39,11 @@ std::string Strings::ReplaceAll(std::string &str, const std::string &snippet, co
 	return str;
 }
 
+std::string Strings::ToUpper(const std::string &str) {
+	std::string copy(str);
+	std::transform(copy.begin(), copy.end(), copy.begin(),
+	               [](unsigned char c) { return static_cast<char>(std::toupper(static_cast<int>(c))); });
+	return (copy);
+}
+
 } // namespace odbcscanner

@@ -12,12 +12,12 @@ require odbc_scanner
 statement error
 SET VARIABLE conn = odbc_connect()
 ----
-Binder Error: No function matches the given name and argument types 'odbc_connect()'
+invalid number of arguments specified
 
 statement error
 SET VARIABLE conn = odbc_connect(NULL)
 ----
-Invalid Input Error: 'odbc_connect' error: specified URL argument must be not NULL
+Invalid Input Error: 'odbc_connect' error: specified connection string argument must be not NULL
 
 statement error
 SET VARIABLE conn = odbc_connect('fail')
@@ -28,6 +28,31 @@ statement error
 SET VARIABLE conn = odbc_connect('Driver=fail')
 ----
 Invalid Input Error: 'SQLDriverConnect' failed
+
+statement error
+SET VARIABLE conn = odbc_connect('Driver=fail', 'foo')
+----
+invalid number of arguments specified
+
+statement error
+SET VARIABLE conn = odbc_connect('Driver=fail', NULL, 'bar')
+----
+'odbc_connect' error: specified username argument must be not NULL
+
+statement error
+SET VARIABLE conn = odbc_connect('Driver=fail;uid=foo;Pwd=bar')
+----
+'SQLDriverConnect' failed, connection string: 'Driver=fail;UID=***;PWD=***'
+
+statement error
+SET VARIABLE conn = odbc_connect('Driver=fail', 'foo', 'bar')
+----
+'SQLDriverConnect' failed, connection string: 'Driver=fail;UID=***;PWD=***;'
+
+statement error
+SET VARIABLE conn = odbc_connect('Driver=fail;', 'foo', 'bar')
+----
+'SQLDriverConnect' failed, connection string: 'Driver=fail;UID=***;PWD=***;'
 
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
