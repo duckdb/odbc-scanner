@@ -38,9 +38,10 @@ enum class ExecState { UNINITIALIZED, EXECUTED, EXHAUSTED };
 struct ReaderOptions {
 	std::string duckdb_conn_string;
 	std::vector<std::string> queries;
+	uint64_t limit;
 
-	ReaderOptions(std::string duckdb_conn_string_in, std::vector<std::string> queries_in)
-	    : duckdb_conn_string(std::move(duckdb_conn_string_in)), queries(std::move(queries_in)) {
+	ReaderOptions(std::string duckdb_conn_string_in, std::vector<std::string> queries_in, uint64_t limit_in)
+	    : duckdb_conn_string(std::move(duckdb_conn_string_in)), queries(std::move(queries_in)), limit(limit_in) {
 	}
 };
 
@@ -141,17 +142,23 @@ struct SourceColumn {
 struct SourceReader {
 	DatabasePtr db;
 	ConnectionPtr conn;
-	ResultPtr result;
-	DataChunkPtr chunk;
-	idx_t chunk_size;
+	std::string select_query;
+	uint64_t limit;
+
+	ResultPtr result = ResultPtr(nullptr, ResultDeleter);
+	DataChunkPtr chunk = DataChunkPtr(nullptr, DataChunkDeleter);
+	idx_t chunk_size = 0;
+	idx_t chunks_count = 0;
 	idx_t row_idx = 0;
 	std::vector<SourceColumn> columns;
 	std::vector<duckdb_vector> vectors;
 	std::vector<uint64_t *> validities;
+	uint64_t offset = 0;
+	bool exhausted = false;
 
-	SourceReader(DatabasePtr db_in, ConnectionPtr conn_in, ResultPtr result_in)
-	    : db(std::move(db_in)), conn(std::move(conn_in)), result(std::move(result_in)),
-	      chunk(nullptr, DataChunkDeleter) {
+	SourceReader(DatabasePtr db_in, ConnectionPtr conn_in, std::string select_query_in, uint64_t limit_in)
+	    : db(std::move(db_in)), conn(std::move(conn_in)), select_query(std::move(select_query_in)), limit(limit_in) {
+
 		this->NextChunkInternal();
 		idx_t col_count = duckdb_data_chunk_get_column_count(chunk.get());
 		this->columns.reserve(col_count);
@@ -183,11 +190,61 @@ struct SourceReader {
 		this->ResetVectorsInternal();
 	}
 
+	ResultPtr ExecuteSelect() {
+		std::string query = select_query;
+		if (limit > 0) {
+			query.append("\n");
+			query.append("LIMIT ");
+			query.append(std::to_string(limit));
+			query.append(" OFFSET ");
+			query.append(std::to_string(offset));
+		}
+
+		ResultPtr res(new duckdb_result(), ResultDeleter);
+		duckdb_state state_select = duckdb_query(conn.get(), query.c_str(), res.get());
+		if (state_select != DuckDBSuccess) {
+			const char *cerr = duckdb_result_error(res.get());
+			std::string err = cerr != nullptr ? std::string(cerr) : "N/A";
+			throw ScannerException("'odbc_copy_from' error: source query failure, sql: '" + query + "', message: '" +
+			                       err + "'");
+		}
+
+		offset += limit;
+		return res;
+	}
+
 	void NextChunkInternal() {
-		this->chunk.reset(duckdb_fetch_chunk(*result));
-		if (chunk.get() == nullptr) {
+		if (exhausted) {
 			return;
 		}
+
+		// initial query
+		if (result.get() == nullptr && chunk.get() == nullptr) {
+			this->result = ExecuteSelect();
+		}
+
+		// get next chunk from current result
+		this->chunk.reset(duckdb_fetch_chunk(*result));
+
+		if (chunk.get() == nullptr) { // result exhausted
+
+			if (limit == 0 || chunk_size * chunks_count < limit) { // we are on the last result
+				this->exhausted = true;
+				return;
+			}
+
+			// lets check if we have next limited result
+			this->result.reset();
+			this->result = ExecuteSelect();
+			this->chunks_count = 0;
+			this->chunk.reset(duckdb_fetch_chunk(*result));
+			if (chunk.get() == nullptr) {
+				this->exhausted = true;
+				return;
+			}
+		}
+
+		this->chunks_count += 1;
 		this->chunk_size = duckdb_data_chunk_get_size(chunk.get());
 	}
 
@@ -258,7 +315,8 @@ struct LocalInitData {
 } // namespace
 
 static ReaderOptions ExtractReaderOptions(duckdb_value duckdb_conn_string_val, duckdb_value file_path_val,
-                                          duckdb_value source_query_val, duckdb_value source_queries_val) {
+                                          duckdb_value source_query_val, duckdb_value source_queries_val,
+                                          duckdb_value source_limit_val) {
 	std::string duckdb_conn_string = ":memory:";
 	if (duckdb_conn_string_val != nullptr && !duckdb_is_null_value(duckdb_conn_string_val)) {
 		auto duckdb_conn_string_cstr = VarcharPtr(duckdb_get_varchar(duckdb_conn_string_val), VarcharDeleter);
@@ -326,7 +384,17 @@ static ReaderOptions ExtractReaderOptions(duckdb_value duckdb_conn_string_val, d
 		}
 	}
 
-	return ReaderOptions(std::move(duckdb_conn_string), std::move(queries));
+	uint64_t source_limit = 0;
+	if (source_limit_val != nullptr && !duckdb_is_null_value(source_limit_val)) {
+		source_limit = duckdb_get_uint64(source_limit_val);
+		if (source_limit < 2048 || source_limit % 2048 != 0) {
+			throw ScannerException(
+			    "'odbc_copy_from' error: invalid source limit specified: " + std::to_string(source_limit) +
+			    ", must be larger or equal to 2048 and be dividable by 2048 without a remainder");
+		}
+	}
+
+	return ReaderOptions(std::move(duckdb_conn_string), std::move(queries), source_limit);
 }
 
 static std::unordered_map<duckdb_type, std::string> ExtractTypeMapping(duckdb_value column_types_val) {
@@ -480,8 +548,10 @@ static void Bind(duckdb_bind_info info) {
 	auto file_path_val = ValuePtr(duckdb_bind_get_named_parameter(info, "file_path"), ValueDeleter);
 	auto source_query_val = ValuePtr(duckdb_bind_get_named_parameter(info, "source_query"), ValueDeleter);
 	auto source_queries_val = ValuePtr(duckdb_bind_get_named_parameter(info, "source_queries"), ValueDeleter);
-	ReaderOptions reader_options = ExtractReaderOptions(duckdb_conn_string_val.get(), file_path_val.get(),
-	                                                    source_query_val.get(), source_queries_val.get());
+	auto source_limit_val = ValuePtr(duckdb_bind_get_named_parameter(info, "source_limit"), ValueDeleter);
+	ReaderOptions reader_options =
+	    ExtractReaderOptions(duckdb_conn_string_val.get(), file_path_val.get(), source_query_val.get(),
+	                         source_queries_val.get(), source_limit_val.get());
 
 	OdbcConnection &conn = *extracted_conn.ptr;
 	DbmsQuirks quirks(conn, std::map<std::string, ValuePtr>());
@@ -580,16 +650,8 @@ static std::unique_ptr<SourceReader> OpenReader(const ReaderOptions &options) {
 		}
 	}
 	const std::string &select_query = options.queries.at(options.queries.size() - 1);
-	ResultPtr result(new duckdb_result(), ResultDeleter);
-	duckdb_state state_select = duckdb_query(conn.get(), select_query.c_str(), result.get());
-	if (state_select != DuckDBSuccess) {
-		const char *cerr = duckdb_result_error(result.get());
-		std::string err = cerr != nullptr ? std::string(cerr) : "N/A";
-		throw ScannerException("'odbc_copy_from' error: source query failure, sql: '" + select_query + "', message: '" +
-		                       err + "'");
-	}
 
-	return std_make_unique<SourceReader>(std::move(db), std::move(conn), std::move(result));
+	return std_make_unique<SourceReader>(std::move(db), std::move(conn), select_query, options.limit);
 }
 
 static std::string LookupMapping(std::unordered_map<duckdb_type, std::string> &mapping, const SourceColumn &col) {
@@ -1009,6 +1071,7 @@ void OdbcCopyFromFunction::Register(duckdb_connection conn) {
 	duckdb_table_function_add_named_parameter(fun.get(), "file_path", varchar_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "source_query", varchar_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "source_queries", list_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "source_limit", ubigint_type.get());
 	// insert options
 	duckdb_table_function_add_named_parameter(fun.get(), "batch_size", uint_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "use_insert_all", bool_type.get());

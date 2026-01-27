@@ -289,5 +289,47 @@ foo\x00bar
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
 
+# source limit
+
+statement error
+SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+  create_table=TRUE,
+  source_limit=1024,
+  source_query='SELECT 42')
+----
+invalid source limit specified
+
+query II
+SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+  create_table=TRUE,
+  source_limit=4096,
+  source_queries=[
+    'CREATE TABLE copy_test_limit AS SELECT unnest(repeat([1,2,3,4,5,6,7,8,9], 2048)) col1',
+    'SELECT * FROM copy_test_limit'
+    ])
+----
+0	2048
+0	4096
+0	6144
+0	8192
+0	10240
+0	12288
+0	14336
+0	16384
+1	18432
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM "duckdb_test_copy_from"')
+----
+18432
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT sum("col1") FROM "duckdb_test_copy_from"')
+----
+92160
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))
