@@ -331,5 +331,63 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT sum("col1") FROM "duckdb_t
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
 
+# dest query with a tail
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'),
+  'CREATE TABLE "duckdb_test_copy_from" (
+    col1_1 INTEGER,
+    col1_2 VARCHAR(10),
+    col2_1 INTEGER,
+    col2_2 VARCHAR(10),
+    col3_1 INTEGER,
+    col3_2 VARCHAR(10),
+    col4_1 INTEGER,
+    col4_2 VARCHAR(10)
+  )')
+
+
+query II
+SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+  create_table=FALSE,
+  batch_size=4,
+  source_queries=[
+    'CREATE TABLE copy_test_dest_query(
+      col1 INTEGER,
+      col2 VARCHAR
+    )',
+    'INSERT INTO copy_test_dest_query VALUES 
+      (1, ''s1''),
+      (2, ''s2''),
+      (3, ''s3''),
+      (4, ''s4''),
+      (5, ''s5''),
+      (6, ''s6''),
+      (7, ''s7''),
+      (8, ''s8''),
+      (9, ''s9''),
+      (10, ''s10''),
+      (11, ''s11'')
+    ',
+    'SELECT * FROM copy_test_dest_query'
+    ],
+  dest_query='INSERT INTO "duckdb_test_copy_from" VALUES(?,?,?,?,?,?,?,?)',
+  dest_query_single='INSERT INTO "duckdb_test_copy_from" VALUES(NULL,NULL,?,?,NULL,NULL,NULL,NULL)'
+  )
+----
+1	11
+
+query IIIIIIII
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+----
+1	s1	2	s2	3	s3	4	s4
+5	s5	6	s6	7	s7	8	s8
+NULL	NULL	9	s9	NULL	NULL	NULL	NULL
+NULL	NULL	10	s10	NULL	NULL	NULL	NULL
+NULL	NULL	11	s11	NULL	NULL	NULL	NULL
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))
