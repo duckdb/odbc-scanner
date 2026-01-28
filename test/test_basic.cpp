@@ -88,3 +88,85 @@ SELECT * FROM odbc_query(
 		REQUIRE(res.Value<int64_t>(0, 0) == 42);
 	}
 }
+
+TEST_CASE("Update query with zero rows changed", group_name) {
+	if (!(DBMSConfigured("DuckDB") || DBMSConfigured("MSSQL") || DBMSConfigured("PostgreSQL") ||
+	      DBMSConfigured("Oracle") || DBMSConfigured("DB2") || DBMSConfigured("FlightSQL"))) {
+		return;
+	}
+
+	ScannerConn sc;
+	{
+		Result res;
+		duckdb_state st = duckdb_query(sc.conn,
+		                               (R"(
+	SELECT * FROM odbc_query(
+		getvariable('conn'), 
+		'
+			DROP TABLE )" + IfExistsSQL() +
+		                                R"( duckdb_test_update_zero_rows
+		',
+		ignore_exec_failure=TRUE
+		)
+	)")
+		                                   .c_str(),
+		                               res.Get());
+		REQUIRE(QuerySuccess(res.Get(), st));
+	}
+	{
+		Result res;
+		duckdb_state st = duckdb_query(sc.conn,
+		                               R"(
+	SELECT * FROM odbc_query(
+		getvariable('conn'), 
+		'
+			CREATE TABLE duckdb_test_update_zero_rows (col1 INTEGER)
+		'
+		)
+	)",
+		                               res.Get());
+		REQUIRE(QuerySuccess(res.Get(), st));
+	}
+	{
+		Result res;
+		duckdb_state st = duckdb_query(sc.conn,
+		                               R"(
+	SELECT * FROM odbc_query(
+		getvariable('conn'), 
+		'
+			INSERT INTO duckdb_test_update_zero_rows VALUES(42)
+		'
+		)
+	)",
+		                               res.Get());
+		REQUIRE(QuerySuccess(res.Get(), st));
+	}
+	{
+		Result res;
+		duckdb_state st = duckdb_query(sc.conn,
+		                               R"(
+	SELECT * FROM odbc_query(
+		getvariable('conn'), 
+		'
+			UPDATE duckdb_test_update_zero_rows SET col1 = 42 WHERE 1 < 0
+		'
+		)
+	)",
+		                               res.Get());
+		REQUIRE(QuerySuccess(res.Get(), st));
+	}
+	{
+		Result res;
+		duckdb_state st = duckdb_query(sc.conn,
+		                               R"(
+	SELECT * FROM odbc_query(
+		getvariable('conn'), 
+		'
+			DROP TABLE duckdb_test_update_zero_rows
+		'
+		)
+	)",
+		                               res.Get());
+		REQUIRE(QuerySuccess(res.Get(), st));
+	}
+}
