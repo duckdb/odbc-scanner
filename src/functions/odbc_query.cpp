@@ -421,7 +421,6 @@ void OdbcQueryFunction::Register(duckdb_connection conn) {
 	// quirks
 	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_as_chars", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_precision_through_ard", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_precision_through_ard_bind", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "decimal_params_as_chars", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "integral_params_as_decimals", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "reset_stmt_before_execute", bool_type.get());
@@ -434,6 +433,7 @@ void OdbcQueryFunction::Register(duckdb_connection conn) {
 	duckdb_table_function_add_named_parameter(fun.get(), "timestamptz_params_as_ss_timestampoffset", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "var_len_data_single_part", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "var_len_params_long_threshold_bytes", uint_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "enable_columns_binding", bool_type.get());
 
 	// callbacks
 	duckdb_table_function_set_bind(fun.get(), odbc_query_bind);

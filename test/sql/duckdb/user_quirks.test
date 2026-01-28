@@ -13,7 +13,6 @@ SELECT * FROM odbc_query(
   'SELECT 42',
 	decimal_columns_as_chars=TRUE,
 	decimal_columns_precision_through_ard=TRUE,
-	decimal_columns_precision_through_ard_bind=TRUE,
 	decimal_params_as_chars=TRUE,
 	integral_params_as_decimals=TRUE,
 	reset_stmt_before_execute=TRUE,
@@ -25,7 +24,7 @@ SELECT * FROM odbc_query(
 	timestamptz_params_as_ss_timestampoffset=TRUE,
 	var_len_data_single_part=TRUE,
 	var_len_params_long_threshold_bytes=42,
-	timestamp_columns_as_timestamp_ns=TRUE
+	enable_columns_binding=TRUE
 )
 
 statement error

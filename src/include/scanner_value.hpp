@@ -44,6 +44,7 @@ class ScannerValue {
 		SQL_TIME_STRUCT time;
 		SQL_SS_TIME2_STRUCT time_with_nanos;
 		SQL_TIMESTAMP_STRUCT timestamp;
+		SqlBit sql_bit;
 
 		InternalValue() : null_val(true) {
 		}
@@ -87,6 +88,8 @@ class ScannerValue {
 		}
 		InternalValue(SQL_TIMESTAMP_STRUCT value) : timestamp(value) {
 		}
+		InternalValue(SqlBit value) : sql_bit(value) {
+		}
 
 		InternalValue(InternalValue &other) = delete;
 		InternalValue(InternalValue &&other) = delete;
@@ -120,6 +123,7 @@ public:
 	explicit ScannerValue(SQL_DATE_STRUCT value);
 	explicit ScannerValue(duckdb_time_struct value, bool use_time_with_nanos);
 	explicit ScannerValue(TimestampNsStruct value);
+	explicit ScannerValue(SqlBit value);
 
 	ScannerValue(ScannerValue &other) = delete;
 	ScannerValue(ScannerValue &&other);

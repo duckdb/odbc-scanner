@@ -12,9 +12,9 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 	case DbmsDriver::ORACLE:
 		this->var_len_params_long_threshold_bytes = 4000;
 		this->decimal_columns_precision_through_ard = true;
-		this->decimal_columns_precision_through_ard_bind = true;
 		this->integral_params_as_decimals = true;
 		this->timestamp_columns_with_typename_date_as_date = true;
+		this->enable_columns_binding = true;
 		break;
 	case DbmsDriver::MSSQL:
 		this->var_len_params_long_threshold_bytes = 8000;
@@ -27,6 +27,7 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 	case DbmsDriver::DB2:
 		this->decimal_params_as_chars = true;
 		this->decimal_columns_as_chars = true;
+		this->enable_columns_binding = true;
 		break;
 
 	case DbmsDriver::MARIADB:
@@ -72,8 +73,6 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 			this->timestamp_columns_as_timestamp_ns = duckdb_get_bool(val.get());
 		} else if (en.first == "decimal_columns_precision_through_ard") {
 			this->decimal_columns_precision_through_ard = duckdb_get_bool(val.get());
-		} else if (en.first == "decimal_columns_precision_through_ard_bind") {
-			this->decimal_columns_precision_through_ard_bind = duckdb_get_bool(val.get());
 		} else if (en.first == "decimal_params_as_chars") {
 			this->decimal_params_as_chars = duckdb_get_bool(val.get());
 		} else if (en.first == "integral_params_as_decimals") {
@@ -102,8 +101,8 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 		} else if (en.first == "var_len_params_long_threshold_bytes") {
 			uint32_t num = duckdb_get_uint32(val.get());
 			this->var_len_params_long_threshold_bytes = num;
-		} else if (en.first == "timestamp_columns_as_timestamp_ns") {
-			this->timestamp_columns_as_timestamp_ns = duckdb_get_bool(val.get());
+		} else if (en.first == "enable_columns_binding") {
+			this->enable_columns_binding = duckdb_get_bool(val.get());
 		} else {
 			throw ScannerException("Unsupported user option: '" + en.first + "'");
 		}
@@ -114,7 +113,6 @@ const std::vector<std::string> DbmsQuirks::AllNames() {
 	std::vector<std::string> res;
 	res.emplace_back("decimal_columns_as_chars");
 	res.emplace_back("decimal_columns_precision_through_ard");
-	res.emplace_back("decimal_columns_precision_through_ard_bind");
 	res.emplace_back("decimal_params_as_chars");
 	res.emplace_back("integral_params_as_decimals");
 	res.emplace_back("reset_stmt_before_execute");
@@ -126,6 +124,7 @@ const std::vector<std::string> DbmsQuirks::AllNames() {
 	res.emplace_back("timestamptz_params_as_ss_timestampoffset");
 	res.emplace_back("var_len_data_single_part");
 	res.emplace_back("var_len_params_long_threshold_bytes");
+	res.emplace_back("enable_columns_binding");
 	return res;
 }
 

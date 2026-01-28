@@ -136,6 +136,12 @@ SQL_TIMESTAMP_STRUCT &ScannerValue::Value<SQL_TIMESTAMP_STRUCT>() {
 	return val.timestamp;
 }
 
+template <>
+SqlBit &ScannerValue::Value<SqlBit>() {
+	CheckType(Params::TYPE_SQL_BIT);
+	return val.sql_bit;
+}
+
 ScannerValue::ScannerValue() : type_id(DUCKDB_TYPE_SQLNULL), len_bytes(SQL_NULL_DATA) {
 }
 
@@ -276,6 +282,9 @@ ScannerValue::ScannerValue(TimestampNsStruct value) : type_id(DUCKDB_TYPE_TIMEST
 	this->len_bytes = sizeof(ts);
 }
 
+ScannerValue::ScannerValue(SqlBit value) : type_id(Params::TYPE_SQL_BIT), len_bytes(sizeof(value)), val(value) {
+}
+
 void ScannerValue::AssignByType(param_type type_id, InternalValue &val, ScannerValue &other) {
 	switch (type_id) {
 	case DUCKDB_TYPE_SQLNULL:
@@ -343,6 +352,9 @@ void ScannerValue::AssignByType(param_type type_id, InternalValue &val, ScannerV
 		break;
 	case DUCKDB_TYPE_TIMESTAMP:
 		val.timestamp = other.Value<SQL_TIMESTAMP_STRUCT>();
+		break;
+	case Params::TYPE_SQL_BIT:
+		val.sql_bit = other.Value<SqlBit>();
 		break;
 	default:
 		throw ScannerException("Unsupported assign value type, ID: " + std::to_string(type_id));

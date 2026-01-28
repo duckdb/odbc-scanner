@@ -45,6 +45,12 @@ Installed version (commit ID) can be checked using the following query:
 SELECT * FROM duckdb_extensions() WHERE extension_name = 'odbc_scanner';
 ```
 
+To install a version built from a specific commit run:
+
+```sql
+FORCE INSTALL 'http://nightly-extensions.duckdb.org/odbc_scanner/<7_chars_commit_id>/v1.2.0/<platform>/odbc_scanner.duckdb_extension.gz';
+```
+
 ## Usage example
 
 ```sql
@@ -311,8 +317,6 @@ Optional named parameters that can change types mapping:
 
  - `decimal_columns_as_chars` (`BOOLEAN`, default: `false`): read `DECIMAL` values as `VARCHAR`s that are parsed back into `DECIMAL`s before returning them to client
  - `decimal_columns_precision_through_ard` (`BOOLEAN`, default: `false`): when reading a `DECIMAL` specify its `precision` and `scale` through "Application Row Descriptor"
- - `decimal_columns_precision_through_ard_bind` (`BOOLEAN`, default: `false`) allow binding a `DECIMAL` column to a result buffer when its `precision` and `scale` are specified through "Application Row Descriptor"
- - `decimal_params_as_chars` (`BOOLEAN`, default: `false`): pass `DECIMAL` parameters as `VARCHAR`s
  - `integral_params_as_decimals` (`BOOLEAN`, default: `false`): pass (unsigned) `TINYINT`, `SMALLINT`, `INTEGER` and `BIGINT` parameters as `SQL_C_NUMERIC`.
  - `reset_stmt_before_execute` (`BOOLEAN`, default: `false`): reset the prepared statement (using `SQLFreeStmt(h, SQL_CLOSE)`) before executing it
  - `time_params_as_ss_time2` (`BOOLEAN`, default: `false`): pass `TIME` parameters as SQL Server's `TIME2` values
@@ -323,6 +327,7 @@ Optional named parameters that can change types mapping:
  - `timestamptz_params_as_ss_timestampoffset` (`BOOLEAN`, default: `false`): pass `TIMESTAMP_TZ` parameters as SQL Server's `DATETIMEOFFSET`
  - `var_len_data_single_part` (`BOOLEAN`, default: `false`): read long `VARCHAR` or `VARBINARY` values as a single read (used when a driver does not support [Retrieving Variable-Length Data in Parts](https://learn.microsoft.com/en-us/sql/odbc/reference/syntax/sqlgetdata-function?view=sql-server-ver17#retrieving-variable-length-data-in-parts))
  - `var_len_params_long_threshold_bytes` (`UINTEGER`, default: `4000`): a length threshold after that `SQL_WVARCHAR` parameters are passed as `SQL_WLONGVARCHAR`
+ - `enable_columns_binding` (`BOOLEAN`, default: `false`): whether to allow using `SQLBindCol` instead of `SQLGetData` for fixed-size columns
 
 Other optional named parameters:
 

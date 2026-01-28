@@ -230,7 +230,7 @@ static void FetchAndSetResultInternal(QueryContext &ctx, SQLSMALLINT ctype, Odbc
 	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, ctype, &fetched, sizeof(fetched), &ind);
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
-		throw ScannerException("'SQLGetData' for failed, C type: " + std::to_string(ctype) + ", column index: " +
+		throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(ctype) + ", column index: " +
 		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
 		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}

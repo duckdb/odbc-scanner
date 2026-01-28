@@ -26,6 +26,16 @@ SELECT column_type from (
 ----
 DECIMAL(4,3)
 
+query II
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS INT), CAST(''1.234'' AS NUMBER(4,3)) FROM dual')
+----
+42	1.234
+
+query II
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMBER(4,3)), CAST(42 AS INT) FROM dual')
+----
+1.234	42
+
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456.789'' AS NUMBER(9,3)) FROM dual')
 ----

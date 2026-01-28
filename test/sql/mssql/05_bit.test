@@ -24,6 +24,23 @@ SELECT column_type from (
 ----
 BOOLEAN
 
+query II
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS INT), CAST(1 AS BIT)')
+----
+42	1
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS INT), CAST(1 AS BIT)',
+  enable_columns_binding=TRUE)
+----
+Invalid Descriptor Index
+
+query II
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(0 AS BIT), CAST(1 AS BIT)',
+  enable_columns_binding=TRUE)
+----
+0	1
+
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params=row(TRUE))
 ----

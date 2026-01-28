@@ -18,6 +18,7 @@ namespace odbcscanner {
 struct Params {
 	static const param_type TYPE_DECIMAL_AS_CHARS = DUCKDB_TYPE_DECIMAL + 1000;
 	static const param_type TYPE_TIME_WITH_NANOS = DUCKDB_TYPE_TIME + 1000;
+	static const param_type TYPE_SQL_BIT = DUCKDB_TYPE_BOOLEAN + 1000;
 
 	static std::vector<ScannerValue> Extract(DbmsQuirks &quirks, duckdb_data_chunk chunk, idx_t col_idx);
 

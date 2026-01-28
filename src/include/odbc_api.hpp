@@ -17,6 +17,10 @@ extern "C" {
 
 namespace odbcscanner {
 
+struct SqlBit {
+	SQLCHAR val = 0;
+};
+
 using EnvHandlePtr = std::unique_ptr<void, void (*)(SQLHANDLE)>;
 
 inline void EnvHandleDeleter(SQLHANDLE env) {

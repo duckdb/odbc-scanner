@@ -29,6 +29,16 @@ SELECT column_type from (
 ----
 DATE
 
+query II
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS INT), CAST(''2020-12-31'' AS DATE) FROM sysibm.sysdummy1')
+----
+42	2020-12-31
+
+query II
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31'' AS DATE), CAST(42 AS INT) FROM sysibm.sysdummy1')
+----
+2020-12-31	42
+
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATE) FROM sysibm.sysdummy1', params=row('2020-12-31'::DATE))
 ----
