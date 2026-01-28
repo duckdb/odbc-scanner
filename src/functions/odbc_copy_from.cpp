@@ -1015,7 +1015,7 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 
 			{
 				SQLRETURN ret = SQLExecute(ctx.hstmt());
-				if (!SQL_SUCCEEDED(ret)) {
+				if (!SQL_SUCCEEDED(ret) && ret != SQL_NO_DATA) {
 					std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 					throw ScannerException("'SQLExecute' failed, query: '" + ctx.query +
 					                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");

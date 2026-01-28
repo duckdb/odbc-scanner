@@ -325,6 +325,14 @@ std::string CastAsDecimalSQL(const std::string &value, uint8_t precision, uint8_
 	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
 }
 
+std::string IfExistsSQL() {
+	if (DBMSConfigured("Oracle")) {
+		return "";
+	} else {
+		return "IF EXISTS";
+	}
+}
+
 #if defined(__linux__)
 static std::string CurrentExecutablePathLinux() {
 	std::string res;

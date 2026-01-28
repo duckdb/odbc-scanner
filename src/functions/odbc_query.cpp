@@ -281,7 +281,7 @@ static SqlExecStatus BindParamsAndExecute(BindData &bdata) {
 
 	{
 		SQLRETURN ret = SQLExecute(ctx.hstmt());
-		if (!SQL_SUCCEEDED(ret)) {
+		if (!SQL_SUCCEEDED(ret) && ret != SQL_NO_DATA) {
 			if (bdata.query_options.ignore_exec_failure) {
 				return SqlExecStatus::FAILURE;
 			}
