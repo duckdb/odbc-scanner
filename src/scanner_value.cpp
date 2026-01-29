@@ -137,6 +137,12 @@ SQL_TIMESTAMP_STRUCT &ScannerValue::Value<SQL_TIMESTAMP_STRUCT>() {
 }
 
 template <>
+SQL_SS_TIMESTAMPOFFSET_STRUCT &ScannerValue::Value<SQL_SS_TIMESTAMPOFFSET_STRUCT>() {
+	CheckType(Params::TYPE_SS_TIMESTAMPOFFSET);
+	return val.timestamp_offset;
+}
+
+template <>
 SqlBit &ScannerValue::Value<SqlBit>() {
 	CheckType(Params::TYPE_SQL_BIT);
 	return val.sql_bit;
@@ -274,6 +280,13 @@ ScannerValue::ScannerValue(duckdb_time_struct value, bool use_time_with_nanos) {
 	}
 }
 
+ScannerValue::ScannerValue(SQL_TIME_STRUCT value) : type_id(DUCKDB_TYPE_TIME), len_bytes(sizeof(value)), val(value) {
+}
+
+ScannerValue::ScannerValue(SQL_SS_TIME2_STRUCT value)
+    : type_id(Params::TYPE_TIME_WITH_NANOS), len_bytes(sizeof(value)), val(value) {
+}
+
 ScannerValue::ScannerValue(TimestampNsStruct value) : type_id(DUCKDB_TYPE_TIMESTAMP) {
 	SQL_TIMESTAMP_STRUCT ts;
 	std::memset(&ts, '\0', sizeof(ts));
@@ -286,6 +299,14 @@ ScannerValue::ScannerValue(TimestampNsStruct value) : type_id(DUCKDB_TYPE_TIMEST
 	ts.fraction = static_cast<SQLUINTEGER>(value.nanos_fraction);
 	this->val.timestamp = ts;
 	this->len_bytes = sizeof(ts);
+}
+
+ScannerValue::ScannerValue(SQL_TIMESTAMP_STRUCT value)
+    : type_id(DUCKDB_TYPE_TIMESTAMP), len_bytes(sizeof(value)), val(value) {
+}
+
+ScannerValue::ScannerValue(SQL_SS_TIMESTAMPOFFSET_STRUCT value)
+    : type_id(Params::TYPE_SS_TIMESTAMPOFFSET), len_bytes(sizeof(value)), val(value) {
 }
 
 ScannerValue::ScannerValue(SqlBit value) : type_id(Params::TYPE_SQL_BIT), len_bytes(sizeof(value)), val(value) {
@@ -361,6 +382,9 @@ void ScannerValue::AssignByType(param_type type_id, InternalValue &val, ScannerV
 		break;
 	case DUCKDB_TYPE_TIMESTAMP:
 		val.timestamp = other.Value<SQL_TIMESTAMP_STRUCT>();
+		break;
+	case Params::TYPE_SS_TIMESTAMPOFFSET:
+		val.timestamp_offset = other.Value<SQL_SS_TIMESTAMPOFFSET_STRUCT>();
 		break;
 	case Params::TYPE_SQL_BIT:
 		val.sql_bit = other.Value<SqlBit>();

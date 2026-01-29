@@ -44,6 +44,18 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.123 AS FLOAT)')
 42.123
 
 query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.123 AS FLOAT)',
+  enable_columns_binding=TRUE)
+----
+42.123
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(42.123 AS FLOAT)',
+  enable_columns_binding=TRUE)
+----
+Invalid Descriptor Index
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS FLOAT)', params=row(42.123::DOUBLE))
 ----
 42.123

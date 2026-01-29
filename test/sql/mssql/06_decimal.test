@@ -62,6 +62,12 @@ SELECT column_type from (
 ----
 DECIMAL(38,3)
 
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456.789'' AS DECIMAL(9,3))',
+  enable_columns_binding=TRUE)
+----
+Inconsistent descriptor information
+
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DECIMAL(38,3))', params=row('12345678901234567890123456789012345.123'::DECIMAL(38,3)))
 ----

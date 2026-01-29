@@ -20,6 +20,18 @@ SELECT column_type from (
 UTINYINT
 
 query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS TINYINT)',
+  enable_columns_binding=TRUE)
+----
+42
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(42 AS TINYINT)',
+  enable_columns_binding=TRUE)
+----
+Invalid Descriptor Index
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TINYINT)', params=row(42::UTINYINT))
 ----
 42

@@ -248,6 +248,14 @@ void Types::BindColumn(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_i
 	case SQL_TYPE_DATE:
 		TypeSpecific::BindColumn<duckdb_date_struct>(ctx, odbc_type, col_idx);
 		break;
+	case SQL_TYPE_TIME:
+	case Types::SQL_SS_TIME2:
+		TypeSpecific::BindColumn<duckdb_time_struct>(ctx, odbc_type, col_idx);
+		break;
+	case SQL_TYPE_TIMESTAMP:
+	case SQL_SS_TIMESTAMPOFFSET:
+		TypeSpecific::BindColumn<duckdb_timestamp_struct>(ctx, odbc_type, col_idx);
+		break;
 		// default: no-op
 	}
 }
@@ -317,14 +325,12 @@ void Types::FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLIN
 		TypeSpecific::FetchAndSetResult<duckdb_date_struct>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	case SQL_TYPE_TIME:
+	case Types::SQL_SS_TIME2:
 		TypeSpecific::FetchAndSetResult<duckdb_time_struct>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	case SQL_TYPE_TIMESTAMP:
 	case SQL_SS_TIMESTAMPOFFSET:
 		TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(ctx, odbc_type, col_idx, vec, row_idx);
-		break;
-	case Types::SQL_SS_TIME2:
-		TypeSpecific::FetchAndSetResult<duckdb_time_struct>(ctx, odbc_type, col_idx, vec, row_idx);
 		break;
 	default:
 		throw ScannerException("Unsupported ODBC fetch type: " + odbc_type.ToString() + ", query: '" + ctx.query +

@@ -20,14 +20,26 @@ SELECT column_type from (
 DATE
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS INT), CAST(''2020-12-31'' AS DATE)')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(''2020-12-31'' AS DATE)')
 ----
-42	2020-12-31
+foo	2020-12-31
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31'' AS DATE), CAST(42 AS INT)')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31'' AS DATE), CAST(''foo'' AS NVARCHAR(max))')
 ----
-2020-12-31	42
+2020-12-31	foo
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31'' AS DATE)',
+  enable_columns_binding=TRUE)
+----
+2020-12-31
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(''2020-12-31'' AS DATE)',
+  enable_columns_binding=TRUE)
+----
+Invalid Descriptor Index
 
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATE)', params=row('2020-12-31'::DATE))

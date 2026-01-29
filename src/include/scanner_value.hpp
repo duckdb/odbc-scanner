@@ -44,6 +44,7 @@ class ScannerValue {
 		SQL_TIME_STRUCT time;
 		SQL_SS_TIME2_STRUCT time_with_nanos;
 		SQL_TIMESTAMP_STRUCT timestamp;
+		SQL_SS_TIMESTAMPOFFSET_STRUCT timestamp_offset;
 		SqlBit sql_bit;
 		SQLGUID sql_guid; // for uuid columns
 
@@ -89,6 +90,8 @@ class ScannerValue {
 		}
 		InternalValue(SQL_TIMESTAMP_STRUCT value) : timestamp(value) {
 		}
+		InternalValue(SQL_SS_TIMESTAMPOFFSET_STRUCT value) : timestamp_offset(value) {
+		}
 		InternalValue(SqlBit value) : sql_bit(value) {
 		}
 		InternalValue(SQLGUID value) : sql_guid(value) {
@@ -125,7 +128,11 @@ public:
 	explicit ScannerValue(duckdb_date_struct value);
 	explicit ScannerValue(SQL_DATE_STRUCT value);
 	explicit ScannerValue(duckdb_time_struct value, bool use_time_with_nanos);
+	explicit ScannerValue(SQL_TIME_STRUCT value);
+	explicit ScannerValue(SQL_SS_TIME2_STRUCT value);
 	explicit ScannerValue(TimestampNsStruct value);
+	explicit ScannerValue(SQL_TIMESTAMP_STRUCT value);
+	explicit ScannerValue(SQL_SS_TIMESTAMPOFFSET_STRUCT value);
 	explicit ScannerValue(SqlBit value);
 	explicit ScannerValue(SQLGUID value);
 

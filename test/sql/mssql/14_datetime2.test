@@ -36,6 +36,18 @@ SELECT column_type from (
 TIMESTAMP_NS
 
 query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:59.123456'' AS DATETIME2)',
+  enable_columns_binding=TRUE)
+----
+2020-12-31 23:58:59.123456
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(''2020-12-31 23:58:59.123456'' AS DATETIME2)',
+  enable_columns_binding=TRUE)
+----
+Invalid Descriptor Index
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATETIME2)', params=row('2020-12-31 23:58:59.123456'::TIMESTAMP))
 ----
 2020-12-31 23:58:59.123456

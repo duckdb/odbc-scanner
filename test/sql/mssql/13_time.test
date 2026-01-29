@@ -25,6 +25,18 @@ SELECT column_type from (
 TIME
 
 query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:58:59.123456'' AS TIME)',
+  enable_columns_binding=TRUE)
+----
+23:58:59.123456
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(''23:58:59.123456'' AS TIME)',
+  enable_columns_binding=TRUE)
+----
+Invalid Descriptor Index
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIME)', params=row('23:58:59.123456'::TIME))
 ----
 23:58:59.123456

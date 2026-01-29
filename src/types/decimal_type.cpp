@@ -144,6 +144,48 @@ static void SetDescriptorFields(QueryContext &ctx, OdbcType &odbc_type, SQLSMALL
 	}
 }
 
+static void ZeroNumericStruct(SQL_NUMERIC_STRUCT &ns) {
+	ns.precision = 0;
+	ns.scale = 0;
+	ns.sign = 0;
+	for (size_t i = 0; i < SQL_MAX_NUMERIC_LEN; i++) {
+		ns.val[i] = 0;
+	}
+}
+
+template <>
+void TypeSpecific::BindColumn<duckdb_decimal>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	if (ctx.quirks.decimal_columns_precision_through_ard) {
+		SetDescriptorFields(ctx, odbc_type, col_idx);
+	}
+
+	if (!ctx.quirks.enable_columns_binding || ctx.quirks.decimal_columns_as_chars) {
+		return;
+	}
+
+	SQLSMALLINT ctype = SQL_C_NUMERIC;
+	if (ctx.quirks.decimal_columns_as_ard_type) {
+		ctype = SQL_ARD_TYPE;
+	}
+
+	SQL_NUMERIC_STRUCT nstruct;
+	ZeroNumericStruct(nstruct);
+	ScannerValue nval(nstruct);
+	ColumnBind nbind(std::move(nval));
+
+	ColumnBind &bind = ctx.BindForColumn(col_idx);
+	bind = std::move(nbind);
+	SQL_NUMERIC_STRUCT &fetched = bind.Value<SQL_NUMERIC_STRUCT>();
+	SQLLEN &ind = bind.Indicator();
+	SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, ctype, &fetched, sizeof(SQL_NUMERIC_STRUCT), &ind);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+		throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(SQL_C_NUMERIC) + ", column index: " +
+		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
+		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+	}
+}
+
 static void Negate(duckdb_hugeint &hi) {
 	hi.lower = ~hi.lower + 1;
 	hi.upper = ~hi.upper;
@@ -227,15 +269,6 @@ static size_t RemoveSeparatorReturnScale(std::string &str) {
 	}
 }
 
-static void ZeroNumericStruct(SQL_NUMERIC_STRUCT &ns) {
-	ns.precision = 0;
-	ns.scale = 0;
-	ns.sign = 0;
-	for (size_t i = 0; i < SQL_MAX_NUMERIC_LEN; i++) {
-		ns.val[i] = 0;
-	}
-}
-
 static std::pair<duckdb_hugeint, bool> FetchDecimal(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
 	SQL_NUMERIC_STRUCT fetched_data;
 	ZeroNumericStruct(fetched_data);
@@ -249,7 +282,7 @@ static std::pair<duckdb_hugeint, bool> FetchDecimal(QueryContext &ctx, OdbcType 
 		ind = bind.ind;
 	} else {
 		SQLSMALLINT ctype = SQL_C_NUMERIC;
-		if (ctx.quirks.decimal_columns_precision_through_ard) {
+		if (ctx.quirks.decimal_columns_as_ard_type) {
 			ctype = SQL_ARD_TYPE;
 		}
 		SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, ctype, &fetched_data, sizeof(fetched_data), &ind);
@@ -319,34 +352,6 @@ static std::pair<duckdb_hugeint, bool> FetchVarchar(QueryContext &ctx, OdbcType 
 	}
 
 	return std::make_pair(parsed, false);
-}
-
-template <>
-void TypeSpecific::BindColumn<duckdb_decimal>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
-	if (ctx.quirks.decimal_columns_precision_through_ard) {
-		SetDescriptorFields(ctx, odbc_type, col_idx);
-	}
-
-	if (!ctx.quirks.enable_columns_binding || ctx.quirks.decimal_columns_as_chars) {
-		return;
-	}
-
-	SQL_NUMERIC_STRUCT nstruct;
-	ZeroNumericStruct(nstruct);
-	ScannerValue nval(nstruct);
-	ColumnBind nbind(std::move(nval));
-
-	ColumnBind &bind = ctx.BindForColumn(col_idx);
-	bind = std::move(nbind);
-	SQL_NUMERIC_STRUCT &fetched = bind.Value<SQL_NUMERIC_STRUCT>();
-	SQLLEN &ind = bind.Indicator();
-	SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, SQL_C_NUMERIC, &fetched, sizeof(SQL_NUMERIC_STRUCT), &ind);
-	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
-		throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(SQL_C_NUMERIC) + ", column index: " +
-		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
-		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
-	}
 }
 
 template <>

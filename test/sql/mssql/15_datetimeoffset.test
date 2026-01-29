@@ -41,6 +41,18 @@ SELECT column_type from (
 TIMESTAMP WITH TIME ZONE
 
 query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:59.1234567-05:00'' AS DATETIMEOFFSET)',
+  enable_columns_binding=TRUE)
+----
+2021-01-01 14:28:59.123456+09:30
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(''2020-12-31 23:58:59.1234567-05:00'' AS DATETIMEOFFSET)',
+  enable_columns_binding=TRUE)
+----
+Invalid Descriptor Index
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS DATETIMEOFFSET)',
   params=row('2020-12-31 23:58:59.123456+00:00'::TIMESTAMP WITH TIME ZONE))
 ----

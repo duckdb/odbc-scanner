@@ -19,6 +19,12 @@ SELECT column_type from (
 ----
 DECIMAL(10,4)
 
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.1234 AS SMALLMONEY)',
+  enable_columns_binding=TRUE)
+----
+Inconsistent descriptor information
+
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(42.1234::DECIMAL(10,4)))
 ----

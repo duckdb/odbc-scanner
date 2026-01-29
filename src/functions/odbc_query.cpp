@@ -421,6 +421,7 @@ void OdbcQueryFunction::Register(duckdb_connection conn) {
 	// quirks
 	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_as_chars", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_precision_through_ard", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_as_ard_type", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "decimal_params_as_chars", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "integral_params_as_decimals", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "reset_stmt_before_execute", bool_type.get());

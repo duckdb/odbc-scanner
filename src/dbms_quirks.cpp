@@ -19,6 +19,7 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 	case DbmsDriver::MSSQL:
 		this->var_len_params_long_threshold_bytes = 8000;
 		this->decimal_columns_precision_through_ard = true;
+		this->decimal_columns_as_ard_type = true;
 		this->decimal_params_as_chars = true;
 		this->time_params_as_ss_time2 = true;
 		this->timestamp_max_fraction_precision = 7;
@@ -73,6 +74,8 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 			this->timestamp_columns_as_timestamp_ns = duckdb_get_bool(val.get());
 		} else if (en.first == "decimal_columns_precision_through_ard") {
 			this->decimal_columns_precision_through_ard = duckdb_get_bool(val.get());
+		} else if (en.first == "decimal_columns_as_ard_type") {
+			this->decimal_columns_as_ard_type = duckdb_get_bool(val.get());
 		} else if (en.first == "decimal_params_as_chars") {
 			this->decimal_params_as_chars = duckdb_get_bool(val.get());
 		} else if (en.first == "integral_params_as_decimals") {
@@ -113,6 +116,7 @@ const std::vector<std::string> DbmsQuirks::AllNames() {
 	std::vector<std::string> res;
 	res.emplace_back("decimal_columns_as_chars");
 	res.emplace_back("decimal_columns_precision_through_ard");
+	res.emplace_back("decimal_columns_as_ard_type");
 	res.emplace_back("decimal_params_as_chars");
 	res.emplace_back("integral_params_as_decimals");
 	res.emplace_back("reset_stmt_before_execute");

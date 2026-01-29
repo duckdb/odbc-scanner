@@ -20,6 +20,7 @@ struct Params {
 	static const param_type TYPE_TIME_WITH_NANOS = DUCKDB_TYPE_TIME + 1000;
 	static const param_type TYPE_SQL_BIT = DUCKDB_TYPE_BOOLEAN + 1000;
 	static const param_type TYPE_SQL_GUID = DUCKDB_TYPE_UUID + 1000;
+	static const param_type TYPE_SS_TIMESTAMPOFFSET = DUCKDB_TYPE_TIME_TZ + 1000;
 
 	static std::vector<ScannerValue> Extract(DbmsQuirks &quirks, duckdb_data_chunk chunk, idx_t col_idx);
 

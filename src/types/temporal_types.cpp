@@ -202,12 +202,139 @@ void TypeSpecific::BindColumn<duckdb_date_struct>(QueryContext &ctx, OdbcType &o
 	bind = std::move(nbind);
 	SQL_DATE_STRUCT &fetched = bind.Value<SQL_DATE_STRUCT>();
 	SQLLEN &ind = bind.Indicator();
-	SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, SQL_C_TYPE_DATE, &fetched, sizeof(SQL_DATE_STRUCT), &ind);
+	SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, SQL_C_TYPE_DATE, &fetched, sizeof(fetched), &ind);
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 		throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(SQL_C_TYPE_DATE) + ", column index: " +
 		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
 		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+	}
+}
+
+static void BindColumnTime(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	SQL_TIME_STRUCT nstruct;
+	nstruct.hour = 0;
+	nstruct.minute = 0;
+	nstruct.second = 0;
+	ScannerValue nval(nstruct);
+	ColumnBind nbind(std::move(nval));
+
+	ColumnBind &bind = ctx.BindForColumn(col_idx);
+	bind = std::move(nbind);
+	SQL_TIME_STRUCT &fetched = bind.Value<SQL_TIME_STRUCT>();
+	SQLLEN &ind = bind.Indicator();
+	SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, SQL_C_TYPE_TIME, &fetched, sizeof(fetched), &ind);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+		throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(SQL_C_TYPE_TIME) + ", column index: " +
+		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
+		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+	}
+}
+
+static void BindColumnSSTime2(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	SQL_SS_TIME2_STRUCT nstruct;
+	nstruct.hour = 0;
+	nstruct.minute = 0;
+	nstruct.second = 0;
+	nstruct.fraction = 0;
+	ScannerValue nval(nstruct);
+	ColumnBind nbind(std::move(nval));
+
+	ColumnBind &bind = ctx.BindForColumn(col_idx);
+	bind = std::move(nbind);
+	SQL_SS_TIME2_STRUCT &fetched = bind.Value<SQL_SS_TIME2_STRUCT>();
+	SQLLEN &ind = bind.Indicator();
+	SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, SQL_C_BINARY, &fetched, sizeof(fetched), &ind);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+		throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(Types::SQL_SS_TIME2) +
+		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
+		                       ",  query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
+		                       diag + "'");
+	}
+}
+
+template <>
+void TypeSpecific::BindColumn<duckdb_time_struct>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	if (!ctx.quirks.enable_columns_binding) {
+		return;
+	}
+	switch (odbc_type.desc_concise_type) {
+	case SQL_TYPE_TIME:
+		BindColumnTime(ctx, odbc_type, col_idx);
+		break;
+	case Types::SQL_SS_TIME2:
+		BindColumnSSTime2(ctx, odbc_type, col_idx);
+		break;
+	default:
+		throw ScannerException("Unsupported ODBC TIME column bind type: " + odbc_type.ToString() + ", query: '" +
+		                       ctx.query + "', column idx: " + std::to_string(col_idx));
+	}
+}
+
+static void BindColumnTimestamp(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	SQL_TIMESTAMP_STRUCT nstruct;
+	nstruct.year = 0;
+	nstruct.month = 0;
+	nstruct.day = 0;
+	nstruct.hour = 0;
+	nstruct.minute = 0;
+	nstruct.second = 0;
+	nstruct.fraction = 0;
+	ScannerValue nval(nstruct);
+	ColumnBind nbind(std::move(nval));
+
+	ColumnBind &bind = ctx.BindForColumn(col_idx);
+	bind = std::move(nbind);
+	SQL_TIMESTAMP_STRUCT &fetched = bind.Value<SQL_TIMESTAMP_STRUCT>();
+	SQLLEN &ind = bind.Indicator();
+	SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, SQL_C_TYPE_TIMESTAMP, &fetched, sizeof(fetched), &ind);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+		throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(SQL_C_TYPE_TIMESTAMP) +
+		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
+		                       ",  query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
+		                       diag + "'");
+	}
+}
+
+static void BindColumnSSTimestampOffset(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	SQL_SS_TIMESTAMPOFFSET_STRUCT nstruct;
+	nstruct.year = 0;
+	nstruct.month = 0;
+	nstruct.day = 0;
+	nstruct.hour = 0;
+	nstruct.minute = 0;
+	nstruct.second = 0;
+	nstruct.fraction = 0;
+	nstruct.timezone_hour = 0;
+	nstruct.timezone_minute = 0;
+	ScannerValue nval(nstruct);
+	ColumnBind nbind(std::move(nval));
+
+	ColumnBind &bind = ctx.BindForColumn(col_idx);
+	bind = std::move(nbind);
+	SQL_SS_TIMESTAMPOFFSET_STRUCT &fetched = bind.Value<SQL_SS_TIMESTAMPOFFSET_STRUCT>();
+	SQLLEN &ind = bind.Indicator();
+	SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, SQL_C_BINARY, &fetched, sizeof(fetched), &ind);
+	if (!SQL_SUCCEEDED(ret)) {
+		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+		throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(SQL_C_BINARY) + ", column index: " +
+		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
+		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+	}
+}
+
+template <>
+void TypeSpecific::BindColumn<duckdb_timestamp_struct>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	if (!ctx.quirks.enable_columns_binding) {
+		return;
+	}
+	if (odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET) {
+		BindColumnSSTimestampOffset(ctx, odbc_type, col_idx);
+	} else {
+		BindColumnTimestamp(ctx, odbc_type, col_idx);
 	}
 }
 
@@ -257,18 +384,30 @@ void TypeSpecific::FetchAndSetResult<duckdb_date_struct>(QueryContext &ctx, Odbc
 
 static void FetchAndSetResultTime(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
                                   idx_t row_idx) {
-	SQL_TIME_STRUCT fetched;
-	fetched.hour = 0;
-	fetched.minute = 0;
-	fetched.second = 0;
-	SQLLEN ind;
-	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_TYPE_TIME, &fetched, sizeof(fetched), &ind);
-	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
-		throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(SQL_C_TYPE_TIME) + ", column index: " +
-		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
-		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+	SQL_TIME_STRUCT fetched_data;
+	fetched_data.hour = 0;
+	fetched_data.minute = 0;
+	fetched_data.second = 0;
+	SQL_TIME_STRUCT *fetched_ptr = &fetched_data;
+	SQLLEN ind = 0;
+
+	if (ctx.quirks.enable_columns_binding) {
+		ColumnBind &bind = ctx.BindForColumn(col_idx);
+		SQL_TIME_STRUCT &bound = bind.Value<SQL_TIME_STRUCT>();
+		fetched_ptr = &bound;
+		ind = bind.ind;
+	} else {
+		SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_TYPE_TIME, &fetched_data, sizeof(fetched_data), &ind);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+			throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(SQL_C_TYPE_TIME) +
+			                       ", column index: " + std::to_string(col_idx) +
+			                       ", column type: " + odbc_type.ToString() + ",  query: '" + ctx.query +
+			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
 	}
+
+	SQL_TIME_STRUCT &fetched = *fetched_ptr;
 
 	if (ind == SQL_NULL_DATA) {
 		Types::SetNullValueToResult(vec, row_idx);
@@ -289,20 +428,32 @@ static void FetchAndSetResultTime(QueryContext &ctx, OdbcType &odbc_type, SQLSMA
 
 static void FetchAndSetResultSSTime2(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
                                      idx_t row_idx) {
-	SQL_SS_TIME2_STRUCT fetched;
-	fetched.hour = 0;
-	fetched.minute = 0;
-	fetched.second = 0;
-	fetched.fraction = 0;
-	SQLLEN ind;
-	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_BINARY, &fetched, sizeof(fetched), &ind);
-	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
-		throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(Types::SQL_SS_TIME2) +
-		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
-		                       ",  query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
-		                       diag + "'");
+
+	SQL_SS_TIME2_STRUCT fetched_data;
+	fetched_data.hour = 0;
+	fetched_data.minute = 0;
+	fetched_data.second = 0;
+	fetched_data.fraction = 0;
+	SQL_SS_TIME2_STRUCT *fetched_ptr = &fetched_data;
+	SQLLEN ind = 0;
+
+	if (ctx.quirks.enable_columns_binding) {
+		ColumnBind &bind = ctx.BindForColumn(col_idx);
+		SQL_SS_TIME2_STRUCT &bound = bind.Value<SQL_SS_TIME2_STRUCT>();
+		fetched_ptr = &bound;
+		ind = bind.ind;
+	} else {
+		SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_BINARY, &fetched_data, sizeof(fetched_data), &ind);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+			throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(Types::SQL_SS_TIME2) +
+			                       ", column index: " + std::to_string(col_idx) +
+			                       ", column type: " + odbc_type.ToString() + ",  query: '" + ctx.query +
+			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
 	}
+
+	SQL_SS_TIME2_STRUCT &fetched = *fetched_ptr;
 
 	if (ind == SQL_NULL_DATA) {
 		Types::SetNullValueToResult(vec, row_idx);
@@ -368,23 +519,35 @@ static int64_t MicrosToNanos(duckdb_timestamp ts_no_fraction, SQLUINTEGER fetche
 
 static void FetchAndSetResultTimestamp(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
                                        idx_t row_idx) {
-	SQL_TIMESTAMP_STRUCT fetched;
-	fetched.year = 0;
-	fetched.month = 0;
-	fetched.day = 0;
-	fetched.hour = 0;
-	fetched.minute = 0;
-	fetched.second = 0;
-	fetched.fraction = 0;
-	SQLLEN ind;
-	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_TYPE_TIMESTAMP, &fetched, sizeof(fetched), &ind);
-	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
-		throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(SQL_C_TYPE_TIMESTAMP) +
-		                       ", column index: " + std::to_string(col_idx) + ", column type: " + odbc_type.ToString() +
-		                       ",  query: '" + ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" +
-		                       diag + "'");
+	SQL_TIMESTAMP_STRUCT fetched_data;
+	fetched_data.year = 0;
+	fetched_data.month = 0;
+	fetched_data.day = 0;
+	fetched_data.hour = 0;
+	fetched_data.minute = 0;
+	fetched_data.second = 0;
+	fetched_data.fraction = 0;
+	SQL_TIMESTAMP_STRUCT *fetched_ptr = &fetched_data;
+	SQLLEN ind = 0;
+
+	if (ctx.quirks.enable_columns_binding) {
+		ColumnBind &bind = ctx.BindForColumn(col_idx);
+		SQL_TIMESTAMP_STRUCT &bound = bind.Value<SQL_TIMESTAMP_STRUCT>();
+		fetched_ptr = &bound;
+		ind = bind.ind;
+	} else {
+		SQLRETURN ret =
+		    SQLGetData(ctx.hstmt(), col_idx, SQL_C_TYPE_TIMESTAMP, &fetched_data, sizeof(fetched_data), &ind);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+			throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(SQL_C_TYPE_TIMESTAMP) +
+			                       ", column index: " + std::to_string(col_idx) +
+			                       ", column type: " + odbc_type.ToString() + ",  query: '" + ctx.query +
+			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
 	}
+
+	SQL_TIMESTAMP_STRUCT &fetched = *fetched_ptr;
 
 	if (ind == SQL_NULL_DATA) {
 		Types::SetNullValueToResult(vec, row_idx);
@@ -414,26 +577,37 @@ static void FetchAndSetResultTimestamp(QueryContext &ctx, OdbcType &odbc_type, S
 	}
 }
 
-static void FetchAndSetResultTimestampOffset(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
-                                             duckdb_vector vec, idx_t row_idx) {
-	SQL_SS_TIMESTAMPOFFSET_STRUCT fetched;
-	fetched.year = 0;
-	fetched.month = 0;
-	fetched.day = 0;
-	fetched.hour = 0;
-	fetched.minute = 0;
-	fetched.second = 0;
-	fetched.fraction = 0;
-	fetched.timezone_hour = 0;
-	fetched.timezone_minute = 0;
-	SQLLEN ind;
-	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_BINARY, &fetched, sizeof(fetched), &ind);
-	if (!SQL_SUCCEEDED(ret)) {
-		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
-		throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(SQL_C_BINARY) + ", column index: " +
-		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
-		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+static void FetchAndSetResultSSTimestampOffset(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
+                                               duckdb_vector vec, idx_t row_idx) {
+	SQL_SS_TIMESTAMPOFFSET_STRUCT fetched_data;
+	fetched_data.year = 0;
+	fetched_data.month = 0;
+	fetched_data.day = 0;
+	fetched_data.hour = 0;
+	fetched_data.minute = 0;
+	fetched_data.second = 0;
+	fetched_data.fraction = 0;
+	fetched_data.timezone_hour = 0;
+	fetched_data.timezone_minute = 0;
+	SQL_SS_TIMESTAMPOFFSET_STRUCT *fetched_ptr = &fetched_data;
+	SQLLEN ind = 0;
+
+	if (ctx.quirks.enable_columns_binding) {
+		ColumnBind &bind = ctx.BindForColumn(col_idx);
+		SQL_SS_TIMESTAMPOFFSET_STRUCT &bound = bind.Value<SQL_SS_TIMESTAMPOFFSET_STRUCT>();
+		fetched_ptr = &bound;
+		ind = bind.ind;
+	} else {
+		SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, SQL_C_BINARY, &fetched_data, sizeof(fetched_data), &ind);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+			throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(SQL_C_BINARY) + ", column index: " +
+			                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
+			                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
 	}
+
+	SQL_SS_TIMESTAMPOFFSET_STRUCT &fetched = *fetched_ptr;
 
 	if (ind == SQL_NULL_DATA) {
 		Types::SetNullValueToResult(vec, row_idx);
@@ -463,7 +637,7 @@ template <>
 void TypeSpecific::FetchAndSetResult<duckdb_timestamp_struct>(QueryContext &ctx, OdbcType &odbc_type,
                                                               SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx) {
 	if (odbc_type.desc_concise_type == Types::SQL_SS_TIMESTAMPOFFSET) {
-		FetchAndSetResultTimestampOffset(ctx, odbc_type, col_idx, vec, row_idx);
+		FetchAndSetResultSSTimestampOffset(ctx, odbc_type, col_idx, vec, row_idx);
 	} else {
 		FetchAndSetResultTimestamp(ctx, odbc_type, col_idx, vec, row_idx);
 	}
