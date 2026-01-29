@@ -30,7 +30,7 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS INT), CAST(1 AS
 42	1
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS INT), CAST(1 AS BIT)',
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(1 AS BIT)',
   enable_columns_binding=TRUE)
 ----
 Invalid Descriptor Index

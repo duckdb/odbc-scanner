@@ -203,9 +203,47 @@ void Types::BindColumn(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_i
 	case SQL_BIT:
 		TypeSpecific::BindColumn<bool>(ctx, odbc_type, col_idx);
 		break;
+	case SQL_TINYINT:
+		if (odbc_type.is_unsigned) {
+			TypeSpecific::BindColumn<uint8_t>(ctx, odbc_type, col_idx);
+		} else {
+			TypeSpecific::BindColumn<int8_t>(ctx, odbc_type, col_idx);
+		}
+		break;
+	case SQL_SMALLINT:
+		if (odbc_type.is_unsigned) {
+			TypeSpecific::BindColumn<uint16_t>(ctx, odbc_type, col_idx);
+		} else {
+			TypeSpecific::BindColumn<int16_t>(ctx, odbc_type, col_idx);
+		}
+		break;
+	case SQL_INTEGER:
+		if (odbc_type.is_unsigned) {
+			TypeSpecific::BindColumn<uint32_t>(ctx, odbc_type, col_idx);
+		} else {
+			TypeSpecific::BindColumn<int32_t>(ctx, odbc_type, col_idx);
+		}
+		break;
+	case SQL_BIGINT:
+		if (odbc_type.is_unsigned) {
+			TypeSpecific::BindColumn<uint64_t>(ctx, odbc_type, col_idx);
+		} else {
+			TypeSpecific::BindColumn<int64_t>(ctx, odbc_type, col_idx);
+		}
+		break;
+	case SQL_REAL:
+		TypeSpecific::BindColumn<float>(ctx, odbc_type, col_idx);
+		break;
+	case SQL_DOUBLE:
+	case SQL_FLOAT:
+		TypeSpecific::BindColumn<double>(ctx, odbc_type, col_idx);
+		break;
 	case SQL_DECIMAL:
 	case SQL_NUMERIC:
 		TypeSpecific::BindColumn<duckdb_decimal>(ctx, odbc_type, col_idx);
+		break;
+	case SQL_GUID:
+		TypeSpecific::BindColumn<ScannerUuid>(ctx, odbc_type, col_idx);
 		break;
 	case SQL_TYPE_DATE:
 		TypeSpecific::BindColumn<duckdb_date_struct>(ctx, odbc_type, col_idx);
