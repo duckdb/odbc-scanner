@@ -223,17 +223,89 @@ void TypeSpecific::BindOdbcParam<uint64_t>(QueryContext &ctx, ScannerValue &para
 }
 
 template <typename INT_TYPE>
-static void FetchAndSetResultInternal(QueryContext &ctx, SQLSMALLINT ctype, OdbcType &odbc_type, SQLSMALLINT col_idx,
-                                      duckdb_vector vec, idx_t row_idx) {
-	INT_TYPE fetched = 0;
-	SQLLEN ind;
-	SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, ctype, &fetched, sizeof(fetched), &ind);
+void BindColumnInternal(QueryContext &ctx, SQLSMALLINT ctype, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	if (!ctx.quirks.enable_columns_binding) {
+		return;
+	}
+	ScannerValue nval(static_cast<INT_TYPE>(0));
+	ColumnBind nbind(std::move(nval));
+
+	ColumnBind &bind = ctx.BindForColumn(col_idx);
+	bind = std::move(nbind);
+	INT_TYPE &fetched = bind.Value<INT_TYPE>();
+	SQLLEN &ind = bind.Indicator();
+	SQLRETURN ret = SQLBindCol(ctx.hstmt(), col_idx, ctype, &fetched, sizeof(fetched), &ind);
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
-		throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(ctype) + ", column index: " +
+		throw ScannerException("'SQLBindCol' failed, C type: " + std::to_string(ctype) + ", column index: " +
 		                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
 		                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
+}
+
+template <>
+void TypeSpecific::BindColumn<int8_t>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	BindColumnInternal<int8_t>(ctx, SQL_C_TINYINT, odbc_type, col_idx);
+}
+
+template <>
+void TypeSpecific::BindColumn<uint8_t>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	BindColumnInternal<uint8_t>(ctx, SQL_C_UTINYINT, odbc_type, col_idx);
+}
+
+template <>
+void TypeSpecific::BindColumn<int16_t>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	BindColumnInternal<int16_t>(ctx, SQL_C_SSHORT, odbc_type, col_idx);
+}
+
+template <>
+void TypeSpecific::BindColumn<uint16_t>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	BindColumnInternal<uint16_t>(ctx, SQL_C_USHORT, odbc_type, col_idx);
+}
+
+template <>
+void TypeSpecific::BindColumn<int32_t>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	BindColumnInternal<int32_t>(ctx, SQL_C_SLONG, odbc_type, col_idx);
+}
+
+template <>
+void TypeSpecific::BindColumn<uint32_t>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	BindColumnInternal<uint32_t>(ctx, SQL_C_ULONG, odbc_type, col_idx);
+}
+
+template <>
+void TypeSpecific::BindColumn<int64_t>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	BindColumnInternal<int64_t>(ctx, SQL_C_SBIGINT, odbc_type, col_idx);
+}
+
+template <>
+void TypeSpecific::BindColumn<uint64_t>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+	BindColumnInternal<uint64_t>(ctx, SQL_C_UBIGINT, odbc_type, col_idx);
+}
+
+template <typename INT_TYPE>
+static void FetchAndSetResultInternal(QueryContext &ctx, SQLSMALLINT ctype, OdbcType &odbc_type, SQLSMALLINT col_idx,
+                                      duckdb_vector vec, idx_t row_idx) {
+	INT_TYPE fetched_data = 0;
+	INT_TYPE *fetched_ptr = &fetched_data;
+	SQLLEN ind = 0;
+
+	if (ctx.quirks.enable_columns_binding) {
+		ColumnBind &bind = ctx.BindForColumn(col_idx);
+		INT_TYPE &bound = bind.Value<INT_TYPE>();
+		fetched_ptr = &bound;
+		ind = bind.ind;
+	} else {
+		SQLRETURN ret = SQLGetData(ctx.hstmt(), col_idx, ctype, &fetched_data, sizeof(fetched_data), &ind);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+			throw ScannerException("'SQLGetData' failed, C type: " + std::to_string(ctype) + ", column index: " +
+			                       std::to_string(col_idx) + ", column type: " + odbc_type.ToString() + ",  query: '" +
+			                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
+	}
+
+	INT_TYPE &fetched = *fetched_ptr;
 
 	if (ind == SQL_NULL_DATA) {
 		Types::SetNullValueToResult(vec, row_idx);

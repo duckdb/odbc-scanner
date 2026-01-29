@@ -39,12 +39,13 @@ class ScannerValue {
 		DecimalChars decimal_chars;
 		WideString wstr;
 		ScannerBlob blob;
-		ScannerUuid uuid;
+		ScannerUuid uuid; // for uuid params
 		SQL_DATE_STRUCT date;
 		SQL_TIME_STRUCT time;
 		SQL_SS_TIME2_STRUCT time_with_nanos;
 		SQL_TIMESTAMP_STRUCT timestamp;
 		SqlBit sql_bit;
+		SQLGUID sql_guid; // for uuid columns
 
 		InternalValue() : null_val(true) {
 		}
@@ -90,6 +91,8 @@ class ScannerValue {
 		}
 		InternalValue(SqlBit value) : sql_bit(value) {
 		}
+		InternalValue(SQLGUID value) : sql_guid(value) {
+		}
 
 		InternalValue(InternalValue &other) = delete;
 		InternalValue(InternalValue &&other) = delete;
@@ -124,6 +127,7 @@ public:
 	explicit ScannerValue(duckdb_time_struct value, bool use_time_with_nanos);
 	explicit ScannerValue(TimestampNsStruct value);
 	explicit ScannerValue(SqlBit value);
+	explicit ScannerValue(SQLGUID value);
 
 	ScannerValue(ScannerValue &other) = delete;
 	ScannerValue(ScannerValue &&other);

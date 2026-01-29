@@ -25,6 +25,19 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''00000000-0000-0000-
 00000000-0000-0000-0000-000000000000
 
 query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''0306c176-e401-11f0-a1ac-e86a6416a6f5'' AS UNIQUEIDENTIFIER)',
+  enable_columns_binding=TRUE)
+----
+0306c176-e401-11f0-a1ac-e86a6416a6f5
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(''0306c176-e401-11f0-a1ac-e86a6416a6f5'' AS UNIQUEIDENTIFIER)',
+  enable_columns_binding=TRUE)
+----
+Invalid Descriptor Index
+
+query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS UNIQUEIDENTIFIER)',
   params=row('0306c176-e401-11f0-a1ac-e86a6416a6f5'::VARCHAR))
 ----
