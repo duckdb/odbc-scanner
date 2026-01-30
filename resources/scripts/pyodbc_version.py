@@ -54,6 +54,12 @@ def run_snowflake():
   exec_sql(cur, "SELECT current_version()")
   print(cur.fetchone())
 
+def run_firebird():
+  conn = connect_await_db_startup()
+  cur = conn.cursor()
+  exec_sql(cur, "SELECT rdb$get_context('SYSTEM', 'ENGINE_VERSION') as version FROM rdb$database")
+  print(cur.fetchone())
+
 if __name__ == "__main__":
   if args.dbms in [
     "DuckDB",
@@ -75,5 +81,7 @@ if __name__ == "__main__":
     run_db2()
   elif "Snowflake" == args.dbms:
     run_snowflake()
+  elif "Firebird" == args.dbms:
+    run_firebird()
   else:
     raise Exception("Unsupported DBMS: " + args.dbms)
