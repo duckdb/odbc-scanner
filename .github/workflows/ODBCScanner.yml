@@ -978,3 +978,77 @@ jobs:
       - name: SQL Tests
         run: |
           python ./resources/scripts/run_sqllogic_tests.py --dbms FlightSQL
+
+  firebird-windows-amd64:
+    # Note: Firebird ODBC on Linux is broken: https://github.com/FirebirdSQL/firebird-odbc-driver/pull/247 -- Use Windows for tests.
+    name: Firebird Windows (amd64)
+    runs-on: windows-latest
+    needs: duckdb-linux-amd64
+    env:
+      ODBC_CONN_STRING: Driver={Firebird ODBC Driver};Database=localhost:C:/tmp/test.fdb;UID=SYSDBA;PWD=masterkey;CHARSET=UTF8;
+      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/latest/download/libduckdb-windows-amd64.zip
+      DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/duckdb.lib
+      DUCKDB_CAPI_LIB_SHARED_PATH: ${{ github.workspace }}/libduckdb/duckdb.dll
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+
+      - name: Dependencies
+        shell: bash
+        run: |
+          choco install \
+            curl \
+            unzip \
+            --no-progress
+
+      - name: Configure
+        shell: bash
+        run: |
+          make configure
+
+      - name: Firebird Server and ODBC Driver
+        shell: pwsh
+        run: |
+          choco install firebird -y --version 5.0.3.1
+          choco install firebird-odbc -y --version 3.0.1.21
+
+          ./configure/venv/Scripts/python.exe -m pip install pyodbc
+
+          $isql = 'C:/Program Files/Firebird/Firebird_5_0/isql.exe'
+
+          # Initialize SYSDBA password
+          "CREATE OR ALTER USER SYSDBA PASSWORD 'masterkey' USING PLUGIN Srp; EXIT;" | & $isql -b -user SYSDBA security.db
+
+          # Create a test database
+          mkdir C:/tmp > $null
+          "CREATE DATABASE 'localhost:C:/tmp/test.fdb' user 'SYSDBA' password 'masterkey'; EXIT;" | & $isql -b -q
+
+          ./configure/venv/Scripts/python.exe ./resources/scripts/pyodbc_version.py --dbms Firebird --conn-str $env:ODBC_CONN_STRING
+
+      - name: DuckDB CAPI Lib
+        shell: bash
+        run: |
+          mkdir libduckdb
+          pushd libduckdb
+          curl --no-progress-meter -LO "${DUCKDB_CAPI_LIB_URL}"
+          unzip -q libduckdb-windows-amd64.zip
+          ls -laR
+          popd
+
+      - name: Build
+        shell: bash
+        run: |
+          make release
+
+      - name: C API Tests
+        shell: bash
+        run: |
+          cp "${DUCKDB_CAPI_LIB_SHARED_PATH}" ./cmake_build/release/test/
+          make test
+
+      - name: SQL Tests
+        shell: bash
+        run: |
+          ./configure/venv/Scripts/python.exe ./resources/scripts/run_sqllogic_tests.py --dbms Firebird
