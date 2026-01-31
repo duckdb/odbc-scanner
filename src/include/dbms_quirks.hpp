@@ -31,6 +31,8 @@ struct DbmsQuirks {
 	explicit DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePtr> &user_quirks);
 
 	static const std::vector<std::string> AllNames();
+
+	static std::map<std::string, ValuePtr> ExtractUserQuirks(duckdb_bind_info info);
 };
 
 } // namespace odbcscanner

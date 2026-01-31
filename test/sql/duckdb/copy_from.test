@@ -16,5 +16,19 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
 ----
 supported values: 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048
 
+query II
+SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+  create_table=TRUE,
+  decimal_params_as_chars=TRUE,
+  integral_params_as_decimals=TRUE,
+  source_query='SELECT ''foo''::VARCHAR AS col1',
+  column_types=MAP {'DUCKDB_TYPE_VARCHAR': 'VARCHAR'}
+)
+----
+1	1
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy_from')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))

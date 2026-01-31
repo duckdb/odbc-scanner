@@ -124,15 +124,6 @@ struct LocalInitData {
 
 } // namespace
 
-static std::map<std::string, ValuePtr> ExtractUserQuirks(duckdb_bind_info info) {
-	std::map<std::string, ValuePtr> res;
-	for (auto &name : DbmsQuirks::AllNames()) {
-		auto val = ValuePtr(duckdb_bind_get_named_parameter(info, name.c_str()), ValueDeleter);
-		res.emplace(name, std::move(val));
-	}
-	return res;
-}
-
 static QueryOptions ExtractQueryOptions(duckdb_value ignore_exec_failure_val, duckdb_value close_connection_val,
                                         bool conn_must_be_closed) {
 	bool ignore_exec_failure = false;
@@ -188,7 +179,7 @@ static void Bind(duckdb_bind_info info) {
 	QueryOptions query_options =
 	    ExtractQueryOptions(ignore_exec_failure_val.get(), close_connection_val.get(), extracted_conn.must_be_closed);
 
-	std::map<std::string, ValuePtr> user_quirks = ExtractUserQuirks(info);
+	std::map<std::string, ValuePtr> user_quirks = DbmsQuirks::ExtractUserQuirks(info);
 	DbmsQuirks quirks(conn, user_quirks);
 	QueryContext ctx(query, std::move(hstmt), quirks);
 

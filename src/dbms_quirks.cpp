@@ -38,6 +38,10 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 		break;
 	case DbmsDriver::POSTGRESQL:
 		break;
+	case DbmsDriver::FIREBIRD:
+		this->decimal_params_as_chars = true;
+		this->decimal_columns_as_chars = true;
+		break;
 
 	case DbmsDriver::SNOWFLAKE:
 		this->decimal_columns_precision_through_ard = true;
@@ -129,6 +133,15 @@ const std::vector<std::string> DbmsQuirks::AllNames() {
 	res.emplace_back("var_len_data_single_part");
 	res.emplace_back("var_len_params_long_threshold_bytes");
 	res.emplace_back("enable_columns_binding");
+	return res;
+}
+
+std::map<std::string, ValuePtr> DbmsQuirks::ExtractUserQuirks(duckdb_bind_info info) {
+	std::map<std::string, ValuePtr> res;
+	for (auto &name : DbmsQuirks::AllNames()) {
+		auto val = ValuePtr(duckdb_bind_get_named_parameter(info, name.c_str()), ValueDeleter);
+		res.emplace(name, std::move(val));
+	}
 	return res;
 }
 

@@ -297,6 +297,8 @@ std::string CastAsBigintSQL(const std::string &value, const std::string &alias) 
 		postfix = " FROM dual";
 	} else if (DBMSConfigured("DB2")) {
 		postfix = " FROM sysibm.sysdummy1";
+	} else if (DBMSConfigured("Firebird")) {
+		postfix = " FROM rdb$database";
 	}
 	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
 }
@@ -314,6 +316,8 @@ std::string CastAsDateSQL(const std::string &value_in, const std::string &alias)
 		postfix = " FROM dual";
 	} else if (DBMSConfigured("DB2")) {
 		postfix = " FROM sysibm.sysdummy1";
+	} else if (DBMSConfigured("Firebird")) {
+		postfix = " FROM rdb$database";
 	}
 	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
 }
@@ -327,6 +331,8 @@ std::string CastAsDecimalSQL(const std::string &value, uint8_t precision, uint8_
 		postfix = " FROM dual";
 	} else if (DBMSConfigured("DB2")) {
 		postfix = " FROM sysibm.sysdummy1";
+	} else if (DBMSConfigured("Firebird")) {
+		postfix = " FROM rdb$database";
 	}
 	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
 }

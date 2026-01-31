@@ -563,7 +563,9 @@ static void Bind(duckdb_bind_info info) {
 	                         source_queries_val.get(), source_limit_val.get());
 
 	OdbcConnection &conn = *extracted_conn.ptr;
-	DbmsQuirks quirks(conn, std::map<std::string, ValuePtr>());
+
+	std::map<std::string, ValuePtr> user_quirks = DbmsQuirks::ExtractUserQuirks(info);
+	DbmsQuirks quirks(conn, user_quirks);
 
 	auto batch_size_val = ValuePtr(duckdb_bind_get_named_parameter(info, "batch_size"), ValueDeleter);
 	auto use_insert_all_val = ValuePtr(duckdb_bind_get_named_parameter(info, "use_insert_all"), ValueDeleter);
@@ -1124,6 +1126,9 @@ void OdbcCopyFromFunction::Register(duckdb_connection conn) {
 	duckdb_table_function_add_named_parameter(fun.get(), "column_types", map_type.get());
 	// general options
 	duckdb_table_function_add_named_parameter(fun.get(), "close_connection", bool_type.get());
+	// quirks
+	duckdb_table_function_add_named_parameter(fun.get(), "decimal_params_as_chars", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "integral_params_as_decimals", bool_type.get());
 
 	// callbacks
 	duckdb_table_function_set_bind(fun.get(), odbc_copy_from_bind);

@@ -16,6 +16,7 @@ enum class DbmsDriver {
 	MARIADB,
 	MYSQL,
 	POSTGRESQL,
+	FIREBIRD,
 
 	SNOWFLAKE,
 	SPARK,

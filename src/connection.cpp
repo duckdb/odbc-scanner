@@ -25,6 +25,8 @@ static DbmsDriver ResolveDbmsDriver(const std::string &dbms_name, const std::str
 		return DbmsDriver::MARIADB;
 	} else if (dbms_name == "MySQL") {
 		return DbmsDriver::MYSQL;
+	} else if (dbms_name == "Firebird") {
+		return DbmsDriver::FIREBIRD;
 
 	} else if (dbms_name == "Snowflake") {
 		return DbmsDriver::SNOWFLAKE;
