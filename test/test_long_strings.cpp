@@ -32,6 +32,8 @@ TEST_CASE("Long string query", group_name) {
 		cast = "to_nclob(?) FROM dual";
 	} else if (DBMSConfigured("DB2")) {
 		cast = "CAST(? AS VARCHAR(20000)) FROM sysibm.sysdummy1";
+	} else if (DBMSConfigured("Firebird")) {
+		cast = "CAST(? AS VARCHAR(20000)) FROM rdb$database";
 	} else if (DBMSConfigured("FlightSQL")) {
 		return;
 	}
