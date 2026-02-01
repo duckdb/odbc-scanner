@@ -24,10 +24,10 @@
 
 DUCKDB_EXTENSION_EXTERN
 
-static void odbc_copy_from_bind(duckdb_bind_info info) noexcept;
-static void odbc_copy_from_init(duckdb_init_info info) noexcept;
-static void odbc_copy_from_local_init(duckdb_init_info info) noexcept;
-static void odbc_copy_from_function(duckdb_function_info info, duckdb_data_chunk output) noexcept;
+static void odbc_copy_bind(duckdb_bind_info info) noexcept;
+static void odbc_copy_init(duckdb_init_info info) noexcept;
+static void odbc_copy_local_init(duckdb_init_info info) noexcept;
+static void odbc_copy_function(duckdb_function_info info, duckdb_data_chunk output) noexcept;
 
 namespace odbcscanner {
 
@@ -36,12 +36,12 @@ namespace {
 enum class ExecState { UNINITIALIZED, EXECUTED, EXHAUSTED };
 
 struct ReaderOptions {
-	std::string duckdb_conn_string;
+	std::string conn_string;
 	std::vector<std::string> queries;
 	uint64_t limit;
 
-	ReaderOptions(std::string duckdb_conn_string_in, std::vector<std::string> queries_in, uint64_t limit_in)
-	    : duckdb_conn_string(std::move(duckdb_conn_string_in)), queries(std::move(queries_in)), limit(limit_in) {
+	ReaderOptions(std::string conn_string_in, std::vector<std::string> queries_in, uint64_t limit_in)
+	    : conn_string(std::move(conn_string_in)), queries(std::move(queries_in)), limit(limit_in) {
 	}
 };
 
@@ -52,14 +52,16 @@ struct InsertOptions {
 	bool use_insert_all = false;
 	bool insert_in_transaction = false;
 	uint64_t max_records_in_transaction = 0;
+	std::string dest_table;
 	std::string dest_query;
 	std::string dest_query_single;
 
 	InsertOptions(uint32_t batch_size_in, bool use_insert_all_in, bool insert_in_transaction_in,
-	              uint64_t max_records_in_transaction_in, std::string dest_query_in, std::string dest_query_single_in)
+	              uint64_t max_records_in_transaction_in, std::string dest_table_in, std::string dest_query_in,
+	              std::string dest_query_single_in)
 	    : batch_size(batch_size_in), use_insert_all(use_insert_all_in), insert_in_transaction(insert_in_transaction_in),
-	      max_records_in_transaction(max_records_in_transaction_in), dest_query(std::move(dest_query_in)),
-	      dest_query_single(std::move(dest_query_single_in)) {
+	      max_records_in_transaction(max_records_in_transaction_in), dest_table(std::move(dest_table_in)),
+	      dest_query(std::move(dest_query_in)), dest_query_single(std::move(dest_query_single_in)) {
 	}
 };
 
@@ -81,19 +83,17 @@ struct GeneralOptions {
 
 struct BindData {
 	int64_t conn_id = 0;
-	std::string table_name;
 	DbmsQuirks quirks;
 	ReaderOptions reader_options;
 	InsertOptions insert_options;
 	CreateTableOptions create_table_options;
 	GeneralOptions general_options;
 
-	BindData(int64_t conn_id_in, std::string table_name_in, DbmsQuirks quirks_in, ReaderOptions reader_options_in,
-	         InsertOptions insert_options_in, CreateTableOptions create_table_options_in,
-	         GeneralOptions general_options_in)
-	    : conn_id(conn_id_in), table_name(std::move(table_name_in)), quirks(quirks_in),
-	      reader_options(std::move(reader_options_in)), insert_options(insert_options_in),
-	      create_table_options(std::move(create_table_options_in)), general_options(general_options_in) {
+	BindData(int64_t conn_id_in, DbmsQuirks quirks_in, ReaderOptions reader_options_in, InsertOptions insert_options_in,
+	         CreateTableOptions create_table_options_in, GeneralOptions general_options_in)
+	    : conn_id(conn_id_in), quirks(quirks_in), reader_options(std::move(reader_options_in)),
+	      insert_options(insert_options_in), create_table_options(std::move(create_table_options_in)),
+	      general_options(general_options_in) {
 	}
 
 	static void Destroy(void *bdata_in) noexcept {
@@ -110,7 +110,7 @@ struct GlobalInitData {
 	GlobalInitData(int64_t conn_id, std::unique_ptr<OdbcConnection> conn_ptr_in, bool close_connection_in)
 	    : conn_id(conn_id), conn_ptr(std::move(conn_ptr_in)), close_connection(close_connection_in) {
 		if (!conn_ptr) {
-			throw ScannerException("'odbc_copy_from' error: ODBC connection not found on global init, id: " +
+			throw ScannerException("'odbc_copy' error: ODBC connection not found on global init, id: " +
 			                       std::to_string(conn_id));
 		}
 	}
@@ -167,7 +167,7 @@ struct SourceReader {
 		for (idx_t col_idx = 0; col_idx < col_count; col_idx++) {
 			const char *name_cstr = duckdb_column_name(result.get(), col_idx);
 			if (name_cstr == nullptr) {
-				throw ScannerException("'odbc_copy_from' error: 'duckdb_column_name' failed, column index: " +
+				throw ScannerException("'odbc_copy' error: 'duckdb_column_name' failed, column index: " +
 				                       std::to_string(col_idx));
 			}
 			std::string name(name_cstr);
@@ -176,7 +176,7 @@ struct SourceReader {
 			if (type_id == DUCKDB_TYPE_DECIMAL) {
 				LogicalTypePtr ltype(duckdb_column_logical_type(result.get(), col_idx), LogicalTypeDeleter);
 				if (ltype.get() == nullptr) {
-					throw ScannerException("'odbc_copy_from' error: cannot access logica type for column, index: " +
+					throw ScannerException("'odbc_copy' error: cannot access logica type for column, index: " +
 					                       std::to_string(col_idx));
 				}
 				uint8_t width = duckdb_decimal_width(ltype.get());
@@ -207,8 +207,8 @@ struct SourceReader {
 		if (state_select != DuckDBSuccess) {
 			const char *cerr = duckdb_result_error(res.get());
 			std::string err = cerr != nullptr ? std::string(cerr) : "N/A";
-			throw ScannerException("'odbc_copy_from' error: source query failure, sql: '" + query + "', message: '" +
-			                       err + "'");
+			throw ScannerException("'odbc_copy' error: source query failure, sql: '" + query + "', message: '" + err +
+			                       "'");
 		}
 
 		offset += limit;
@@ -254,8 +254,7 @@ struct SourceReader {
 		for (idx_t col_idx = 0; col_idx < columns.size(); col_idx++) {
 			auto vec = duckdb_data_chunk_get_vector(chunk.get(), col_idx);
 			if (vec == nullptr) {
-				throw ScannerException("'odbc_copy_from' error: output vector is NULL, index: " +
-				                       std::to_string(col_idx));
+				throw ScannerException("'odbc_copy' error: output vector is NULL, index: " + std::to_string(col_idx));
 			}
 			vectors[col_idx] = vec;
 			validities[col_idx] = duckdb_vector_get_validity(vec);
@@ -316,61 +315,61 @@ struct LocalInitData {
 
 } // namespace
 
-static ReaderOptions ExtractReaderOptions(duckdb_value duckdb_conn_string_val, duckdb_value file_path_val,
+static ReaderOptions ExtractReaderOptions(duckdb_value source_conn_string_val, duckdb_value source_file_val,
                                           duckdb_value source_query_val, duckdb_value source_queries_val,
                                           duckdb_value source_limit_val) {
-	std::string duckdb_conn_string = ":memory:";
-	if (duckdb_conn_string_val != nullptr && !duckdb_is_null_value(duckdb_conn_string_val)) {
-		auto duckdb_conn_string_cstr = VarcharPtr(duckdb_get_varchar(duckdb_conn_string_val), VarcharDeleter);
-		std::string duckdb_conn_string_raw(duckdb_conn_string_cstr.get());
-		duckdb_conn_string = Strings::Trim(duckdb_conn_string_raw);
-		if (duckdb_conn_string.empty()) {
-			throw ScannerException("'odbc_copy_from' error: specified DuckDB connection string must be not empty");
+	std::string source_conn_string = ":memory:";
+	if (source_conn_string_val != nullptr && !duckdb_is_null_value(source_conn_string_val)) {
+		auto source_conn_string_cstr = VarcharPtr(duckdb_get_varchar(source_conn_string_val), VarcharDeleter);
+		std::string source_conn_string_raw(source_conn_string_cstr.get());
+		source_conn_string = Strings::Trim(source_conn_string_raw);
+		if (source_conn_string.empty()) {
+			throw ScannerException("'odbc_copy' error: specified DuckDB connection string must be not empty");
 		}
 	}
 
-	bool file_specified = file_path_val != nullptr && !duckdb_is_null_value(file_path_val);
+	bool file_specified = source_file_val != nullptr && !duckdb_is_null_value(source_file_val);
 	bool single_query_specified = source_query_val != nullptr && !duckdb_is_null_value(source_query_val);
 	bool query_list_specified = source_queries_val != nullptr && !duckdb_is_null_value(source_queries_val);
 	std::vector<std::string> queries;
 	if (file_specified) {
 		if (single_query_specified || query_list_specified) {
-			throw ScannerException("'odbc_copy_from' error: only a single one from the following options can be "
-			                       "specified: 'file_path', 'source_query', 'source_queries'");
+			throw ScannerException("'odbc_copy' error: only a single one from the following options can be "
+			                       "specified: 'source_file', 'source_query', 'source_queries'");
 		}
-		auto file_path_cstr = VarcharPtr(duckdb_get_varchar(file_path_val), VarcharDeleter);
-		std::string file_path_raw(file_path_cstr.get());
-		std::string file_path_trimmed = Strings::Trim(file_path_raw);
-		if (file_path_trimmed.empty()) {
-			throw ScannerException("'odbc_copy_from' error: specified file path must be not empty");
+		auto source_file_cstr = VarcharPtr(duckdb_get_varchar(source_file_val), VarcharDeleter);
+		std::string source_file_raw(source_file_cstr.get());
+		std::string source_file_trimmed = Strings::Trim(source_file_raw);
+		if (source_file_trimmed.empty()) {
+			throw ScannerException("'odbc_copy' error: specified file path must be not empty");
 		}
-		std::string file_path;
-		for (char ch : file_path_trimmed) {
-			file_path.push_back(ch);
+		std::string source_file;
+		for (char ch : source_file_trimmed) {
+			source_file.push_back(ch);
 			if (ch == '\'') {
-				file_path.push_back('\'');
+				source_file.push_back('\'');
 			}
 		}
-		std::string query = "SELECT * FROM '" + file_path + "'";
+		std::string query = "SELECT * FROM '" + source_file + "'";
 		queries.emplace_back(std::move(query));
 
 	} else if (single_query_specified) {
 		if (query_list_specified) {
-			throw ScannerException("'odbc_copy_from' error: only a single one from the following options can be "
-			                       "specified: 'file_path', 'source_query', 'source_queries'");
+			throw ScannerException("'odbc_copy' error: only a single one from the following options can be "
+			                       "specified: 'source_file', 'source_query', 'source_queries'");
 		}
 		auto query_cstr = VarcharPtr(duckdb_get_varchar(source_query_val), VarcharDeleter);
 		std::string query_raw(query_cstr.get());
 		std::string query = Strings::Trim(query_raw);
 		if (query.empty()) {
-			throw ScannerException("'odbc_copy_from' error: specified source query must be not empty");
+			throw ScannerException("'odbc_copy' error: specified source query must be not empty");
 		}
 		queries.emplace_back(std::move(query));
 
 	} else {
 		idx_t count = duckdb_get_list_size(source_queries_val);
 		if (0 == count) {
-			throw ScannerException("'odbc_copy_from' error: source queries list must be not empty");
+			throw ScannerException("'odbc_copy' error: source queries list must be not empty");
 		}
 		queries.reserve(count);
 		for (idx_t i = 0; i < count; i++) {
@@ -379,7 +378,7 @@ static ReaderOptions ExtractReaderOptions(duckdb_value duckdb_conn_string_val, d
 			std::string query_raw(query_cstr.get());
 			std::string query = Strings::Trim(query_raw);
 			if (query.empty()) {
-				throw ScannerException("'odbc_copy_from' error: specified source query must be not empty, index: " +
+				throw ScannerException("'odbc_copy' error: specified source query must be not empty, index: " +
 				                       std::to_string(i));
 			}
 			queries.emplace_back(std::move(query));
@@ -391,12 +390,12 @@ static ReaderOptions ExtractReaderOptions(duckdb_value duckdb_conn_string_val, d
 		source_limit = duckdb_get_uint64(source_limit_val);
 		if (source_limit < 2048 || source_limit % 2048 != 0) {
 			throw ScannerException(
-			    "'odbc_copy_from' error: invalid source limit specified: " + std::to_string(source_limit) +
+			    "'odbc_copy' error: invalid source limit specified: " + std::to_string(source_limit) +
 			    ", must be larger or equal to 2048 and be dividable by 2048 without a remainder");
 		}
 	}
 
-	return ReaderOptions(std::move(duckdb_conn_string), std::move(queries), source_limit);
+	return ReaderOptions(std::move(source_conn_string), std::move(queries), source_limit);
 }
 
 static std::unordered_map<duckdb_type, std::string> ExtractTypeMapping(duckdb_value column_types_val) {
@@ -405,12 +404,12 @@ static std::unordered_map<duckdb_type, std::string> ExtractTypeMapping(duckdb_va
 	}
 
 	if (duckdb_is_null_value(column_types_val)) {
-		throw ScannerException("'odbc_copy_from' error: specified 'column_types' map must be not NULL");
+		throw ScannerException("'odbc_copy' error: specified 'column_types' map must be not NULL");
 	}
 
 	idx_t mapping_len = duckdb_get_map_size(column_types_val);
 	if (mapping_len == 0) {
-		throw ScannerException("'odbc_copy_from' error: specified 'column_types' map must be non empty");
+		throw ScannerException("'odbc_copy' error: specified 'column_types' map must be non empty");
 	}
 
 	std::unordered_map<duckdb_type, std::string> mapping;
@@ -418,36 +417,36 @@ static std::unordered_map<duckdb_type, std::string> ExtractTypeMapping(duckdb_va
 	for (idx_t i = 0; i < mapping_len; i++) {
 		auto key_val = ValuePtr(duckdb_get_map_key(column_types_val, i), ValueDeleter);
 		if (key_val.get() == nullptr || duckdb_is_null_value(key_val.get())) {
-			throw ScannerException("'odbc_copy_from' error: 'column_types' map keys must be not NULL, index: " +
+			throw ScannerException("'odbc_copy' error: 'column_types' map keys must be not NULL, index: " +
 			                       std::to_string(i));
 		}
 		auto key_cstr = VarcharPtr(duckdb_get_varchar(key_val.get()), VarcharDeleter);
 		if (key_cstr.get() == nullptr) {
-			throw ScannerException("'odbc_copy_from' error: 'column_types' map keys chars must be not NULL, index: " +
+			throw ScannerException("'odbc_copy' error: 'column_types' map keys chars must be not NULL, index: " +
 			                       std::to_string(i));
 		}
 		std::string key_raw(key_cstr.get());
 		std::string key_str = Strings::Trim(key_raw);
 		if (key_str.empty()) {
-			throw ScannerException("'odbc_copy_from' error: 'column_types' map keys must be not blank, index: " +
+			throw ScannerException("'odbc_copy' error: 'column_types' map keys must be not blank, index: " +
 			                       std::to_string(i));
 		}
 		duckdb_type key = Types::FromString(key_str);
 
 		auto value_val = ValuePtr(duckdb_get_map_value(column_types_val, i), ValueDeleter);
 		if (value_val.get() == nullptr || duckdb_is_null_value(value_val.get())) {
-			throw ScannerException("'odbc_copy_from' error: 'column_types' map values must be not NULL, index: " +
+			throw ScannerException("'odbc_copy' error: 'column_types' map values must be not NULL, index: " +
 			                       std::to_string(i));
 		}
 		auto value_cstr = VarcharPtr(duckdb_get_varchar(value_val.get()), VarcharDeleter);
 		if (value_cstr.get() == nullptr) {
-			throw ScannerException("'odbc_copy_from' error: 'column_types' map values chars must be not NULL, index: " +
+			throw ScannerException("'odbc_copy' error: 'column_types' map values chars must be not NULL, index: " +
 			                       std::to_string(i));
 		}
 		std::string value_raw(value_cstr.get());
 		std::string value = Strings::Trim(value_raw);
 		if (value.empty()) {
-			throw ScannerException("'odbc_copy_from' error: 'column_types' map values must be not blank, index: " +
+			throw ScannerException("'odbc_copy' error: 'column_types' map values must be not blank, index: " +
 			                       std::to_string(i));
 		}
 
@@ -459,8 +458,8 @@ static std::unordered_map<duckdb_type, std::string> ExtractTypeMapping(duckdb_va
 
 static InsertOptions ExtractInsertOptions(DbmsDriver driver, duckdb_value batch_size_val,
                                           duckdb_value use_insert_all_val, duckdb_value insert_in_transaction_val,
-                                          duckdb_value max_records_in_transaction_val, duckdb_value dest_query_val,
-                                          duckdb_value dest_query_single_val) {
+                                          duckdb_value max_records_in_transaction_val, duckdb_value dest_table_val,
+                                          duckdb_value dest_query_val, duckdb_value dest_query_single_val) {
 	uint32_t batch_size = InsertOptions::default_batch_size;
 	if (batch_size_val != nullptr && !duckdb_is_null_value(batch_size_val)) {
 		batch_size = duckdb_get_uint32(batch_size_val);
@@ -473,7 +472,7 @@ static InsertOptions ExtractInsertOptions(DbmsDriver driver, duckdb_value batch_
 		} else {
 			msg = "must be a divisor of the engine vector size: " + std::to_string(engine_vector_size);
 		}
-		throw ScannerException("'odbc_copy_from' error: invalid value specified for the 'batch_size' parameter: " +
+		throw ScannerException("'odbc_copy' error: invalid value specified for the 'batch_size' parameter: " +
 		                       std::to_string(batch_size) + ", " + msg);
 	}
 
@@ -492,10 +491,25 @@ static InsertOptions ExtractInsertOptions(DbmsDriver driver, duckdb_value batch_
 		max_records_in_transaction = duckdb_get_uint64(max_records_in_transaction_val);
 	}
 
+	std::string dest_table;
+	if (dest_table_val != nullptr && !duckdb_is_null_value(dest_table_val)) {
+		auto dest_table_cstr = VarcharPtr(duckdb_get_varchar(dest_table_val), VarcharDeleter);
+		dest_table = std::string(dest_table_cstr.get());
+	}
+
 	std::string dest_query;
 	if (dest_query_val != nullptr && !duckdb_is_null_value(dest_query_val)) {
 		auto dest_query_cstr = VarcharPtr(duckdb_get_varchar(dest_query_val), VarcharDeleter);
 		dest_query = std::string(dest_query_cstr.get());
+	}
+
+	if (dest_table.empty() && dest_query.empty()) {
+		throw ScannerException("'odbc_copy' error: either 'dest_table' or `dest_query` option must be specicifed");
+	}
+
+	if (!dest_table.empty() && !dest_query.empty()) {
+		throw ScannerException(
+		    "'odbc_copy' error: 'dest_table' and `dest_query` options cannot be both specified in the same call");
 	}
 
 	std::string dest_query_single;
@@ -505,14 +519,19 @@ static InsertOptions ExtractInsertOptions(DbmsDriver driver, duckdb_value batch_
 	}
 
 	return InsertOptions(batch_size, use_insert_all, insert_in_transaction, max_records_in_transaction,
-	                     std::move(dest_query), std::move(dest_query_single));
+	                     std::move(dest_table), std::move(dest_query), std::move(dest_query_single));
 }
 
-static CreateTableOptions ExtractCreateTableOptions(DbmsDriver driver, DbmsQuirks &quirks,
-                                                    duckdb_value create_table_val, duckdb_value column_types_val) {
+static CreateTableOptions ExtractCreateTableOptions(const InsertOptions &insert_options, DbmsDriver driver,
+                                                    DbmsQuirks &quirks, duckdb_value create_table_val,
+                                                    duckdb_value column_types_val) {
 	bool create_table = false;
 	if (create_table_val != nullptr && !duckdb_is_null_value(create_table_val)) {
 		create_table = duckdb_get_bool(create_table_val);
+	}
+
+	if (create_table && insert_options.dest_table.empty()) {
+		throw ScannerException("'odbc_copy' error: when 'create_table=TRUE' the 'dest_table' option must be specified");
 	}
 
 	std::unordered_map<duckdb_type, std::string> column_types;
@@ -532,9 +551,8 @@ static GeneralOptions ExtractGeneralOptions(duckdb_value close_connection_val, b
 	if (close_connection_val != nullptr && !duckdb_is_null_value(close_connection_val)) {
 		close_connection = duckdb_get_bool(close_connection_val);
 		if (conn_must_be_closed && !close_connection) {
-			throw ScannerException(
-			    "'odbc_copy_from' error: 'close_connection=FALSE' option cannot be specified along with "
-			    "a connection string");
+			throw ScannerException("'odbc_copy' error: 'close_connection=FALSE' option cannot be specified along with "
+			                       "a connection string");
 		}
 	}
 	return GeneralOptions(close_connection);
@@ -542,24 +560,17 @@ static GeneralOptions ExtractGeneralOptions(duckdb_value close_connection_val, b
 
 static void Bind(duckdb_bind_info info) {
 	auto conn_id_or_str_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
-	auto extracted_conn = OdbcConnection::ExtractOrOpen("odbc_copy_from", conn_id_or_str_val.get());
+	auto extracted_conn = OdbcConnection::ExtractOrOpen("odbc_copy", conn_id_or_str_val.get());
 	// Return the connection to registry at the end of the block
 	auto deferred = Defer([&extracted_conn] { ConnectionsRegistry::Add(std::move(extracted_conn.ptr)); });
 
-	auto table_name_val = ValuePtr(duckdb_bind_get_parameter(info, 1), ValueDeleter);
-	if (duckdb_is_null_value(table_name_val.get())) {
-		throw ScannerException("'odbc_copy_from' error: specified table name must be not NULL");
-	}
-	auto table_name_cstr = VarcharPtr(duckdb_get_varchar(table_name_val.get()), VarcharDeleter);
-	std::string table_name(table_name_cstr.get());
-
-	auto duckdb_conn_string_val = ValuePtr(duckdb_bind_get_named_parameter(info, "duckdb_conn_string"), ValueDeleter);
-	auto file_path_val = ValuePtr(duckdb_bind_get_named_parameter(info, "file_path"), ValueDeleter);
+	auto source_conn_string_val = ValuePtr(duckdb_bind_get_named_parameter(info, "source_conn_string"), ValueDeleter);
+	auto source_file_val = ValuePtr(duckdb_bind_get_named_parameter(info, "source_file"), ValueDeleter);
 	auto source_query_val = ValuePtr(duckdb_bind_get_named_parameter(info, "source_query"), ValueDeleter);
 	auto source_queries_val = ValuePtr(duckdb_bind_get_named_parameter(info, "source_queries"), ValueDeleter);
 	auto source_limit_val = ValuePtr(duckdb_bind_get_named_parameter(info, "source_limit"), ValueDeleter);
 	ReaderOptions reader_options =
-	    ExtractReaderOptions(duckdb_conn_string_val.get(), file_path_val.get(), source_query_val.get(),
+	    ExtractReaderOptions(source_conn_string_val.get(), source_file_val.get(), source_query_val.get(),
 	                         source_queries_val.get(), source_limit_val.get());
 
 	OdbcConnection &conn = *extracted_conn.ptr;
@@ -573,23 +584,23 @@ static void Bind(duckdb_bind_info info) {
 	    ValuePtr(duckdb_bind_get_named_parameter(info, "insert_in_transaction"), ValueDeleter);
 	auto max_records_in_transaction_val =
 	    ValuePtr(duckdb_bind_get_named_parameter(info, "max_records_in_transaction"), ValueDeleter);
+	auto dest_table_val = ValuePtr(duckdb_bind_get_named_parameter(info, "dest_table"), ValueDeleter);
 	auto dest_query_val = ValuePtr(duckdb_bind_get_named_parameter(info, "dest_query"), ValueDeleter);
 	auto dest_query_single_val = ValuePtr(duckdb_bind_get_named_parameter(info, "dest_query_single"), ValueDeleter);
 	InsertOptions insert_options = ExtractInsertOptions(
 	    conn.driver, batch_size_val.get(), use_insert_all_val.get(), insert_in_transaction_val.get(),
-	    max_records_in_transaction_val.get(), dest_query_val.get(), dest_query_single_val.get());
+	    max_records_in_transaction_val.get(), dest_table_val.get(), dest_query_val.get(), dest_query_single_val.get());
 
 	auto create_table_val = ValuePtr(duckdb_bind_get_named_parameter(info, "create_table"), ValueDeleter);
 	auto column_types_val = ValuePtr(duckdb_bind_get_named_parameter(info, "column_types"), ValueDeleter);
 	CreateTableOptions create_table_options =
-	    ExtractCreateTableOptions(conn.driver, quirks, create_table_val.get(), column_types_val.get());
+	    ExtractCreateTableOptions(insert_options, conn.driver, quirks, create_table_val.get(), column_types_val.get());
 
 	auto close_connection_val = ValuePtr(duckdb_bind_get_named_parameter(info, "close_connection"), ValueDeleter);
 	GeneralOptions general_options = ExtractGeneralOptions(close_connection_val.get(), extracted_conn.must_be_closed);
 
-	auto bdata_ptr =
-	    std_make_unique<BindData>(extracted_conn.id, std::move(table_name), quirks, std::move(reader_options),
-	                              insert_options, std::move(create_table_options), general_options);
+	auto bdata_ptr = std_make_unique<BindData>(extracted_conn.id, quirks, std::move(reader_options), insert_options,
+	                                           std::move(create_table_options), general_options);
 	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
 
 	auto bool_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN), LogicalTypeDeleter);
@@ -598,9 +609,9 @@ static void Bind(duckdb_bind_info info) {
 	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
 
 	duckdb_bind_add_result_column(info, "completed", bool_type.get());
-	duckdb_bind_add_result_column(info, "records_inserted", ubigint_type.get());
+	duckdb_bind_add_result_column(info, "rows_processed", ubigint_type.get());
 	duckdb_bind_add_result_column(info, "elapsed_seconds", float_type.get());
-	duckdb_bind_add_result_column(info, "records_per_second", float_type.get());
+	duckdb_bind_add_result_column(info, "rows_per_second", float_type.get());
 	duckdb_bind_add_result_column(info, "table_ddl", varchar_type.get());
 }
 
@@ -621,7 +632,7 @@ static void LocalInit(duckdb_init_info info) {
 
 static void CheckSuccess(duckdb_state st, const std::string &msg) {
 	if (st != DuckDBSuccess) {
-		throw ScannerException("'odbc_copy_from' error: " + msg);
+		throw ScannerException("'odbc_copy' error: " + msg);
 	}
 }
 
@@ -635,8 +646,7 @@ static std::unique_ptr<SourceReader> OpenReader(const ReaderOptions &options) {
 
 	duckdb_database db_bare = nullptr;
 	char *error_msg_cstr = nullptr;
-	duckdb_state state_db =
-	    duckdb_open_ext(options.duckdb_conn_string.c_str(), &db_bare, config.get(), &error_msg_cstr);
+	duckdb_state state_db = duckdb_open_ext(options.conn_string.c_str(), &db_bare, config.get(), &error_msg_cstr);
 	VarcharPtr error_msg_ptr(error_msg_cstr, VarcharDeleter);
 	std::string error_msg = error_msg_ptr.get() != nullptr ? std::string(error_msg_ptr.get()) : "N/A";
 	CheckSuccess(state_db, "'duckdb_open_ext' failed, message: " + error_msg);
@@ -648,7 +658,7 @@ static std::unique_ptr<SourceReader> OpenReader(const ReaderOptions &options) {
 	ConnectionPtr conn(conn_bare, ConnectionDeleter);
 
 	if (options.queries.size() == 0) {
-		throw ScannerException("'odbc_copy_from' error: no source queries specified");
+		throw ScannerException("'odbc_copy' error: no source queries specified");
 	}
 	for (size_t i = 0; i < options.queries.size() - 1; i++) {
 		ResultPtr res(new duckdb_result(), ResultDeleter);
@@ -657,7 +667,7 @@ static std::unique_ptr<SourceReader> OpenReader(const ReaderOptions &options) {
 		if (state_query != DuckDBSuccess) {
 			const char *cerr = duckdb_result_error(res.get());
 			std::string err = cerr != nullptr ? std::string(cerr) : "N/A";
-			throw ScannerException("'odbc_copy_from' error: source prep query failure, index: " + std::to_string(i) +
+			throw ScannerException("'odbc_copy' error: source prep query failure, index: " + std::to_string(i) +
 			                       ", sql: '" + query + "', message: '" + err + "'");
 		}
 	}
@@ -670,8 +680,8 @@ static std::string LookupMapping(std::unordered_map<duckdb_type, std::string> &m
 	auto it = mapping.find(col.type_id);
 	if (it == mapping.end()) {
 		std::string dtype_name = Types::ToString(col.type_id);
-		throw ScannerException("'odbc_copy_from' error: column type not recognized, id: " +
-		                       std::to_string(col.type_id) + ", name: '" + dtype_name + "'");
+		throw ScannerException("'odbc_copy' error: column type not recognized, id: " + std::to_string(col.type_id) +
+		                       ", name: '" + dtype_name + "'");
 	}
 	std::string res = it->second;
 	for (size_t i = 0; i < col.typmods.size(); i++) {
@@ -707,8 +717,8 @@ static std::string BuildCreateTableQuery(const std::string &table_name, const st
 	return query;
 }
 
-static std::string BuildInsertQuery(const std::string &table_name, const std::vector<SourceColumn> &columns,
-                                    InsertOptions options, uint32_t batch_size) {
+static std::string BuildInsertQuery(const std::vector<SourceColumn> &columns, InsertOptions options,
+                                    uint32_t batch_size) {
 	// query explicitly specified by user, not need to generate one
 	if (!options.dest_query.empty()) {
 		if (batch_size == 1 && !options.dest_query_single.empty()) {
@@ -723,7 +733,7 @@ static std::string BuildInsertQuery(const std::string &table_name, const std::ve
 		query.append("ALL\n");
 		for (uint32_t row_idx = 0; row_idx < batch_size; row_idx++) {
 			query.append("INTO \"");
-			query.append(table_name);
+			query.append(options.dest_table);
 			query.append("\"");
 			query.append(" (");
 			for (size_t i = 0; i < columns.size(); i++) {
@@ -749,7 +759,7 @@ static std::string BuildInsertQuery(const std::string &table_name, const std::ve
 
 	} else {
 		query.append("INTO \"");
-		query.append(table_name);
+		query.append(options.dest_table);
 		query.append("\"");
 		query.append("(\n");
 		for (size_t i = 0; i < columns.size(); i++) {
@@ -838,7 +848,7 @@ static void SetResultsRow(duckdb_data_chunk output, bool completed, BindData &bd
 
 static std::string PrepareInsert(HSTMT hstmt, BindData &bdata, const std::vector<SourceColumn> columns,
                                  uint32_t batch_size) {
-	std::string query = BuildInsertQuery(bdata.table_name, columns, bdata.insert_options, batch_size);
+	std::string query = BuildInsertQuery(columns, bdata.insert_options, batch_size);
 	auto wquery = WideChar::Widen(query.data(), query.length());
 	SQLRETURN ret = SQLPrepareW(hstmt, wquery.data(), wquery.length<SQLINTEGER>());
 	if (!SQL_SUCCEEDED(ret)) {
@@ -923,7 +933,8 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 		}
 
 		if (bdata.create_table_options.do_create_table) {
-			std::string query = BuildCreateTableQuery(bdata.table_name, reader.columns, bdata.create_table_options);
+			std::string query =
+			    BuildCreateTableQuery(bdata.insert_options.dest_table, reader.columns, bdata.create_table_options);
 			auto wquery = WideChar::Widen(query.data(), query.length());
 			SQLRETURN ret = SQLExecDirectW(hstmt.get(), wquery.data(), wquery.length<SQLINTEGER>());
 			if (!SQL_SUCCEEDED(ret)) {
@@ -1062,7 +1073,7 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 	}
 }
 
-static void CopyFrom(duckdb_function_info info, duckdb_data_chunk output) {
+static void Copy(duckdb_function_info info, duckdb_data_chunk output) {
 	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_function_get_bind_data(info));
 	GlobalInitData &gdata = *reinterpret_cast<GlobalInitData *>(duckdb_function_get_init_data(info));
 	LocalInitData &ldata = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
@@ -1093,9 +1104,9 @@ static void CopyFrom(duckdb_function_info info, duckdb_data_chunk output) {
 	}
 }
 
-void OdbcCopyFromFunction::Register(duckdb_connection conn) {
+void OdbcCopyFunction::Register(duckdb_connection conn) {
 	auto fun = TableFunctionPtr(duckdb_create_table_function(), TableFunctionDeleter);
-	duckdb_table_function_set_name(fun.get(), "odbc_copy_from");
+	duckdb_table_function_set_name(fun.get(), "odbc_copy");
 
 	// parameters
 	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
@@ -1106,11 +1117,10 @@ void OdbcCopyFromFunction::Register(duckdb_connection conn) {
 	auto map_type = LogicalTypePtr(duckdb_create_map_type(varchar_type.get(), varchar_type.get()), LogicalTypeDeleter);
 	auto list_type = LogicalTypePtr(duckdb_create_list_type(varchar_type.get()), LogicalTypeDeleter);
 	auto any_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_ANY), LogicalTypeDeleter);
-	duckdb_table_function_add_parameter(fun.get(), any_type.get());     // connection handle or string
-	duckdb_table_function_add_parameter(fun.get(), varchar_type.get()); // destination table name
+	duckdb_table_function_add_parameter(fun.get(), any_type.get()); // connection handle or string
 	// reader options
-	duckdb_table_function_add_named_parameter(fun.get(), "duckdb_conn_string", varchar_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "file_path", varchar_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "source_conn_string", varchar_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "source_file", varchar_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "source_query", varchar_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "source_queries", list_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "source_limit", ubigint_type.get());
@@ -1119,6 +1129,7 @@ void OdbcCopyFromFunction::Register(duckdb_connection conn) {
 	duckdb_table_function_add_named_parameter(fun.get(), "use_insert_all", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "insert_in_transaction", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "max_records_in_transaction", ubigint_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "dest_table", varchar_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "dest_query", varchar_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "dest_query_single", varchar_type.get());
 	// create table options
@@ -1131,22 +1142,22 @@ void OdbcCopyFromFunction::Register(duckdb_connection conn) {
 	duckdb_table_function_add_named_parameter(fun.get(), "integral_params_as_decimals", bool_type.get());
 
 	// callbacks
-	duckdb_table_function_set_bind(fun.get(), odbc_copy_from_bind);
-	duckdb_table_function_set_init(fun.get(), odbc_copy_from_init);
-	duckdb_table_function_set_local_init(fun.get(), odbc_copy_from_local_init);
-	duckdb_table_function_set_function(fun.get(), odbc_copy_from_function);
+	duckdb_table_function_set_bind(fun.get(), odbc_copy_bind);
+	duckdb_table_function_set_init(fun.get(), odbc_copy_init);
+	duckdb_table_function_set_local_init(fun.get(), odbc_copy_local_init);
+	duckdb_table_function_set_function(fun.get(), odbc_copy_function);
 
 	// register and cleanup
 	duckdb_state state = duckdb_register_table_function(conn, fun.get());
 
 	if (state != DuckDBSuccess) {
-		throw ScannerException("'odbc_copy_from' function registration failed");
+		throw ScannerException("'odbc_copy' function registration failed");
 	}
 }
 
 } // namespace odbcscanner
 
-static void odbc_copy_from_bind(duckdb_bind_info info) noexcept {
+static void odbc_copy_bind(duckdb_bind_info info) noexcept {
 	try {
 		odbcscanner::Bind(info);
 	} catch (std::exception &e) {
@@ -1154,7 +1165,7 @@ static void odbc_copy_from_bind(duckdb_bind_info info) noexcept {
 	}
 }
 
-static void odbc_copy_from_init(duckdb_init_info info) noexcept {
+static void odbc_copy_init(duckdb_init_info info) noexcept {
 	try {
 		odbcscanner::GlobalInit(info);
 	} catch (std::exception &e) {
@@ -1162,7 +1173,7 @@ static void odbc_copy_from_init(duckdb_init_info info) noexcept {
 	}
 }
 
-static void odbc_copy_from_local_init(duckdb_init_info info) noexcept {
+static void odbc_copy_local_init(duckdb_init_info info) noexcept {
 	try {
 		odbcscanner::LocalInit(info);
 	} catch (std::exception &e) {
@@ -1170,9 +1181,9 @@ static void odbc_copy_from_local_init(duckdb_init_info info) noexcept {
 	}
 }
 
-static void odbc_copy_from_function(duckdb_function_info info, duckdb_data_chunk output) noexcept {
+static void odbc_copy_function(duckdb_function_info info, duckdb_data_chunk output) noexcept {
 	try {
-		odbcscanner::CopyFrom(info, output);
+		odbcscanner::Copy(info, output);
 	} catch (std::exception &e) {
 		duckdb_function_set_error(info, e.what());
 	}

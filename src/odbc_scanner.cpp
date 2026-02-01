@@ -17,7 +17,7 @@ static void Initialize(duckdb_connection connection, duckdb_extension_info, duck
 	OdbcCloseFunction::Register(connection);
 	OdbcCommitFunction::Register(connection);
 	OdbcConnectFunction::Register(connection);
-	OdbcCopyFromFunction::Register(connection);
+	OdbcCopyFunction::Register(connection);
 	OdbcCreateParamsFunction::Register(connection);
 	OdbcListDataSourcesFunction::Register(connection);
 	OdbcListDriversFunction::Register(connection);

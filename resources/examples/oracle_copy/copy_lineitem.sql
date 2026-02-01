@@ -6,7 +6,7 @@ SET VARIABLE conn = odbc_connect('Driver={Oracle Driver};DBQ=//127.0.0.1:1521/XE
 CALL odbc_query(getvariable('conn'), 'DROP TABLE "lineitem"', ignore_exec_failure=TRUE);
 
 -- Records/second: 10192
-SELECT * FROM odbc_copy_from(getvariable('conn'), 'lineitem', 
+SELECT * FROM odbc_copy(getvariable('conn'), 'lineitem', 
   create_table=TRUE,
   source_queries=[
     'LOAD tpch',

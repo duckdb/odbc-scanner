@@ -22,7 +22,8 @@ statement ok
 SET VARIABLE conn2 = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 query II
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn2'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn2'),
+  dest_table='duckdb_test_copy',
   create_table=TRUE,
   source_queries=[
     'CREATE TABLE tmp1(col1 SMALLINT, col2 INTEGER)',

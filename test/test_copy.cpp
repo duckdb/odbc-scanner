@@ -42,7 +42,7 @@ TEST_CASE("Copy from file into Oracle", group_name) {
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn,
 		                               (R"(
-  SELECT * FROM odbc_copy_from(getvariable('conn'), 'nl_train_stations', file_path=')" +
+  SELECT * FROM odbc_copy(getvariable('conn'), dest_table='nl_train_stations', source_file=')" +
 		                                project_dir + R"(/resources/data/nl_stations_short.csv')
   )")
 		                                   .c_str(),
@@ -101,8 +101,8 @@ TEST_CASE("Copy from file into Oracle with table creation", group_name) {
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn,
 		                               (R"(
-  SELECT * FROM odbc_copy_from(getvariable('conn'),
-		'nl_train_stations', file_path=')" +
+  SELECT * FROM odbc_copy(getvariable('conn'),
+		dest_table='nl_train_stations', source_file=')" +
 		                                project_dir +
 		                                R"(/resources/data/nl_stations_short.csv',
 		create_table=TRUE)
