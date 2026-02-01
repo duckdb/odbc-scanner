@@ -1,6 +1,6 @@
-# name: test/sql/mssql/copy_from.test
-# description: test odbc_copy_from() function with MSSQL
-# group: [mssql_copy_from]
+# name: test/sql/mssql/copy.test
+# description: test odbc_copy() function with MSSQL
+# group: [mssql_copy]
 
 require odbc_scanner
 
@@ -8,24 +8,26 @@ statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE IF EXISTS "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE IF EXISTS "duckdb_test_copy"')
 
 # no destination
 
 statement error
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
   source_queries=[
     'CREATE TABLE copy_test_basic(col1 SMALLINT, col2 INTEGER)',
     'INSERT INTO copy_test_basic VALUES (41, 42), (43, 44)',
     'SELECT * FROM copy_test_basic'
     ])
 ----
-Invalid object name 'duckdb_test_copy_from'
+Invalid object name 'duckdb_test_copy'
 
 # basic
 
 query II
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
   create_table=TRUE,
   source_queries=[
     'CREATE TABLE copy_test_basic(col1 SMALLINT, col2 INTEGER)',
@@ -36,18 +38,19 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
 1	2
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
 41	42
 43	44
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 
 # boolean
 
 query II
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
   create_table=TRUE,
   source_queries=[
     'CREATE TABLE copy_test_boolean(col1 BOOLEAN)',
@@ -60,25 +63,26 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy_from"')
+    'SELECT * FROM "duckdb_test_copy"')
 )
 ----
 BOOLEAN
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
 TRUE
 NULL
 FALSE
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 
 # integrals
 
 query II
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
   create_table=TRUE,
   source_queries=[
     'CREATE TABLE copy_test_integrals(
@@ -99,7 +103,7 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy_from"')
+    'SELECT * FROM "duckdb_test_copy"')
 )
 ----
 SMALLINT
@@ -111,17 +115,18 @@ BIGINT
 BIGINT
 
 query IIIIIII
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
 1	2	3	4	5	6	7
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 
 # floats
 
 query II
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
   create_table=TRUE,
   source_queries=[
     'CREATE TABLE copy_test_floats(
@@ -137,24 +142,25 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy_from"')
+    'SELECT * FROM "duckdb_test_copy"')
 )
 ----
 FLOAT
 DOUBLE
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
 1.0	2.0
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 
 # decimal
 
 query II
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
   create_table=TRUE,
   source_queries=[
     'CREATE TABLE copy_test_decimal(
@@ -170,24 +176,25 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy_from"')
+    'SELECT * FROM "duckdb_test_copy"')
 )
 ----
 DECIMAL(7,5)
 DECIMAL(38,10)
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
 1.0	2.0
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 
 # temporal
 
 query II
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
   create_table=TRUE,
   source_queries=[
     'CREATE TABLE copy_test_temporal(
@@ -208,7 +215,7 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy_from"')
+    'SELECT * FROM "duckdb_test_copy"')
 )
 ----
 DATE
@@ -216,17 +223,18 @@ TIMESTAMP
 TIMESTAMP
 
 query III
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
 2020-12-31	2020-12-31 01:02:03.456789	2020-12-31 01:02:03.456789
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 
 # varchar
 
 query II
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
   create_table=TRUE,
   source_queries=[
     'CREATE TABLE copy_test_varchar(
@@ -243,23 +251,24 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy_from"')
+    'SELECT * FROM "duckdb_test_copy"')
 )
 ----
 VARCHAR
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
 🌌
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 
 # blob
 
 query II
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
   create_table=TRUE,
   source_queries=[
     'CREATE TABLE copy_test_blob(
@@ -276,23 +285,24 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy_from"')
+    'SELECT * FROM "duckdb_test_copy"')
 )
 ----
 BLOB
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
 foo\x00bar
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 
 # source limit
 
 statement error
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
   create_table=TRUE,
   source_limit=1024,
   source_query='SELECT 42')
@@ -300,7 +310,8 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
 invalid source limit specified
 
 query II
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
   create_table=TRUE,
   source_limit=4096,
   source_queries=[
@@ -319,23 +330,23 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
 1	18432
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM "duckdb_test_copy"')
 ----
 18432
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT sum("col1") FROM "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT sum("col1") FROM "duckdb_test_copy"')
 ----
 92160
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 
 # dest query with a tail
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'),
-  'CREATE TABLE "duckdb_test_copy_from" (
+  'CREATE TABLE "duckdb_test_copy" (
     col1_1 INTEGER,
     col1_2 NVARCHAR(10),
     col2_1 INTEGER,
@@ -348,8 +359,7 @@ SELECT * FROM odbc_query(getvariable('conn'),
 
 
 query II
-SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duckdb_test_copy_from',
-  create_table=FALSE,
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
   batch_size=4,
   source_queries=[
     'CREATE TABLE copy_test_dest_query(
@@ -371,14 +381,14 @@ SELECT completed, records_inserted FROM odbc_copy_from(getvariable('conn'), 'duc
     ',
     'SELECT * FROM copy_test_dest_query'
     ],
-  dest_query='INSERT INTO "duckdb_test_copy_from" VALUES(?,?,?,?,?,?,?,?)',
-  dest_query_single='INSERT INTO "duckdb_test_copy_from" VALUES(NULL,NULL,?,?,NULL,NULL,NULL,NULL)'
+  dest_query='INSERT INTO "duckdb_test_copy" VALUES(?,?,?,?,?,?,?,?)',
+  dest_query_single='INSERT INTO "duckdb_test_copy" VALUES(NULL,NULL,?,?,NULL,NULL,NULL,NULL)'
   )
 ----
 1	11
 
 query IIIIIIII
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
 1	s1	2	s2	3	s3	4	s4
 5	s5	6	s6	7	s7	8	s8
@@ -387,7 +397,7 @@ NULL	NULL	10	s10	NULL	NULL	NULL	NULL
 NULL	NULL	11	s11	NULL	NULL	NULL	NULL
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy_from"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 
 statement ok
 SELECT odbc_close(getvariable('conn'))

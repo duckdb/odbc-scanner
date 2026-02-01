@@ -93,6 +93,7 @@ SELECT odbc_close(getvariable('conn'));
  - [odbc_close](#odbc_close)
  - [odbc_commit](#odbc_commit)
  - [odbc_connect](#odbc_connect)
+ - [odbc_copy](#odbc_copy)
  - [odbc_create_params](#odbc_create_params)
  - [odbc_list_data_sources](#odbc_list_data_sources)
  - [odbc_list_drivers](#odbc_list_drivers)
@@ -216,6 +217,102 @@ Connection handle that can be placed into a `VARIABLE`. Connection is not closed
 SET VARIABLE conn = odbc_connect('Driver={Oracle Driver};DBQ=//127.0.0.1:1521/XE;UID=system;PWD=tiger;')
 ```
 
+### odbc_copy
+
+```sql
+odbc_copy(conn_handle BIGINT, [, <optional named parameters>]) -> TABLE
+```
+```sql
+odbc_copy(conn_string VARCHAR, [, <optional named parameters>]) -> TABLE
+```
+
+Copies rows from a DuckDB accessible file or table into the remote DB.
+
+#### Parameters:
+
+ - `conn_handle_or_string` (`BIGINT` or `VARCHAR`), one of:
+   - ODBC connection handle created with [odbc_connect](#odbc_connect)
+   - ODBC connection string, intended for for one-off queries, in this case new ODBC connection will be opened and will be closed automatically after the query is complete
+
+Optional named parameters (source):
+
+ - `source_conn_string` (`VARCHAR`, default: `:memory:`): DuckDB connection string to the source DB, example: `ducklake:postgres:postgresql://username:pwd@127.0.0.1:5432/lake1`
+ - `source_file` (`VARCHAR`): path to a Parquet, CSV or JSON file (remote or local) to be read with DuckDB, example: `https://blobs.duckdb.org/nl_stations.csv`, equivalent to `source_query='SELECT * FROM '<source_file>'`
+ - `source_query` (`VARCHAR`): DuckDB SQL query to read the data, example: `FROM nl_train_stations`
+ - `source_queries` (`LIST(VARCHAR)`): multiple DuckDB SQL queries executed one by one, last query must return the result set to copy, results of previous queries are discarded, results of all queries are materialized in memory, example:
+
+```sql
+source_queries=[
+  'CREATE SECRET s (TYPE s3 [...])',
+  'FROM nl_train_stations'
+],
+```
+
+ - `source_limit` (`UBIGINT`, default: `0`): the number of records to read from source query/file at once, when this option is specified - the source query is run multiple times appending `LIMIT <limit> OFFSET <offset>` to it, must be more or equal to `2048`, `2048` must be dividable by it without a remainder
+
+Optional named parameters (destination):
+
+ - `dest_table` (`VARCHAR`): destination table name in remote DB, will be used in `INSERT` and `CREATE TABLE` queries quoted in double quotes, cannot be specified if `dest_query` is specified
+ - `dest_query` (`VARCHAR`): query to be executed in remote DB for each source batch, must have the number of ODBC parameter placeholders `?` equal to the `source_columns_count * batch_size`, cannot be specified if `dest_table` is specified, example: `CALL import_city(?,?,?,?)`
+ - `dest_query_single` (`VARCHAR`): only used when the `batch_size>0` and the number of rows read in the last source batch are less than the `batch_size`, in this case used instead of `dest_query`, must have the number of ODBC parameter placeholders `?` equal to the `source_columns_count`
+
+Optional named parameters (create table):
+
+ - `create_table` (`BOOLEAN`, deafult: `FALSE`): whether to create a table in the destination remote DB using the column names and column types from the source query, effectively implements CTAS (create table as select)
+ - `column_types` (`MAP(VARCHAR, VARCHAR)`): when `create_table=TRUE` is specified, allows to provide/override the type mapping between source DuckDB types and destination RDBMS types, example:
+
+```sql
+create_table=TRUE,
+column_types=MAP {
+    'DUCKDB_TYPE_VARCHAR' : 'VARCHAR2(10)',
+    'DUCKDB_TYPE_DECIMAL': 'NUMBER({typmod1},{typmod2})'}
+```
+
+Optional named parameters (query parameters):
+
+ - `decimal_params_as_chars` (`BOOLEAN`, default: `false`): pass `DECIMAL` parameters as `VARCHAR`s
+ - `integral_params_as_decimals` (`BOOLEAN`, default: `false`): pass (unsigned) `TINYINT`, `SMALLINT`, `INTEGER` and `BIGINT` parameters as `SQL_C_NUMERIC`.
+
+Optional named parameters (other):
+
+ - `batch_size` (`UINTEGER`, default: `16`): number of records to be inserted (or executed in case of `dest_query`) in a single `SQLExecute` ODBC to remote DB, allowed values: `1`, `2`, `4`, `8`, `16`, `32`, `64`, `128`, `256`, `512`, `1024`, `2048`
+ - `use_insert_all` (`BOOLEAN`, default: `FALSE`): generate `INSERT ALL` barch insert query instead of batch insert with `INSERT ... VALUES (...), (...), ... (...)`, enabled automatically for Oracle
+ - `insert_in_transaction` (`BOOLEAN`, default: `TRUE`): begin a transaction in remote DB for this copy call, commit transaction when all rows are processed, roll it back on error
+ - `max_records_in_transaction` (`UBIGINT`, default: `0`): when specified causes the remote transaction to be committed every time after the specified number of rows is processed
+ - `close_connection` (`BOOLEAN`, default: `false`): closes the passed connection after the function call is completed, intended to be used with one-shot invocations of the `odbc_copy`
+
+#### Returns:
+
+A table with the following columns:
+
+ - `completed` (`BOOLEAN`): a flag whether this output row is the last row in result set
+ - `rows_processed` (`UBIGINT`): a number of rows read from the source
+ - `elapsed_seconds` (`FLOAT`): a number of seconds passed after the copy process has started
+ - `rows_per_second` (`FLOAT`): a number of rows processed in one second
+ - `table_ddl` (`VARCHAR`): generated `CREATE TABLE` query that was executed in remote DB before starting the copy process
+
+ One resulting row is emitted for every `2048` rows read from source. Only the last row has the `completed=TRUE` and non null `table_dll` (only when `create_table=TRUE` is specified) values.
+
+#### Examples:
+
+```sql
+FROM odbc_copy(getvariable('conn'),
+  source_file='https://blobs.duckdb.org/nl_stations.csv',
+  dest_table='nl_train_stations',
+  create_table=TRUE)
+```
+```sql
+FROM odbc_copy(getvariable('conn'),
+  source_conn_string='ducklake:postgres:postgresql://username:pwd@127.0.0.1:5432/lake1',
+  source_queries=[
+    'CREATE SECRET s (TYPE s3 [...])',
+    'FROM nl_train_stations'
+  ],
+  dest_table='nl_train_stations',
+  create_table=TRUE,
+  batch_size=32,
+  max_records_in_transaction=42);
+```
 ### odbc_create_params
 
 ```sql
