@@ -117,7 +117,7 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Decimal INT128 query with a literal", group_name) {
-	if (DBMSConfigured("DB2")) {
+	if (DBMSConfigured("DB2") || DBMSConfigured("Firebird")) {
 		return;
 	}
 	ScannerConn sc;
@@ -159,7 +159,7 @@ SELECT * FROM odbc_query(
 */
 
 TEST_CASE("Decimal INT128 query with a negative literal", group_name) {
-	if (DBMSConfigured("DB2")) {
+	if (DBMSConfigured("DB2") || DBMSConfigured("Firebird")) {
 		return;
 	}
 	ScannerConn sc;
@@ -228,7 +228,7 @@ SELECT * FROM odbc_query(
 }
 
 TEST_CASE("Decimal INT128 query with a negative literal parameter", group_name) {
-	if (DBMSConfigured("DB2") || DBMSConfigured("FlightSQL")) {
+	if (DBMSConfigured("DB2") || DBMSConfigured("FlightSQL") || DBMSConfigured("Firebird")) {
 		return;
 	}
 	ScannerConn sc;
@@ -296,7 +296,7 @@ SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row('-1.234
 }
 
 TEST_CASE("Decimal INT128 query with a negative parameter", group_name) {
-	if (DBMSConfigured("DB2") || DBMSConfigured("FlightSQL")) {
+	if (DBMSConfigured("DB2") || DBMSConfigured("FlightSQL") || DBMSConfigured("Firebird")) {
 		return;
 	}
 	ScannerConn sc;
