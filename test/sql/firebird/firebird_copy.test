@@ -254,11 +254,10 @@ SELECT column_type from (
 ----
 VARCHAR
 
-# todo: investigate unicode support
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
-??
+🌌
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')

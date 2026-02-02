@@ -546,12 +546,10 @@ static CreateTableOptions ExtractCreateTableOptions(const InsertOptions &insert_
 	}
 
 	std::unordered_map<duckdb_type, std::string> column_types;
-	if (create_table) {
-		column_types = Mappings::Resolve(driver, quirks);
-		std::unordered_map<duckdb_type, std::string> column_types_user = ExtractTypeMapping(column_types_val);
-		for (auto en : column_types_user) {
-			column_types[en.first] = en.second;
-		}
+	column_types = Mappings::Resolve(driver, quirks);
+	std::unordered_map<duckdb_type, std::string> column_types_user = ExtractTypeMapping(column_types_val);
+	for (auto en : column_types_user) {
+		column_types[en.first] = en.second;
 	}
 
 	bool commit_after_create_table = driver == DbmsDriver::FIREBIRD;

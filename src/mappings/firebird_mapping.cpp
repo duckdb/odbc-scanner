@@ -21,7 +21,7 @@ std::unordered_map<duckdb_type, std::string> Mappings::FIREBIRD(const DbmsQuirks
 	        {DUCKDB_TYPE_DATE, "DATE"},
 	        {DUCKDB_TYPE_TIMESTAMP, "TIMESTAMP"},
 
-	        {DUCKDB_TYPE_VARCHAR, "VARCHAR(32765)"},
+	        {DUCKDB_TYPE_VARCHAR, "BLOB SUB_TYPE TEXT"},
 	        {DUCKDB_TYPE_BLOB, "BLOB"}};
 }
 
