@@ -106,3 +106,23 @@ SELECT * FROM odbc_query(
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
 }
+
+TEST_CASE("Firebird version query", group_name) {
+	if (!(DBMSConfigured("Firebird"))) {
+		return;
+	}
+	ScannerConn sc;
+	Result res;
+	duckdb_state st = duckdb_query(sc.conn, R"(
+SELECT * FROM odbc_query(
+	getvariable('conn'), 
+	'
+		SELECT ''Firebird '' || rdb$get_context(''SYSTEM'', ''ENGINE_VERSION'') as version FROM rdb$database
+	'
+	)
+)",
+	                               res.Get());
+	REQUIRE(QuerySuccess(res.Get(), st));
+	REQUIRE(res.NextChunk());
+	std::cout << res.Value<std::string>(0, 0) << std::endl;
+}

@@ -20,6 +20,8 @@ struct Mappings {
 	static std::unordered_map<duckdb_type, std::string> MSSQL(const DbmsQuirks &quirks);
 
 	static std::unordered_map<duckdb_type, std::string> DB2(const DbmsQuirks &quirks);
+
+	static std::unordered_map<duckdb_type, std::string> FIREBIRD(const DbmsQuirks &quirks);
 };
 
 } // namespace odbcscanner

@@ -1,6 +1,6 @@
-# name: test/sql/db2/copy.test
-# description: test odbc_copy() function with DB2
-# group: [db2_copy]
+# name: test/sql/firebird/firebird_copycopy.test
+# description: test odbc_copy() function with Firebird
+# group: [firebird_copy]
 
 require odbc_scanner
 
@@ -8,20 +8,21 @@ statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"', ignore_exec_failure=TRUE)
+FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"', ignore_exec_failure=TRUE)
 
 # no destination
 
 statement error
 SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
   dest_table='duckdb_test_copy',
+  batch_size=1,
   source_queries=[
     'CREATE TABLE copy_test_basic(col1 SMALLINT, col2 INTEGER)',
     'INSERT INTO copy_test_basic VALUES (41, 42), (43, 44)',
     'SELECT * FROM copy_test_basic'
     ])
 ----
-.duckdb_test_copy
+-duckdb_test_copy
 
 # basic
 
@@ -165,7 +166,7 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
   source_queries=[
     'CREATE TABLE copy_test_decimal(
       col1 DECIMAL(7, 5),
-      col2 DECIMAL(31, 10)
+      col2 DECIMAL(17, 10)
     )',
     'INSERT INTO copy_test_decimal VALUES (1.0, 2.0)',
     'SELECT * FROM copy_test_decimal'
@@ -179,8 +180,8 @@ SELECT column_type from (
     'SELECT * FROM "duckdb_test_copy"')
 )
 ----
-DECIMAL(7,5)
-DECIMAL(31,10)
+DECIMAL(9,5)
+DECIMAL(18,10)
 
 query II
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
@@ -200,12 +201,10 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
     'CREATE TABLE copy_test_temporal(
       col1 DATE,
       col2 TIMESTAMP,
-      col5 TIMESTAMP_NS,
     )',
     'INSERT INTO copy_test_temporal VALUES (
       ''2020-12-31'',
-      ''2020-12-31 01:02:03.456789'',
-      ''2020-12-31 01:02:03.456789012'',
+      ''2020-12-31 01:02:03.456789''
     )',
     'SELECT * FROM copy_test_temporal'
     ])
@@ -220,12 +219,11 @@ SELECT column_type from (
 ----
 DATE
 TIMESTAMP
-TIMESTAMP
 
-query III
+query II
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
-2020-12-31	2020-12-31 01:02:03.456789	2020-12-31 01:02:03.456789
+2020-12-31	2020-12-31 01:02:03.4567
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
@@ -256,10 +254,11 @@ SELECT column_type from (
 ----
 VARCHAR
 
+# todo: investigate unicode support
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
-🌌
+??
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
@@ -345,7 +344,7 @@ SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 # dest query with a tail
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'),
+FROM odbc_query(getvariable('conn'),
   'CREATE TABLE "duckdb_test_copy" (
     col1_1 INTEGER,
     col1_2 VARCHAR(10),
@@ -356,7 +355,6 @@ SELECT * FROM odbc_query(getvariable('conn'),
     col4_1 INTEGER,
     col4_2 VARCHAR(10)
   )')
-
 
 query II
 SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),

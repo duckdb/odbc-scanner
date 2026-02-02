@@ -260,6 +260,7 @@ Optional named parameters (create table):
 
  - `create_table` (`BOOLEAN`, deafult: `FALSE`): whether to create a table in the destination remote DB using the column names and column types from the source query, effectively implements CTAS (create table as select)
  - `column_types` (`MAP(VARCHAR, VARCHAR)`): when `create_table=TRUE` is specified, allows to provide/override the type mapping between source DuckDB types and destination RDBMS types, example:
+ - `commit_after_create_table` (`BOOLEAN`, default: `FALSE`): whether to issue a `COMMIT` after executing `CREATE TABLE`, enabled automatically for Firebird
 
 ```sql
 create_table=TRUE,
@@ -277,7 +278,8 @@ Optional named parameters (other):
 
  - `batch_size` (`UINTEGER`, default: `16`): number of records to be inserted (or executed in case of `dest_query`) in a single `SQLExecute` ODBC to remote DB, allowed values: `1`, `2`, `4`, `8`, `16`, `32`, `64`, `128`, `256`, `512`, `1024`, `2048`
  - `use_insert_all` (`BOOLEAN`, default: `FALSE`): generate `INSERT ALL` barch insert query instead of batch insert with `INSERT ... VALUES (...), (...), ... (...)`, enabled automatically for Oracle
- - `insert_in_transaction` (`BOOLEAN`, default: `TRUE`): begin a transaction in remote DB for this copy call, commit transaction when all rows are processed, roll it back on error
+ - `use_insert_union` (`BOOLEAN`, default: `FALSE`): generate `INSERT ... SELECT FROM .. UNION ALL ...` barch insert query instead of batch insert with `INSERT ... VALUES (...), (...), ... (...)`, enabled automatically for Firebird
+ - `copy_in_transaction` (`BOOLEAN`, default: `TRUE`): begin a transaction in remote DB for this copy call, commit transaction when all rows are processed, roll it back on error
  - `max_records_in_transaction` (`UBIGINT`, default: `0`): when specified causes the remote transaction to be committed every time after the specified number of rows is processed
  - `close_connection` (`BOOLEAN`, default: `false`): closes the passed connection after the function call is completed, intended to be used with one-shot invocations of the `odbc_copy`
 

@@ -12,6 +12,8 @@ std::unordered_map<duckdb_type, std::string> Mappings::Resolve(DbmsDriver driver
 		return MSSQL(quirks);
 	case DbmsDriver::DB2:
 		return DB2(quirks);
+	case DbmsDriver::FIREBIRD:
+		return FIREBIRD(quirks);
 
 	case DbmsDriver::MARIADB:
 	case DbmsDriver::MYSQL:
