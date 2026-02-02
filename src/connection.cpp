@@ -46,7 +46,6 @@ static std::string FilterPwd(const std::string url) {
 	auto uid_filtered = std::regex_replace(url, uid_pattern, "UID=***");
 	std::regex pwd_pattern("PWD=[^;]+", std::regex_constants::icase);
 	return std::regex_replace(uid_filtered, pwd_pattern, "PWD=***");
-	return uid_filtered;
 }
 
 OdbcConnection::OdbcConnection(const std::string &url) {

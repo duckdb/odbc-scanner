@@ -1,6 +1,6 @@
-# name: test/sql/oracle/copy.test
-# description: test odbc_copy() function with Oracle
-# group: [oracle_copy]
+# name: test/sql/mssql/mssql_copy.test
+# description: test odbc_copy() function with MSSQL
+# group: [mssql_copy]
 
 require odbc_scanner
 
@@ -8,7 +8,7 @@ statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"', ignore_exec_failure=TRUE)
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE IF EXISTS "duckdb_test_copy"')
 
 # no destination
 
@@ -21,7 +21,7 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
     'SELECT * FROM copy_test_basic'
     ])
 ----
-ORA-00942: table or view does not exist
+Invalid object name 'duckdb_test_copy'
 
 # basic
 
@@ -66,14 +66,14 @@ SELECT column_type from (
     'SELECT * FROM "duckdb_test_copy"')
 )
 ----
-DECIMAL(1,0)
+BOOLEAN
 
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
-1
+TRUE
 NULL
-0
+FALSE
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
@@ -92,10 +92,9 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
       col4 USMALLINT,
       col5 INTEGER,
       col6 UINTEGER,
-      col7 BIGINT,
-      col8 UBIGINT
+      col7 BIGINT
     )',
-    'INSERT INTO copy_test_integrals VALUES (1,2,3,4,5,6,7,8)',
+    'INSERT INTO copy_test_integrals VALUES (1,2,3,4,5,6,7)',
     'SELECT * FROM copy_test_integrals'
     ])
 ----
@@ -107,19 +106,18 @@ SELECT column_type from (
     'SELECT * FROM "duckdb_test_copy"')
 )
 ----
-DECIMAL(3,0)
-DECIMAL(3,0)
-DECIMAL(5,0)
-DECIMAL(5,0)
-DECIMAL(10,0)
-DECIMAL(10,0)
-DECIMAL(19,0)
-DECIMAL(19,0)
+SMALLINT
+SMALLINT
+SMALLINT
+INTEGER
+INTEGER
+BIGINT
+BIGINT
 
-query IIIIIIII
+query IIIIIII
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
 ----
-1	2	3	4	5	6	7	8
+1	2	3	4	5	6	7
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
@@ -300,76 +298,46 @@ foo\x00bar
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 
-# custom
+# source limit
+
+statement error
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
+  create_table=TRUE,
+  source_limit=1024,
+  source_query='SELECT 42')
+----
+invalid source limit specified
 
 query II
 SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
   dest_table='duckdb_test_copy',
   create_table=TRUE,
+  source_limit=4096,
   source_queries=[
-    'CREATE TABLE copy_test_custom(
-      col1 VARCHAR,
-    )',
-    'INSERT INTO copy_test_custom VALUES (
-      ''🌌''
-    )',
-    'SELECT * FROM copy_test_custom'
-    ],
-  column_types=MAP {'DUCKDB_TYPE_VARCHAR' : 'VARCHAR2(10)'}
-  )
+    'CREATE TABLE copy_test_limit AS SELECT unnest(repeat([1,2,3,4,5,6,7,8,9], 2048)) col1',
+    'SELECT * FROM copy_test_limit'
+    ])
 ----
-1	1
+0	2048
+0	4096
+0	6144
+0	8192
+0	10240
+0	12288
+0	14336
+0	16384
+1	18432
 
 query I
-SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy"')
-)
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM "duckdb_test_copy"')
 ----
-VARCHAR
+18432
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT sum("col1") FROM "duckdb_test_copy"')
 ----
-?
-
-statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
-
-# explicit dest query
-
-statement ok
-SELECT * FROM odbc_query(getvariable('conn'),
-  'CREATE TABLE "duckdb_test_copy" (
-    col1 NUMBER(10,0),
-    col2 VARCHAR2(10),
-    col3 NUMBER(10,0),
-    col4 NVARCHAR2(10)
-  )')
-
-query II
-SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
-  create_table=FALSE,
-  batch_size=2,
-  source_queries=[
-    'CREATE TABLE copy_test_dest_query(
-      col1 INTEGER,
-      col2 VARCHAR
-    )',
-    'INSERT INTO copy_test_dest_query VALUES 
-      (42, ''foo''),
-      (43, ''🌌'')
-    ',
-    'SELECT * FROM copy_test_dest_query'
-    ],
-  dest_query='INSERT INTO "duckdb_test_copy" VALUES(?,?,?,?)')
-----
-1	2
-
-query IIII
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
-----
-42	foo	43	🌌
+92160
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
@@ -379,14 +347,14 @@ SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'),
   'CREATE TABLE "duckdb_test_copy" (
-    col1_1 NUMBER(10,0),
-    col1_2 NVARCHAR2(10),
-    col2_1 NUMBER(10,0),
-    col2_2 NVARCHAR2(10),
-    col3_1 NUMBER(10,0),
-    col3_2 NVARCHAR2(10),
-    col4_1 NUMBER(10,0),
-    col4_2 NVARCHAR2(10)
+    col1_1 INTEGER,
+    col1_2 NVARCHAR(10),
+    col2_1 INTEGER,
+    col2_2 NVARCHAR(10),
+    col3_1 INTEGER,
+    col3_2 NVARCHAR(10),
+    col4_1 INTEGER,
+    col4_2 NVARCHAR(10)
   )')
 
 
@@ -427,62 +395,6 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"'
 NULL	NULL	9	s9	NULL	NULL	NULL	NULL
 NULL	NULL	10	s10	NULL	NULL	NULL	NULL
 NULL	NULL	11	s11	NULL	NULL	NULL	NULL
-
-statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
-
-# error when copying, make sure the hang on driver unload is not happening
-# note: use the incorrect error message to trigger the hanging
-
-statement error
-SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
-  dest_table='duckdb_test_copy',
-  create_table=TRUE,
-  source_query='SELECT * FROM fail'
-)
-----
-Table with name fail does not exist
-
-# source limit
-
-statement error
-SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
-  dest_table='duckdb_test_copy',
-  create_table=TRUE,
-  source_limit=1024,
-  source_query='SELECT 42')
-----
-invalid source limit specified
-
-query II
-SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
-  dest_table='duckdb_test_copy',
-  create_table=TRUE,
-  source_limit=4096,
-  source_queries=[
-    'CREATE TABLE copy_test_limit AS SELECT unnest(repeat([1,2,3,4,5,6,7,8,9], 2048)) col1',
-    'SELECT * FROM copy_test_limit'
-    ])
-----
-0	2048
-0	4096
-0	6144
-0	8192
-0	10240
-0	12288
-0	14336
-0	16384
-1	18432
-
-query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM "duckdb_test_copy"')
-----
-18432.0
-
-query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT sum("col1") FROM "duckdb_test_copy"')
-----
-92160.0
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')

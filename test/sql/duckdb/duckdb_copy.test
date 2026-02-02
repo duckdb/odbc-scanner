@@ -1,4 +1,4 @@
-# name: test/sql/duckdb/copy.test
+# name: test/sql/duckdb/duckdb_copy.test
 # description: test for 'copy()' function
 # group: [duckdb_copy]
 

@@ -4,25 +4,13 @@ This directory contains tests for Firebird database types support in the ODBC Sc
 
 Reference: [link](https://firebirdsql.org/file/documentation/html/en/refdocs/fblangref50/firebird-50-language-reference.html#fblangref50-datatypes)
 
-## Test Environment
-
-Tests use the official Firebird Docker image: https://github.com/FirebirdSQL/firebird-docker  
-Docker Hub: `firebirdsql/firebird:5`
-
-Default connection settings:
-- Server: 127.0.0.1
-- Port: 3050
-- Database: /var/lib/firebird/data/test.fdb
-- User: testuser
-- Password: testpass
-
 ## Firebird Data Types
 
 ### Integer Types
 - [x] SMALLINT - 16-bit signed integer (-32,768 to 32,767)
 - [x] INTEGER - 32-bit signed integer (-2,147,483,648 to 2,147,483,647)
 - [x] BIGINT - 64-bit signed integer
-- [ ] INT128 - 128-bit signed integer (Firebird 4.0+)
+- [ ] **INT128 - 128-bit signed integer (Firebird 4.0+)**
 
 ### Fixed-Point Types
 - [x] NUMERIC(precision, scale) - Exact numeric with declared precision
@@ -44,7 +32,7 @@ Default connection settings:
 ### Binary Types
 - [X] BINARY(n) - Fixed-length binary data (synonym for CHAR CHARACTER SET OCTETS)
 - [X] VARBINARY(n) - Variable-length binary data (synonym for VARCHAR CHARACTER SET OCTETS)
-- [ ] BLOB - Binary large object (up to 4GB)
+- [ ] **BLOB - Binary large object (up to 4GB)**
 
 ### Date/Time Types
 - [x] DATE - Date only (0001-01-01 to 9999-12-31)
@@ -56,3 +44,14 @@ Default connection settings:
 ### Boolean Type
 - [x] BOOLEAN - True/False/Unknown value
 
+## Test Environment
+
+Tests use the official Firebird Docker image: https://github.com/FirebirdSQL/firebird-docker  
+Docker Hub: `firebirdsql/firebird:5`
+
+Default connection settings:
+- Server: 127.0.0.1
+- Port: 3050
+- Database: /var/lib/firebird/data/test.fdb
+- User: testuser
+- Password: testpass
