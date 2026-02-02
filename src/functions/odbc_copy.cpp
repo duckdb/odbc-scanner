@@ -1041,21 +1041,23 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 
 		// at this point we have either full or incomplete flat batch
 
-		bool insert_tail_at_once = true;
+		bool tail_insert_prepared = false;
+		bool use_batch_insert = true;
 		size_t flat_batch_idx = 0;
 
 		for (;;) {
 
-			if (row_idx < ldata.last_prepared_batch_size && insert_tail_at_once) {
-				insert_tail_at_once = false;
+			if (row_idx < ldata.last_prepared_batch_size && !tail_insert_prepared) {
 				flat_batch.resize(row_idx * row.size());
 				uint32_t batch_size = BatchSizeForChunk(bdata.insert_options, reader, row_idx);
 				ctx.query = PrepareInsert(ctx.hstmt(), bdata, reader.columns, batch_size);
 				ldata.param_types.resize(batch_size * row.size());
 				ldata.last_prepared_batch_size = batch_size;
+				tail_insert_prepared = true;
+				use_batch_insert = batch_size > 1;
 			}
 
-			if (insert_tail_at_once) {
+			if (use_batch_insert) {
 				Params::SetExpectedTypes(ctx, ldata.param_types, flat_batch);
 				Params::BindToOdbc(ctx, flat_batch);
 			} else {
@@ -1086,7 +1088,7 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 				}
 			}
 
-			if (insert_tail_at_once || flat_batch_idx >= flat_batch.size()) {
+			if (use_batch_insert || flat_batch_idx >= flat_batch.size()) {
 				break;
 			}
 		}
