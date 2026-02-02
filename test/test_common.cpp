@@ -261,6 +261,11 @@ bool DBMSConfigured(const std::string dbms_name) {
 		return dbms_name == "DuckDB";
 	}
 	std::string str(cstr);
+	if (dbms_name == "Firebird") {
+		std::string needle_alt = "{Firebird ODBC Driver}";
+		std::string needle = "{Firebird Driver}";
+		return str.find(needle_alt) != std::string::npos || str.find(needle) != std::string::npos;
+	}
 	std::string needle = std::string("{" + dbms_name + " Driver}");
 	return str.find(needle) != std::string::npos;
 }

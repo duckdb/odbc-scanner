@@ -1,0 +1,74 @@
+# name: test/sql/firebird/05_float.test
+# description: test for Firebird FLOAT, REAL and DOUBLE PRECISION types
+# group: [firebird_float]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+# FLOAT test (32-bit single precision, ~7 decimal digits)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(3.14159 AS FLOAT) FROM rdb$database')
+----
+3.14159
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(-123.456 AS FLOAT) FROM rdb$database')
+----
+-123.456
+
+# REAL test (synonym for FLOAT)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(2.71828 AS REAL) FROM rdb$database')
+----
+2.71828
+
+# DOUBLE PRECISION test (64-bit double precision, ~15 decimal digits)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(3.141592653589793 AS DOUBLE PRECISION) FROM rdb$database')
+----
+3.1415926535898
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(-999999.999999 AS DOUBLE PRECISION) FROM rdb$database')
+----
+-999999.999999
+
+# Zero values
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(0.0 AS FLOAT) FROM rdb$database')
+----
+0.0
+
+# NULL values
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS FLOAT) FROM rdb$database')
+----
+NULL
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS DOUBLE PRECISION) FROM rdb$database')
+----
+NULL
+
+# Verify column types
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(3.14 AS FLOAT) FROM rdb$database')
+)
+----
+FLOAT
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(3.14 AS DOUBLE PRECISION) FROM rdb$database')
+)
+----
+DOUBLE
+
+# Note: DECFLOAT(16) and DECFLOAT(34) are decimal floating-point types
+# available in Firebird 4.0+ with exact decimal precision
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

@@ -32,6 +32,9 @@ TEST_CASE("Long string query", group_name) {
 		cast = "to_nclob(?) FROM dual";
 	} else if (DBMSConfigured("DB2")) {
 		cast = "CAST(? AS VARCHAR(20000)) FROM sysibm.sysdummy1";
+	} else if (DBMSConfigured("Firebird")) {
+		// Force a single-byte character set due Firebird VARCHAR length limit imposed by database page size.
+		cast = "CAST(? AS VARCHAR(20000) CHARACTER SET NONE) FROM RDB$DATABASE";
 	} else if (DBMSConfigured("FlightSQL")) {
 		return;
 	}

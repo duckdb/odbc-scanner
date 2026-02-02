@@ -1,0 +1,48 @@
+# name: test/sql/firebird/07_time.test
+# description: test for Firebird TIME type
+# group: [firebird_time]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+# Basic TIME test
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''12:30:45'' AS TIME) FROM rdb$database')
+----
+12:30:45
+
+# TIME with different values
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''00:00:00'' AS TIME) FROM rdb$database')
+----
+00:00:00
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:59:59'' AS TIME) FROM rdb$database')
+----
+23:59:59
+
+# CURRENT_TIME
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CURRENT_TIME FROM rdb$database')
+----
+<REGEX>:\d{2}:\d{2}:\d{2}
+
+# NULL value
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS TIME) FROM rdb$database')
+----
+NULL
+
+# Verify column type
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''12:30:45'' AS TIME) FROM rdb$database')
+)
+----
+TIME
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

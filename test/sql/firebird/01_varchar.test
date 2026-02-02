@@ -1,0 +1,53 @@
+# name: test/sql/firebird/01_varchar.test
+# description: test for Firebird VARCHAR type
+# group: [firebird_varchar]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+# Basic VARCHAR test
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARCHAR(10)) FROM rdb$database')
+----
+foo
+
+# VARCHAR with different lengths
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''test'' AS VARCHAR(100)) FROM rdb$database')
+----
+test
+
+# VARCHAR with NULL
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS VARCHAR(50)) FROM rdb$database')
+----
+NULL
+
+# VARCHAR with parameter
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 
+  'SELECT CAST(? AS VARCHAR(100)) FROM rdb$database',
+  params=row('hello'::VARCHAR))
+----
+hello
+
+# VARCHAR with Unicode (UTF8)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 
+  'SELECT CAST(? AS VARCHAR(10)) FROM rdb$database',
+  params=row('🦆'::VARCHAR))
+----
+🦆
+
+# Verify column type
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''test'' AS VARCHAR(100)) FROM rdb$database')
+)
+----
+VARCHAR
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

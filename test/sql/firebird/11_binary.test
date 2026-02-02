@@ -1,0 +1,42 @@
+# name: test/sql/firebird/11_binary.test
+# description: test for Firebird BINARY and VARBINARY types
+# group: [firebird_binary]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+# BINARY test (fixed-length, synonym for CHAR CHARACTER SET OCTETS)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''test'' AS BINARY(10)) FROM rdb$database')
+----
+test      
+
+# VARBINARY test (variable-length, synonym for VARCHAR CHARACTER SET OCTETS)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''data'' AS VARBINARY(20)) FROM rdb$database')
+----
+data
+
+# NULL values
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS BINARY(5)) FROM rdb$database')
+----
+NULL
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS VARBINARY(10)) FROM rdb$database')
+----
+NULL
+
+# Verify column types - reportin as VARCHAR
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''test'' AS VARBINARY(20)) FROM rdb$database')
+)
+----
+VARCHAR
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

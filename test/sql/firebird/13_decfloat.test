@@ -1,0 +1,99 @@
+# name: test/sql/firebird/13_decfloat.test
+# description: test for Firebird DECFLOAT type (Firebird 4.0+)
+# group: [firebird_decfloat]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+# DECFLOAT(16) - 16-digit precision
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(1234567890123456 AS DECFLOAT(16)) FROM rdb$database')
+----
+1234567890123456
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(123.456789012345 AS DECFLOAT(16)) FROM rdb$database')
+----
+123.456789012345
+
+# DECFLOAT(34) - 34-digit precision (default)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(1234567890123456789012345678901234 AS DECFLOAT(34)) FROM rdb$database')
+----
+1234567890123456789012345678901234
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(123.4567890123456789012345678901234 AS DECFLOAT(34)) FROM rdb$database')
+----
+123.4567890123456789012345678901234
+
+# DECFLOAT without precision defaults to DECFLOAT(34)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(99999999.99999999999999999999999999 AS DECFLOAT) FROM rdb$database')
+----
+99999999.99999999999999999999999999
+
+# Scientific notation
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(1.23E20 AS DECFLOAT(34)) FROM rdb$database')
+----
+123000000000000000000
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(4.56E-10 AS DECFLOAT(16)) FROM rdb$database')
+----
+0.000000000456
+
+# Exact decimal arithmetic (no binary approximation)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(0.1 AS DECFLOAT(16)) + CAST(0.2 AS DECFLOAT(16)) FROM rdb$database')
+----
+0.3
+
+# Zero values
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(0 AS DECFLOAT(16)) FROM rdb$database')
+----
+0
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(0.0 AS DECFLOAT(34)) FROM rdb$database')
+----
+0.0
+
+# NULL values
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS DECFLOAT(16)) FROM rdb$database')
+----
+NULL
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS DECFLOAT(34)) FROM rdb$database')
+----
+NULL
+
+# Negative values
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(-999999999.999999 AS DECFLOAT(16)) FROM rdb$database')
+----
+-999999999.999999
+
+# Verify column types
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(123.45 AS DECFLOAT(16)) FROM rdb$database')
+)
+----
+DOUBLE
+
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(123.45 AS DECFLOAT(34)) FROM rdb$database')
+)
+----
+DOUBLE
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

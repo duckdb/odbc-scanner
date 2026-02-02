@@ -1,0 +1,14 @@
+# name: test/sql/firebird/firebird_version.test
+# description: test for Firebird version
+# group: [firebird_version]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement ok
+CALL odbc_query(getvariable('conn'), 'SELECT rdb$get_context(''SYSTEM'', ''ENGINE_VERSION'') as version FROM rdb$database')
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

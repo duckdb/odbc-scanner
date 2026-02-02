@@ -1,0 +1,102 @@
+# name: test/sql/firebird/16_nchar.test
+# description: test for Firebird NCHAR type (fixed-length with ISO8859_1 character set)
+# group: [firebird_nchar]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+# Basic NCHAR test (defaults to length 1 if not specified)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''A'' AS NCHAR) FROM rdb$database')
+----
+A
+
+# NCHAR with specified length (fixed-length, padded with spaces)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''Hello'' AS NCHAR(10)) FROM rdb$database')
+----
+Hello     
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''Test'' AS NCHAR(8)) FROM rdb$database')
+----
+Test    
+
+# NCHAR with exact length
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''Four'' AS NCHAR(4)) FROM rdb$database')
+----
+Four
+
+# NATIONAL CHARACTER synonym
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''ISO'' AS NATIONAL CHARACTER(5)) FROM rdb$database')
+----
+ISO  
+
+# NATIONAL CHAR synonym
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''Data'' AS NATIONAL CHAR(6)) FROM rdb$database')
+----
+Data  
+
+# NATIONAL CHARACTER VARYING (variable-length equivalent)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''Variable'' AS NATIONAL CHARACTER VARYING(20)) FROM rdb$database')
+----
+Variable
+
+# NATIONAL CHAR VARYING synonym
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''Text'' AS NATIONAL CHAR VARYING(15)) FROM rdb$database')
+----
+Text
+
+# NULL value
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS NCHAR(10)) FROM rdb$database')
+----
+NULL
+
+# String with ISO8859_1 characters (Latin-1)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''Café'' AS NCHAR(10)) FROM rdb$database')
+----
+Café      
+
+# With parameters
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 
+  'SELECT CAST(? AS NCHAR(15)) FROM rdb$database',
+  params=row('Testing'::VARCHAR))
+----
+Testing        
+
+# NCHAR (includes padding)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''Hi'' AS NCHAR(5)) FROM rdb$database')
+----
+Hi   
+
+# Comparison - trailing spaces matter for NCHAR
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 
+  'SELECT CASE WHEN CAST(''AB'' AS NCHAR(2)) = CAST(''AB'' AS NCHAR(2)) THEN 1 ELSE 0 END FROM rdb$database')
+----
+1
+
+# Verify column type
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''Test'' AS NCHAR(10)) FROM rdb$database')
+)
+----
+VARCHAR
+
+# Note: NCHAR is essentially CHAR with CHARACTER SET ISO8859_1
+# The character set determines the supported characters and collation behavior
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

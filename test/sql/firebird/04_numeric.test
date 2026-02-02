@@ -1,0 +1,86 @@
+# name: test/sql/firebird/04_numeric.test
+# description: test for Firebird NUMERIC and DECIMAL types
+# group: [firebird_numeric]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+# NUMERIC test - exact precision
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(123.45 AS NUMERIC(10,2)) FROM rdb$database')
+----
+123.45
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(-999.999 AS NUMERIC(10,3)) FROM rdb$database')
+----
+-999.999
+
+# DECIMAL test - precision at least as declared
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(12345.6789 AS DECIMAL(15,4)) FROM rdb$database')
+----
+12345.6789
+
+# Large precision (stored as INT128 when precision > 18)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(123456789.123456789 AS DECIMAL(18,9)) FROM rdb$database')
+----
+123456789.123456789
+
+# NUMERIC(4,2) - stored as SMALLINT internally
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(99.99 AS NUMERIC(4,2)) FROM rdb$database')
+----
+99.99
+
+# DECIMAL(4,2) - stored as INTEGER internally
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(99.99 AS DECIMAL(4,2)) FROM rdb$database')
+----
+99.99
+
+# NUMERIC(9,4) - stored as INTEGER
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(12345.6789 AS NUMERIC(9,4)) FROM rdb$database')
+----
+12345.6789
+
+# NUMERIC(18,6) - stored as BIGINT  
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(123456789012.123456 AS NUMERIC(18,6)) FROM rdb$database')
+----
+123456789012.123456
+
+# Zero value
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(0.00 AS NUMERIC(5,2)) FROM rdb$database')
+----
+0.00
+
+# NULL value
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS NUMERIC(10,2)) FROM rdb$database')
+----
+NULL
+
+# Verify column type
+#   Firebird ODBC driver always returns 18 as precision
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(123.45 AS NUMERIC(10,2)) FROM rdb$database')
+)
+----
+DECIMAL(18,2)
+
+# Verify column type
+#   NUMERIC with precision 19-38 requires Firebird 4.0+ and INT128 storage
+#   Firebird ODBC driver always returns INT128 storage as chars
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(123.45 AS NUMERIC(38,6)) FROM rdb$database')
+)
+----
+VARCHAR

@@ -1,0 +1,98 @@
+# name: test/sql/firebird/14_time_with_time_zone.test
+# description: test for Firebird TIME WITH TIME ZONE type (Firebird 4.0+)
+# group: [firebird_time_tz]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement ok
+CALL odbc_query(getvariable('conn'), "SET TIME ZONE 'America/Sao_Paulo'")
+
+# Basic TIME WITH TIME ZONE with offset
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''12:30:45 -03:00'' AS TIME WITH TIME ZONE) FROM rdb$database')
+----
+12:30:45
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''14:15:30 +05:30'' AS TIME WITH TIME ZONE) FROM rdb$database')
+----
+05:45:30
+
+# TIME WITH TIME ZONE with named zone
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''10:00:00 America/New_York'' AS TIME WITH TIME ZONE) FROM rdb$database')
+----
+12:00:00
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''15:45:00 Europe/London'' AS TIME WITH TIME ZONE) FROM rdb$database')
+----
+12:45:00
+
+# TIME WITH TIME ZONE at UTC
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''12:00:00 GMT'' AS TIME WITH TIME ZONE) FROM rdb$database')
+----
+09:00:00
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''12:00:00 +00:00'' AS TIME WITH TIME ZONE) FROM rdb$database')
+----
+09:00:00
+
+# CURRENT_TIME with time zone (returns session time zone)
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CURRENT_TIME FROM rdb$database')
+----
+<REGEX>:\d{2}:\d{2}:\d{2}
+
+# Equivalence test - different time zones but same UTC time
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 
+  'SELECT CASE WHEN TIME ''10:00 -02:00'' = TIME ''09:00 -03:00'' THEN 1 ELSE 0 END FROM rdb$database')
+----
+1
+
+# NULL value
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS TIME WITH TIME ZONE) FROM rdb$database')
+----
+NULL
+
+# Verify column type
+query I
+SELECT column_type from (
+  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 
+    'SELECT CAST(''12:30:45 -03:00'' AS TIME WITH TIME ZONE) FROM rdb$database')
+)
+----
+TIME
+
+# Arithmetic - add seconds to TIME WITH TIME ZONE
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 
+  'SELECT CAST(''10:00:00 +00:00'' AS TIME WITH TIME ZONE) + 3600 FROM rdb$database')
+----
+08:00:00
+
+# Extract timezone information
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 
+  'SELECT EXTRACT(TIMEZONE_HOUR FROM TIME ''12:30:00 -03:00'') FROM rdb$database')
+----
+-3
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 
+  'SELECT EXTRACT(TIMEZONE_MINUTE FROM TIME ''12:30:00 +05:30'') FROM rdb$database')
+----
+30
+
+statement ok
+CALL odbc_query(getvariable('conn'), "SET TIME ZONE 'UTC'")
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
