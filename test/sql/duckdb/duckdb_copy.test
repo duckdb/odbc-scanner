@@ -37,5 +37,36 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
+# batch tail query single
+
+statement ok
+FROM odbc_query(getvariable('conn'), "CREATE TABLE duckdb_test_copy (col1 INTEGER)")
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  source_query='select unnest(repeat([42], 18))',
+  dest_query='INSERT INTO duckdb_test_copy VALUES(?),(?),(?),(?),(?),(?),(?),(?),(?),(?),(?),(?),(?),(?),(?),(?)',
+  dest_query_single='INSERT INTO duckdb_test_copy VALUES(?)'
+)
+----
+1	18
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
+
+# batch tail gen
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  source_query='select unnest(repeat([42], 18))',
+  dest_table='duckdb_test_copy',
+  create_table=TRUE
+)
+----
+1	18
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))
