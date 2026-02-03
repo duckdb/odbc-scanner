@@ -51,19 +51,20 @@ struct InsertOptions {
 	uint32_t batch_size = 0;
 	bool use_insert_all = false;
 	bool use_insert_union = false;
+	std::string dummy_table_name;
 	bool copy_in_transaction = false;
 	uint64_t max_records_in_transaction = 0;
 	std::string dest_table;
 	std::string dest_query;
 	std::string dest_query_single;
 
-	InsertOptions(uint32_t batch_size_in, bool use_insert_all_in, bool use_insert_union_in, bool copy_in_transaction_in,
-	              uint64_t max_records_in_transaction_in, std::string dest_table_in, std::string dest_query_in,
-	              std::string dest_query_single_in)
+	InsertOptions(uint32_t batch_size_in, bool use_insert_all_in, bool use_insert_union_in,
+	              std::string dummy_table_name_in, bool copy_in_transaction_in, uint64_t max_records_in_transaction_in,
+	              std::string dest_table_in, std::string dest_query_in, std::string dest_query_single_in)
 	    : batch_size(batch_size_in), use_insert_all(use_insert_all_in), use_insert_union(use_insert_union_in),
-	      copy_in_transaction(copy_in_transaction_in), max_records_in_transaction(max_records_in_transaction_in),
-	      dest_table(std::move(dest_table_in)), dest_query(std::move(dest_query_in)),
-	      dest_query_single(std::move(dest_query_single_in)) {
+	      dummy_table_name(std::move(dummy_table_name_in)), copy_in_transaction(copy_in_transaction_in),
+	      max_records_in_transaction(max_records_in_transaction_in), dest_table(std::move(dest_table_in)),
+	      dest_query(std::move(dest_query_in)), dest_query_single(std::move(dest_query_single_in)) {
 	}
 };
 
@@ -462,7 +463,7 @@ static std::unordered_map<duckdb_type, std::string> ExtractTypeMapping(duckdb_va
 
 static InsertOptions ExtractInsertOptions(DbmsDriver driver, duckdb_value batch_size_val,
                                           duckdb_value use_insert_all_val, duckdb_value use_insert_union_val,
-                                          duckdb_value copy_in_transaction_val,
+                                          duckdb_value dummy_table_name_val, duckdb_value copy_in_transaction_val,
                                           duckdb_value max_records_in_transaction_val, duckdb_value dest_table_val,
                                           duckdb_value dest_query_val, duckdb_value dest_query_single_val) {
 	uint32_t batch_size = InsertOptions::default_batch_size;
@@ -489,6 +490,19 @@ static InsertOptions ExtractInsertOptions(DbmsDriver driver, duckdb_value batch_
 	bool use_insert_union = driver == DbmsDriver::FIREBIRD;
 	if (use_insert_union_val != nullptr && !duckdb_is_null_value(use_insert_union_val)) {
 		use_insert_union = duckdb_get_bool(use_insert_union_val);
+	}
+
+	std::string dummy_table_name;
+	if (driver == DbmsDriver::ORACLE) {
+		dummy_table_name = "dual";
+	} else if (driver == DbmsDriver::DB2) {
+		dummy_table_name = "sysibm.sysdummy1";
+	} else if (driver == DbmsDriver::FIREBIRD) {
+		dummy_table_name = "rdb$database";
+	}
+	if (dummy_table_name_val != nullptr && !duckdb_is_null_value(dummy_table_name_val)) {
+		auto dummy_table_name_cstr = VarcharPtr(duckdb_get_varchar(dummy_table_name_val), VarcharDeleter);
+		dummy_table_name = std::string(dummy_table_name_cstr.get());
 	}
 
 	bool copy_in_transaction = true;
@@ -528,8 +542,9 @@ static InsertOptions ExtractInsertOptions(DbmsDriver driver, duckdb_value batch_
 		dest_query_single = std::string(dest_query_single_cstr.get());
 	}
 
-	return InsertOptions(batch_size, use_insert_all, use_insert_union, copy_in_transaction, max_records_in_transaction,
-	                     std::move(dest_table), std::move(dest_query), std::move(dest_query_single));
+	return InsertOptions(batch_size, use_insert_all, use_insert_union, std::move(dummy_table_name), copy_in_transaction,
+	                     max_records_in_transaction, std::move(dest_table), std::move(dest_query),
+	                     std::move(dest_query_single));
 }
 
 static CreateTableOptions ExtractCreateTableOptions(const InsertOptions &insert_options, DbmsDriver driver,
@@ -595,16 +610,17 @@ static void Bind(duckdb_bind_info info) {
 	auto batch_size_val = ValuePtr(duckdb_bind_get_named_parameter(info, "batch_size"), ValueDeleter);
 	auto use_insert_all_val = ValuePtr(duckdb_bind_get_named_parameter(info, "use_insert_all"), ValueDeleter);
 	auto use_insert_union_val = ValuePtr(duckdb_bind_get_named_parameter(info, "use_insert_union"), ValueDeleter);
+	auto dummy_table_name_val = ValuePtr(duckdb_bind_get_named_parameter(info, "dummy_table_name"), ValueDeleter);
 	auto copy_in_transaction_val = ValuePtr(duckdb_bind_get_named_parameter(info, "copy_in_transaction"), ValueDeleter);
 	auto max_records_in_transaction_val =
 	    ValuePtr(duckdb_bind_get_named_parameter(info, "max_records_in_transaction"), ValueDeleter);
 	auto dest_table_val = ValuePtr(duckdb_bind_get_named_parameter(info, "dest_table"), ValueDeleter);
 	auto dest_query_val = ValuePtr(duckdb_bind_get_named_parameter(info, "dest_query"), ValueDeleter);
 	auto dest_query_single_val = ValuePtr(duckdb_bind_get_named_parameter(info, "dest_query_single"), ValueDeleter);
-	InsertOptions insert_options =
-	    ExtractInsertOptions(conn.driver, batch_size_val.get(), use_insert_all_val.get(), use_insert_union_val.get(),
-	                         copy_in_transaction_val.get(), max_records_in_transaction_val.get(), dest_table_val.get(),
-	                         dest_query_val.get(), dest_query_single_val.get());
+	InsertOptions insert_options = ExtractInsertOptions(
+	    conn.driver, batch_size_val.get(), use_insert_all_val.get(), use_insert_union_val.get(),
+	    dummy_table_name_val.get(), copy_in_transaction_val.get(), max_records_in_transaction_val.get(),
+	    dest_table_val.get(), dest_query_val.get(), dest_query_single_val.get());
 
 	auto create_table_val = ValuePtr(duckdb_bind_get_named_parameter(info, "create_table"), ValueDeleter);
 	auto column_types_val = ValuePtr(duckdb_bind_get_named_parameter(info, "column_types"), ValueDeleter);
@@ -773,7 +789,11 @@ static std::string BuildInsertQuery(const std::vector<SourceColumn> &columns, In
 			}
 			query.append(")\n");
 		}
-		query.append("SELECT 1 FROM dual");
+		query.append("SELECT 1");
+		if (!options.dummy_table_name.empty()) {
+			query.append(" FROM ");
+			query.append(options.dummy_table_name);
+		}
 
 	} else if (options.use_insert_union && batch_size > 1) {
 		query.append("INTO \"");
@@ -796,7 +816,11 @@ static std::string BuildInsertQuery(const std::vector<SourceColumn> &columns, In
 				}
 				query.append(" ");
 			}
-			query.append("FROM RDB$DATABASE\n");
+			if (!options.dummy_table_name.empty()) {
+				query.append("FROM ");
+				query.append(options.dummy_table_name);
+			}
+			query.append("\n");
 			if (row_idx < batch_size - 1) {
 				query.append("UNION ALL\n");
 			}
@@ -807,7 +831,7 @@ static std::string BuildInsertQuery(const std::vector<SourceColumn> &columns, In
 		query.append("INTO \"");
 		query.append(options.dest_table);
 		query.append("\"");
-		query.append("(\n");
+		query.append(" (\n");
 		for (size_t i = 0; i < columns.size(); i++) {
 			const SourceColumn &col = columns.at(i);
 			query.append("\"");
@@ -1179,6 +1203,7 @@ void OdbcCopyFunction::Register(duckdb_connection conn) {
 	duckdb_table_function_add_named_parameter(fun.get(), "batch_size", uint_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "use_insert_all", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "use_insert_union", bool_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "dummy_table_name", varchar_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "copy_in_transaction", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "max_records_in_transaction", ubigint_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "dest_table", varchar_type.get());
