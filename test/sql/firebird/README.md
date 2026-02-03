@@ -27,12 +27,12 @@ Reference: [link](https://firebirdsql.org/file/documentation/html/en/refdocs/fbl
 - [x] VARCHAR(n) - Variable-length character string (up to 32,765 bytes)
 - [x] CHAR(n) - Fixed-length character string (up to 32,767 bytes)
 - [x] NCHAR(n) - Fixed-length with ISO8859_1 character set
-- [ ] BLOB SUB_TYPE TEXT - Large text objects (up to 4GB)
+- [x] BLOB SUB_TYPE TEXT - Large text objects (up to 4GB)
 
 ### Binary Types
 - [X] BINARY(n) - Fixed-length binary data (synonym for CHAR CHARACTER SET OCTETS)
 - [X] VARBINARY(n) - Variable-length binary data (synonym for VARCHAR CHARACTER SET OCTETS)
-- [ ] **BLOB - Binary large object (up to 4GB)**
+- [x] BLOB [SUB_TYPE BINARY] - Binary large object (up to 4GB)
 
 ### Date/Time Types
 - [x] DATE - Date only (0001-01-01 to 9999-12-31)

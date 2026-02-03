@@ -1,0 +1,58 @@
+# name: test/sql/firebird/17_blob.test
+# description: test for Firebird BLOB type
+# group: [firebird_blob]
+
+require odbc_scanner
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), "SELECT CAST(CAST(x'666f6f00626172' AS BLOB) AS VARCHAR(30)) FROM rdb$database")
+----
+foo.bar
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BLOB) FROM rdb$database',
+  params=row('foo'::BLOB))
+----
+foo
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(CAST(? AS BLOB) AS VARCHAR(30)) FROM rdb$database',
+  params=row('foo\x00bar'::BLOB))
+----
+foo.bar
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BLOB) FROM rdb$database',
+  params=row(NULL::BLOB))
+----
+NULL
+
+statement ok
+SET VARIABLE params1 = odbc_create_params()
+
+statement ok
+PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BLOB) FROM rdb$database',
+  params_handle=getvariable('params1'))
+
+statement ok
+PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
+
+statement ok
+EXECUTE p1_bind('foo\x00bar'::BLOB)
+
+query I
+EXECUTE p1
+----
+foo\x00bar
+
+statement ok
+DEALLOCATE p1_bind
+
+statement ok
+DEALLOCATE p1
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

@@ -12,6 +12,7 @@ std::unordered_map<duckdb_type, std::string> Mappings::FIREBIRD(const DbmsQuirks
 	        {DUCKDB_TYPE_INTEGER, "INTEGER"},
 	        {DUCKDB_TYPE_UINTEGER, "BIGINT"},
 	        {DUCKDB_TYPE_BIGINT, "BIGINT"},
+	        {DUCKDB_TYPE_UBIGINT, "INT128"},
 
 	        {DUCKDB_TYPE_FLOAT, "REAL"},
 	        {DUCKDB_TYPE_DOUBLE, "DOUBLE PRECISION"},
