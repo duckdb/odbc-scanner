@@ -144,6 +144,8 @@ public:
 
 	~ScannerValue();
 
+	void Destroy();
+
 	std::string ToUtf8String(size_t max_len = std::numeric_limits<size_t>::max());
 
 	param_type ParamType();

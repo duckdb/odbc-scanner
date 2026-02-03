@@ -397,20 +397,7 @@ void ScannerValue::AssignByType(param_type type_id, InternalValue &val, ScannerV
 	}
 }
 
-ScannerValue::ScannerValue(ScannerValue &&other)
-    : type_id(other.type_id), len_bytes(other.len_bytes), expected_type(other.expected_type) {
-	AssignByType(type_id, this->val, other);
-}
-
-ScannerValue &ScannerValue::operator=(ScannerValue &&other) {
-	this->type_id = other.type_id;
-	this->len_bytes = other.len_bytes;
-	this->expected_type = other.expected_type;
-	AssignByType(type_id, this->val, other);
-	return *this;
-}
-
-ScannerValue::~ScannerValue() {
+void ScannerValue::Destroy() {
 	switch (type_id) {
 	case DUCKDB_TYPE_VARCHAR:
 		this->val.wstr.~WideString();
@@ -422,6 +409,24 @@ ScannerValue::~ScannerValue() {
 		// no-op
 	}
 	}
+}
+
+ScannerValue::ScannerValue(ScannerValue &&other)
+    : type_id(other.type_id), len_bytes(other.len_bytes), expected_type(other.expected_type) {
+	AssignByType(type_id, this->val, other);
+}
+
+ScannerValue &ScannerValue::operator=(ScannerValue &&other) {
+	this->Destroy();
+	this->type_id = other.type_id;
+	this->len_bytes = other.len_bytes;
+	this->expected_type = other.expected_type;
+	AssignByType(type_id, this->val, other);
+	return *this;
+}
+
+ScannerValue::~ScannerValue() {
+	this->Destroy();
 }
 
 std::string ScannerValue::ToUtf8String(size_t max_len) {
