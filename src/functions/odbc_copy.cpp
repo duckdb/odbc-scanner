@@ -1132,6 +1132,10 @@ static void Copy(duckdb_function_info info, duckdb_data_chunk output) {
 	OdbcConnection &conn = *gdata.conn_ptr;
 
 	if (ldata.state == ExecState::EXHAUSTED) {
+		if (bdata.insert_options.copy_in_transaction) {
+			Commit(conn);
+			SetTransactionMode(conn, ldata.orig_transaction_mode);
+		}
 		duckdb_data_chunk_set_size(output, 0);
 		return;
 	}
@@ -1142,10 +1146,6 @@ static void Copy(duckdb_function_info info, duckdb_data_chunk output) {
 
 	try {
 		CopyInTransaction(info, output);
-		if (bdata.insert_options.copy_in_transaction) {
-			Commit(conn);
-			SetTransactionMode(conn, ldata.orig_transaction_mode);
-		}
 	} catch (const std::exception &e) {
 		if (bdata.insert_options.copy_in_transaction) {
 			Rollback(conn);
