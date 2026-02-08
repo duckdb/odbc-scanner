@@ -51,12 +51,23 @@ endif()
 ###
 project(${EXTENSION_NAME} LANGUAGES C CXX)
 
-find_package(ODBC REQUIRED)
-message(STATUS "ODBC library found at: " ${ODBC_LIBRARIES})
+if (APPLE AND "$ENV{DUCKDB_PLATFORM}" STREQUAL osx_amd64)
+    set(CMAKE_OSX_ARCHITECTURES x86_64)
+    execute_process(
+        COMMAND /bin/bash -c "/usr/local/bin/brew ls -v unixodbc | grep libodbc.dylib"
+        OUTPUT_VARIABLE ODBC_LIBRARIES
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY
+        ECHO_OUTPUT_VARIABLE
+    )
+else()
+    find_package(ODBC REQUIRED)
+    message(STATUS "ODBC library found at: " ${ODBC_LIBRARIES})
 
-if (NOT MSVC)
-    get_filename_component(ODBC_LIB_DIR ${ODBC_LIBRARIES} DIRECTORY)
-    find_library(ODBCINST_LIB NAMES odbcinst libodbcinst REQUIRED HINTS ${ODBC_LIB_DIR})
+    if (NOT MSVC)
+        get_filename_component(ODBC_LIB_DIR ${ODBC_LIBRARIES} DIRECTORY)
+        find_library(ODBCINST_LIB NAMES odbcinst libodbcinst REQUIRED HINTS ${ODBC_LIB_DIR})
+    endif()
 endif()
 
 set(CMAKE_CXX_STANDARD "11" CACHE STRING "C++ standard to enforce")
