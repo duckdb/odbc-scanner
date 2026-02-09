@@ -252,7 +252,7 @@ source_queries=[
 
 Optional named parameters (destination):
 
- - `dest_table` (`VARCHAR`): destination table name in remote DB, will be used in `INSERT` and `CREATE TABLE` queries quoted in double quotes, cannot be specified if `dest_query` is specified
+ - `dest_table` (`VARCHAR`): destination table name in remote DB, will be used in `INSERT` and `CREATE TABLE` queries, cannot be specified if `dest_query` is specified; different DBs have different rules regarding case sensitivity and the default case, thus the name of the destination table may need to be specified in upper-case: `TAB1` or in quoted form: `"tab1"` (or with a schema name: `"schema1"."tab1"`) 
  - `dest_query` (`VARCHAR`): query to be executed in remote DB for each source batch, must have the number of ODBC parameter placeholders `?` equal to the `source_columns_count * batch_size`, cannot be specified if `dest_table` is specified, example: `CALL import_city(?,?,?,?)`
  - `dest_query_single` (`VARCHAR`): only used when the `batch_size>0` and the number of rows read in the last source batch are less than the `batch_size`, in this case used instead of `dest_query`, must have the number of ODBC parameter placeholders `?` equal to the `source_columns_count`
 
@@ -260,6 +260,7 @@ Optional named parameters (create table):
 
  - `create_table` (`BOOLEAN`, deafult: `FALSE`): whether to create a table in the destination remote DB using the column names and column types from the source query, effectively implements CTAS (create table as select)
  - `column_types` (`MAP(VARCHAR, VARCHAR)`): when `create_table=TRUE` is specified, allows to provide/override the type mapping between source DuckDB types and destination RDBMS types, example:
+ - `column_quotes` (`VARCHAR`, default: `"`): quotation character (or string) to be used to quote column names in the generated `CREATE TABLE` and `INSERT` queries
  - `commit_after_create_table` (`BOOLEAN`, default: `FALSE`): whether to issue a `COMMIT` after executing `CREATE TABLE`, enabled automatically for Firebird
 
 ```sql
@@ -301,7 +302,7 @@ A table with the following columns:
 ```sql
 FROM odbc_copy(getvariable('conn'),
   source_file='https://blobs.duckdb.org/nl_stations.csv',
-  dest_table='nl_train_stations',
+  dest_table='NL_TRAIN_STATIONS',
   create_table=TRUE)
 ```
 ```sql
@@ -311,7 +312,7 @@ FROM odbc_copy(getvariable('conn'),
     'CREATE SECRET s (TYPE s3 [...])',
     'FROM nl_train_stations'
   ],
-  dest_table='nl_train_stations',
+  dest_table='NL_TRAIN_STATIONS',
   create_table=TRUE,
   batch_size=32,
   max_records_in_transaction=42);

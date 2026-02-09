@@ -22,7 +22,7 @@ TEST_CASE("Copy from file into Oracle", group_name) {
 	{
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn, R"(
-  SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "nl_train_stations"', ignore_exec_failure=TRUE)
+  SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE NL_TRAIN_STATIONS', ignore_exec_failure=TRUE)
   )",
 		                               res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st));
@@ -42,7 +42,7 @@ TEST_CASE("Copy from file into Oracle", group_name) {
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn,
 		                               (R"(
-  SELECT * FROM odbc_copy(getvariable('conn'), dest_table='nl_train_stations', source_file=')" +
+  SELECT * FROM odbc_copy(getvariable('conn'), dest_table='NL_TRAIN_STATIONS', source_file=')" +
 		                                project_dir + R"(/resources/data/nl_stations_short.csv')
   )")
 		                                   .c_str(),
@@ -52,7 +52,7 @@ TEST_CASE("Copy from file into Oracle", group_name) {
 	{
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn, R"(
-  SELECT * FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM "nl_train_stations"')
+  SELECT * FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM NL_TRAIN_STATIONS')
   )",
 		                               res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st));
@@ -62,7 +62,7 @@ TEST_CASE("Copy from file into Oracle", group_name) {
 	{
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn, R"(
-  SELECT * FROM odbc_query(getvariable('conn'), 'SELECT "id", "code", "geo_lng" FROM "nl_train_stations" WHERE "id" = 227')
+  SELECT * FROM odbc_query(getvariable('conn'), 'SELECT "id", "code", "geo_lng" FROM NL_TRAIN_STATIONS WHERE "id" = 227')
   )",
 		                               res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st));
@@ -74,7 +74,7 @@ TEST_CASE("Copy from file into Oracle", group_name) {
 	{
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn, R"(
-  SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "nl_train_stations"')
+  SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE NL_TRAIN_STATIONS')
   )",
 		                               res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st));
@@ -92,7 +92,7 @@ TEST_CASE("Copy from file into Oracle with table creation", group_name) {
 	{
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn, R"(
-  SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "nl_train_stations"', ignore_exec_failure=TRUE)
+  SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE NL_TRAIN_STATIONS', ignore_exec_failure=TRUE)
   )",
 		                               res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st));
@@ -102,7 +102,7 @@ TEST_CASE("Copy from file into Oracle with table creation", group_name) {
 		duckdb_state st = duckdb_query(sc.conn,
 		                               (R"(
   SELECT * FROM odbc_copy(getvariable('conn'),
-		dest_table='nl_train_stations', source_file=')" +
+		dest_table='NL_TRAIN_STATIONS', source_file=')" +
 		                                project_dir +
 		                                R"(/resources/data/nl_stations_short.csv',
 		create_table=TRUE)
@@ -114,7 +114,7 @@ TEST_CASE("Copy from file into Oracle with table creation", group_name) {
 	{
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn, R"(
-  SELECT * FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM "nl_train_stations"')
+  SELECT * FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM NL_TRAIN_STATIONS')
   )",
 		                               res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st));
@@ -124,7 +124,7 @@ TEST_CASE("Copy from file into Oracle with table creation", group_name) {
 	{
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn, R"(
-  SELECT * FROM odbc_query(getvariable('conn'), 'SELECT "id", "code", "geo_lng" FROM "nl_train_stations" WHERE "id" = 227')
+  SELECT * FROM odbc_query(getvariable('conn'), 'SELECT "id", "code", "geo_lng" FROM NL_TRAIN_STATIONS WHERE "id" = 227')
   )",
 		                               res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st));
@@ -136,7 +136,7 @@ TEST_CASE("Copy from file into Oracle with table creation", group_name) {
 	{
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn, R"(
-  SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "nl_train_stations"')
+  SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE NL_TRAIN_STATIONS')
   )",
 		                               res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st));

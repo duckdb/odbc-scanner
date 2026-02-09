@@ -8,10 +8,10 @@ LOAD odbc_scanner;
 -- Records/second: 22704
 -- SET VARIABLE conn = odbc_connect('Driver={DB2 Driver};HostName=127.0.0.1;Port=50000;Database=testdb;UID=db2inst1;PWD=testpwd;');
 
-CALL odbc_query(getvariable('conn'), 'DROP TABLE "lineitem"', ignore_exec_failure=TRUE);
+CALL odbc_query(getvariable('conn'), 'DROP TABLE LINEITEM', ignore_exec_failure=TRUE);
 
 SELECT * FROM odbc_copy(getvariable('conn'), 
-  dest_table='lineitem', 
+  dest_table='LINEITEM', 
   create_table=TRUE,
   source_queries=[
     'INSTALL tpch',
