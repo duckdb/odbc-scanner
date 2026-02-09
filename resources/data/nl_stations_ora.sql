@@ -1,4 +1,4 @@
-CREATE TABLE "nl_train_stations" (
+CREATE TABLE NL_TRAIN_STATIONS (
   "id"          NUMBER(19),
   "code"        VARCHAR2(255),
   "uic"         NUMBER(19),

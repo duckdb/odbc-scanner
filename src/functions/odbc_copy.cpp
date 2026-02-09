@@ -71,11 +71,13 @@ struct InsertOptions {
 struct CreateTableOptions {
 	bool do_create_table = false;
 	std::unordered_map<duckdb_type, std::string> column_types;
+	std::string column_quotes;
 	bool commit_after = false;
 
 	CreateTableOptions(bool do_create_table_in, std::unordered_map<duckdb_type, std::string> column_types_in,
-	                   bool commit_after_in)
-	    : do_create_table(do_create_table_in), column_types(column_types_in), commit_after(commit_after_in) {
+	                   std::string column_quotes_in, bool commit_after_in)
+	    : do_create_table(do_create_table_in), column_types(column_types_in),
+	      column_quotes(std::move(column_quotes_in)), commit_after(commit_after_in) {
 	}
 };
 
@@ -549,7 +551,7 @@ static InsertOptions ExtractInsertOptions(DbmsDriver driver, duckdb_value batch_
 
 static CreateTableOptions ExtractCreateTableOptions(const InsertOptions &insert_options, DbmsDriver driver,
                                                     DbmsQuirks &quirks, duckdb_value create_table_val,
-                                                    duckdb_value column_types_val,
+                                                    duckdb_value column_types_val, duckdb_value column_quotes_val,
                                                     duckdb_value commit_after_create_table_val) {
 	bool create_table = false;
 	if (create_table_val != nullptr && !duckdb_is_null_value(create_table_val)) {
@@ -567,12 +569,19 @@ static CreateTableOptions ExtractCreateTableOptions(const InsertOptions &insert_
 		column_types[en.first] = en.second;
 	}
 
+	std::string column_quotes = "\"";
+	if (column_quotes_val != nullptr && !duckdb_is_null_value(column_quotes_val)) {
+		auto column_quotes_cstr = VarcharPtr(duckdb_get_varchar(column_quotes_val), VarcharDeleter);
+		column_quotes = std::string(column_quotes_cstr.get());
+	}
+
 	bool commit_after_create_table = driver == DbmsDriver::FIREBIRD;
 	if (commit_after_create_table_val != nullptr && !duckdb_is_null_value(commit_after_create_table_val)) {
 		commit_after_create_table = duckdb_get_bool(commit_after_create_table_val);
 	}
 
-	return CreateTableOptions(create_table, std::move(column_types), commit_after_create_table);
+	return CreateTableOptions(create_table, std::move(column_types), std::move(column_quotes),
+	                          commit_after_create_table);
 }
 
 static GeneralOptions ExtractGeneralOptions(duckdb_value close_connection_val, bool conn_must_be_closed) {
@@ -624,11 +633,12 @@ static void Bind(duckdb_bind_info info) {
 
 	auto create_table_val = ValuePtr(duckdb_bind_get_named_parameter(info, "create_table"), ValueDeleter);
 	auto column_types_val = ValuePtr(duckdb_bind_get_named_parameter(info, "column_types"), ValueDeleter);
+	auto column_quotes_val = ValuePtr(duckdb_bind_get_named_parameter(info, "column_quotes"), ValueDeleter);
 	auto commit_after_create_table_val =
 	    ValuePtr(duckdb_bind_get_named_parameter(info, "commit_after_create_table"), ValueDeleter);
 	CreateTableOptions create_table_options =
 	    ExtractCreateTableOptions(insert_options, conn.driver, quirks, create_table_val.get(), column_types_val.get(),
-	                              commit_after_create_table_val.get());
+	                              column_quotes_val.get(), commit_after_create_table_val.get());
 
 	auto close_connection_val = ValuePtr(duckdb_bind_get_named_parameter(info, "close_connection"), ValueDeleter);
 	GeneralOptions general_options = ExtractGeneralOptions(close_connection_val.get(), extracted_conn.must_be_closed);
@@ -730,15 +740,14 @@ static std::string LookupMapping(std::unordered_map<duckdb_type, std::string> &m
 static std::string BuildCreateTableQuery(const std::string &table_name, const std::vector<SourceColumn> &columns,
                                          CreateTableOptions &options) {
 	std::string query = "CREATE TABLE ";
-	query.append("\"");
 	query.append(table_name);
-	query.append("\"");
 	query.append(" (\n");
 	for (size_t i = 0; i < columns.size(); i++) {
 		const SourceColumn &col = columns.at(i);
-		query.append("    \"");
+		query.append("    ");
+		query.append(options.column_quotes);
 		query.append(col.name);
-		query.append("\"");
+		query.append(options.column_quotes);
 		query.append(" ");
 		const std::string &type_name = LookupMapping(options.column_types, col);
 		query.append(type_name);
@@ -766,15 +775,14 @@ static std::string BuildInsertQuery(const std::vector<SourceColumn> &columns, In
 	if (options.use_insert_all && batch_size > 1) {
 		query.append("ALL\n");
 		for (uint32_t row_idx = 0; row_idx < batch_size; row_idx++) {
-			query.append("INTO \"");
+			query.append("INTO ");
 			query.append(options.dest_table);
-			query.append("\"");
 			query.append(" (");
 			for (size_t i = 0; i < columns.size(); i++) {
 				const SourceColumn &col = columns.at(i);
-				query.append("\"");
+				query.append(create_options.column_quotes);
 				query.append(col.name);
-				query.append("\"");
+				query.append(create_options.column_quotes);
 				if (i < columns.size() - 1) {
 					query.append(",");
 				}
@@ -796,10 +804,9 @@ static std::string BuildInsertQuery(const std::vector<SourceColumn> &columns, In
 		}
 
 	} else if (options.use_insert_union && batch_size > 1) {
-		query.append("INTO \"");
+		query.append("INTO ");
 		query.append(options.dest_table);
-		query.append("\" ");
-		query.append("SELECT * FROM (\n");
+		query.append(" SELECT * FROM (\n");
 		for (uint32_t row_idx = 0; row_idx < batch_size; row_idx++) {
 			query.append("SELECT ");
 			for (size_t i = 0; i < columns.size(); i++) {
@@ -808,9 +815,9 @@ static std::string BuildInsertQuery(const std::vector<SourceColumn> &columns, In
 				const std::string &type_name = LookupMapping(create_options.column_types, col);
 				query.append(type_name);
 				query.append(") AS ");
-				query.append("\"");
+				query.append(create_options.column_quotes);
 				query.append(col.name);
-				query.append("\"");
+				query.append(create_options.column_quotes);
 				if (i < columns.size() - 1) {
 					query.append(",");
 				}
@@ -828,15 +835,14 @@ static std::string BuildInsertQuery(const std::vector<SourceColumn> &columns, In
 		query.append(") AS a");
 
 	} else {
-		query.append("INTO \"");
+		query.append("INTO ");
 		query.append(options.dest_table);
-		query.append("\"");
 		query.append(" (\n");
 		for (size_t i = 0; i < columns.size(); i++) {
 			const SourceColumn &col = columns.at(i);
-			query.append("\"");
+			query.append(create_options.column_quotes);
 			query.append(col.name);
-			query.append("\"");
+			query.append(create_options.column_quotes);
 			if (i < columns.size() - 1) {
 				query.append(",");
 			}
@@ -1212,6 +1218,7 @@ void OdbcCopyFunction::Register(duckdb_connection conn) {
 	// create table options
 	duckdb_table_function_add_named_parameter(fun.get(), "create_table", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "column_types", map_type.get());
+	duckdb_table_function_add_named_parameter(fun.get(), "column_quotes", varchar_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "commit_after_create_table", bool_type.get());
 	// general options
 	duckdb_table_function_add_named_parameter(fun.get(), "close_connection", bool_type.get());

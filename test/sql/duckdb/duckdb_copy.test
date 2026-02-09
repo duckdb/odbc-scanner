@@ -29,7 +29,8 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
   integral_params_as_decimals=TRUE,
   source_conn_string=':memory:',
   source_query='SELECT ''foo''::VARCHAR AS col1',
-  column_types=MAP {'DUCKDB_TYPE_VARCHAR': 'VARCHAR'}
+  column_types=MAP {'DUCKDB_TYPE_VARCHAR': 'VARCHAR'},
+  column_quotes=''
 )
 ----
 1	1
@@ -64,6 +65,25 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 )
 ----
 1	18
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
+
+# custom quotes
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy',
+  create_table=TRUE,
+  source_query='SELECT 42::INT AS col1',
+  column_quotes='_foo_'
+)
+----
+1	1
+
+query I
+SELECT column_name FROM odbc_query(getvariable('conn'), 'SUMMARIZE duckdb_test_copy')
+----
+_foo_col1_foo_
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')

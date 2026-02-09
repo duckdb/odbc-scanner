@@ -8,10 +8,10 @@ LOAD odbc_scanner;
 -- Records/second: 27457
 -- SET VARIABLE conn = odbc_connect('Driver={DB2 Driver};HostName=127.0.0.1;Port=50000;Database=testdb;UID=db2inst1;PWD=testpwd;');
 
-CALL odbc_query(getvariable('conn'), 'DROP TABLE "taxi_2019_04"', ignore_exec_failure=TRUE);
+CALL odbc_query(getvariable('conn'), 'DROP TABLE TAXI_2019_04', ignore_exec_failure=TRUE);
 
 SELECT * FROM odbc_copy(getvariable('conn'), 
-  dest_table='taxi_2019_04', 
+  dest_table='TAXI_2019_04', 
   create_table=TRUE,
   source_query='SELECT * FROM ''https://blobs.duckdb.org/data/taxi_2019_04.parquet'' LIMIT 100000');
 

@@ -8,7 +8,7 @@ statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE IF EXISTS "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE IF EXISTS duckdb_test_copy')
 
 # no destination
 
@@ -38,13 +38,13 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 1	2
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM duckdb_test_copy')
 ----
 41	42
 43	44
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # boolean
 
@@ -63,20 +63,20 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy"')
+    'SELECT * FROM duckdb_test_copy')
 )
 ----
 BOOLEAN
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM duckdb_test_copy')
 ----
 TRUE
 NULL
 FALSE
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # integrals
 
@@ -103,7 +103,7 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy"')
+    'SELECT * FROM duckdb_test_copy')
 )
 ----
 SMALLINT
@@ -115,12 +115,12 @@ BIGINT
 BIGINT
 
 query IIIIIII
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM duckdb_test_copy')
 ----
 1	2	3	4	5	6	7
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # floats
 
@@ -142,19 +142,19 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy"')
+    'SELECT * FROM duckdb_test_copy')
 )
 ----
 FLOAT
 DOUBLE
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM duckdb_test_copy')
 ----
 1.0	2.0
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # decimal
 
@@ -176,19 +176,19 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy"')
+    'SELECT * FROM duckdb_test_copy')
 )
 ----
 DECIMAL(7,5)
 DECIMAL(38,10)
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM duckdb_test_copy')
 ----
 1.0	2.0
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # temporal
 
@@ -215,7 +215,7 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy"')
+    'SELECT * FROM duckdb_test_copy')
 )
 ----
 DATE
@@ -223,12 +223,12 @@ TIMESTAMP
 TIMESTAMP
 
 query III
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM duckdb_test_copy')
 ----
 2020-12-31	2020-12-31 01:02:03.456789	2020-12-31 01:02:03.456789
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # varchar
 
@@ -251,18 +251,18 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy"')
+    'SELECT * FROM duckdb_test_copy')
 )
 ----
 VARCHAR
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM duckdb_test_copy')
 ----
 🌌
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # blob
 
@@ -285,18 +285,18 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 query I
 SELECT column_type from (
   DESCRIBE SELECT * FROM odbc_query(getvariable('conn'),
-    'SELECT * FROM "duckdb_test_copy"')
+    'SELECT * FROM duckdb_test_copy')
 )
 ----
 BLOB
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM duckdb_test_copy')
 ----
 foo\x00bar
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # source limit
 
@@ -330,23 +330,23 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 1	18432
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM duckdb_test_copy')
 ----
 18432
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT sum("col1") FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT sum("col1") FROM duckdb_test_copy')
 ----
 92160
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # dest query with a tail
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'),
-  'CREATE TABLE "duckdb_test_copy" (
+  'CREATE TABLE duckdb_test_copy (
     col1_1 INTEGER,
     col1_2 NVARCHAR(10),
     col2_1 INTEGER,
@@ -381,14 +381,14 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
     ',
     'SELECT * FROM copy_test_dest_query'
     ],
-  dest_query='INSERT INTO "duckdb_test_copy" VALUES(?,?,?,?,?,?,?,?)',
-  dest_query_single='INSERT INTO "duckdb_test_copy" VALUES(NULL,NULL,?,?,NULL,NULL,NULL,NULL)'
+  dest_query='INSERT INTO duckdb_test_copy VALUES(?,?,?,?,?,?,?,?)',
+  dest_query_single='INSERT INTO duckdb_test_copy VALUES(NULL,NULL,?,?,NULL,NULL,NULL,NULL)'
   )
 ----
 1	11
 
 query IIIIIIII
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM duckdb_test_copy')
 ----
 1	s1	2	s2	3	s3	4	s4
 5	s5	6	s6	7	s7	8	s8
@@ -397,7 +397,36 @@ NULL	NULL	10	s10	NULL	NULL	NULL	NULL
 NULL	NULL	11	s11	NULL	NULL	NULL	NULL
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE "duckdb_test_copy"')
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
+
+# custom schema
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'CREATE SCHEMA duckdb_test_copy_schema')
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_test_copy_schema.tab1',
+  create_table=TRUE,
+  source_queries=[
+    'CREATE TABLE copy_test_basic(col1 SMALLINT, col2 INTEGER)',
+    'INSERT INTO copy_test_basic VALUES (41, 42), (43, 44)',
+    'SELECT * FROM copy_test_basic'
+    ])
+----
+1	2
+
+query II
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM duckdb_test_copy_schema.tab1')
+----
+41	42
+43	44
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy_schema.tab1')
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP SCHEMA duckdb_test_copy_schema')
 
 statement ok
 SELECT odbc_close(getvariable('conn'))
