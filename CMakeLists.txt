@@ -126,6 +126,7 @@ add_library(${EXTENSION_NAME} SHARED ${EXTENSION_SOURCES})
 
 if(DEFINED ${EXTENSION_NAME}_CMAKE_ONLY_BUILD)
     add_dependencies(${EXTENSION_NAME} duckdb_platform)
+    add_dependencies(duckdb_local_extension_repo ${EXTENSION_NAME})
     add_custom_command(
         TARGET odbc_scanner
         POST_BUILD
