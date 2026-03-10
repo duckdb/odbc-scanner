@@ -428,5 +428,51 @@ SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy_schem
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP SCHEMA duckdb_test_copy_schema')
 
+# local temp table
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='#duckdb_test_copy_temp_local',
+  create_table=TRUE,
+  source_queries=[
+    'CREATE TABLE copy_test_basic(col1 SMALLINT, col2 INTEGER)',
+    'INSERT INTO copy_test_basic VALUES (41, 42), (43, 44)',
+    'SELECT * FROM copy_test_basic'
+    ])
+----
+1	2
+
+query II
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM #duckdb_test_copy_temp_local')
+----
+41	42
+43	44
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE #duckdb_test_copy_temp_local')
+
+# global temp table
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='##duckdb_test_copy_temp_global',
+  create_table=TRUE,
+  source_queries=[
+    'CREATE TABLE copy_test_basic(col1 SMALLINT, col2 INTEGER)',
+    'INSERT INTO copy_test_basic VALUES (41, 42), (43, 44)',
+    'SELECT * FROM copy_test_basic'
+    ])
+----
+1	2
+
+query II
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM ##duckdb_test_copy_temp_global')
+----
+41	42
+43	44
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE ##duckdb_test_copy_temp_global')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))
