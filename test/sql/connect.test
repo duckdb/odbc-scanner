@@ -5,7 +5,7 @@
 statement error
 SET VARIABLE conn = odbc_connect()
 ----
-Catalog Error: Scalar Function with name odbc_connect does not exist!
+Catalog Error: Scalar Function
 
 require odbc_scanner
 

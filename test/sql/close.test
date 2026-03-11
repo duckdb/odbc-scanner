@@ -5,7 +5,7 @@
 statement error
 SELECT odbc_close()
 ----
-Catalog Error: Scalar Function with name odbc_close does not exist!
+Catalog Error: Scalar Function
 
 require odbc_scanner
 

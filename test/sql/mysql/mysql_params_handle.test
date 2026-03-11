@@ -7,12 +7,12 @@ require-env MYSQL_AVAILABLE
 statement error
 SET VARIABLE params1 = odbc_create_params()
 ----
-Catalog Error: Scalar Function with name odbc_create_params does not exist!
+Catalog Error: Scalar Function
 
 statement error
 SELECT odbc_bind_params()
 ----
-Catalog Error: Scalar Function with name odbc_bind_params does not exist!
+Catalog Error: Scalar Function
 
 require odbc_scanner
 

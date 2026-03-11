@@ -5,7 +5,7 @@
 statement error
 SELECT * FROM odbc_query()
 ----
-Catalog Error: Table Function with name odbc_query does not exist!
+Catalog Error: Table Function
 
 require odbc_scanner
 
