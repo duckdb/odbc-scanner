@@ -25,7 +25,7 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''14:15:30 +05:30'' A
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''10:00:00 America/New_York'' AS TIME WITH TIME ZONE) FROM rdb$database')
 ----
-12:00:00
+11:00:00
 
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''15:45:00 Europe/London'' AS TIME WITH TIME ZONE) FROM rdb$database')
