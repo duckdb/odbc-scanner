@@ -142,9 +142,11 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 ----
 1	50
 
+# sum() over INTEGER returns HUGEINT in DuckDB, which the scanner cannot map
+# directly; cast to BIGINT so the three columns all come back as integers.
 query III
 SELECT * FROM odbc_query(getvariable('conn'),
-  'SELECT min(col1), max(col1), sum(col1) FROM duckdb_bind_once')
+  'SELECT min(col1), max(col1), sum(col1)::BIGINT FROM duckdb_bind_once')
 ----
 1	50	1275
 
