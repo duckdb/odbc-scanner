@@ -4,8 +4,6 @@
 
 require odbc_scanner
 
-require-env TIMEZONE_DISABLED
-
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
@@ -23,16 +21,19 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''14:15:30 +05:30'' A
 ----
 05:45:30
 
-# TIME WITH TIME ZONE with named zone
+# TIME WITH TIME ZONE with named zone.
+# Only DST-free zones are used here: when no date is present, Firebird
+# resolves the offset against CURRENT_DATE, so zones with DST (e.g.
+# America/New_York, Europe/London) drift by +/-1 hour across the year.
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''10:00:00 America/New_York'' AS TIME WITH TIME ZONE) FROM rdb$database')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''18:00:00 Asia/Tokyo'' AS TIME WITH TIME ZONE) FROM rdb$database')
 ----
-11:00:00
+06:00:00
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''15:45:00 Europe/London'' AS TIME WITH TIME ZONE) FROM rdb$database')
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''15:45:00 Asia/Kolkata'' AS TIME WITH TIME ZONE) FROM rdb$database')
 ----
-12:45:00
+07:15:00
 
 # TIME WITH TIME ZONE at UTC
 query I
