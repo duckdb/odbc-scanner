@@ -82,10 +82,15 @@ void TypeSpecific::BindOdbcParam<SQL_NUMERIC_STRUCT>(QueryContext &ctx, ScannerV
 
 template <>
 void TypeSpecific::BindOdbcParam<DecimalChars>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
-	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_NUMERIC;
+	SQLSMALLINT expected = param.ExpectedType();
+	// Preserve the driver's column type when it is a CHAR/VARCHAR/WCHAR family:
+	// binding SQL_C_CHAR → the actual expected type avoids an extra driver-side
+	// coercion. For non-character expected types (e.g. SQL_NUMERIC), fall back to
+	// SQL_VARCHAR — the driver then parses the char buffer into the target type.
+	SQLSMALLINT sqltype = Types::IsCharacterSQLType(expected) ? expected : SQL_VARCHAR;
 	DecimalChars &dc = param.Value<DecimalChars>();
 	SQLRETURN ret =
-	    SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_CHAR, SQL_VARCHAR, param.LengthBytes(), 0,
+	    SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_CHAR, sqltype, param.LengthBytes(), 0,
 	                     reinterpret_cast<SQLPOINTER>(dc.data()), param.LengthBytes(), &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);

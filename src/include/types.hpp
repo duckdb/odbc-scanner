@@ -42,6 +42,11 @@ struct Types {
 
 	static const std::string UNKNOWN_DUCKDB_TYPE_NAME;
 
+	static bool IsCharacterSQLType(SQLSMALLINT t) {
+		return t == SQL_CHAR || t == SQL_VARCHAR || t == SQL_LONGVARCHAR || t == SQL_WCHAR || t == SQL_WVARCHAR ||
+		       t == SQL_WLONGVARCHAR;
+	}
+
 	static const SQLSMALLINT SQL_SS_TIME2 = -154;
 	static const SQLSMALLINT SQL_SS_TIMESTAMPOFFSET = -155;
 

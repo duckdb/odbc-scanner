@@ -163,6 +163,13 @@ public:
 
 	void TransformIntegralToDecimal();
 
+	// Stringifies an integral/float parameter in-place and re-tags it as
+	// TYPE_DECIMAL_AS_CHARS so the scanner can bind the value as SQL_C_CHAR.
+	// This lets us avoid driver code paths that convert numeric-C → character-SQL,
+	// which are historically a common source of silent data corruption across
+	// ODBC drivers (e.g. Firebird ODBC ≤ 3.5.0, some MSSQL/MySQL releases).
+	void TransformNumericToChars();
+
 private:
 	void CheckType(param_type expected);
 

@@ -134,6 +134,35 @@ std::vector<SQLSMALLINT> Params::CollectTypes(QueryContext &ctx) {
 	return param_types;
 }
 
+// When the prepared-parameter's target is a character SQL type and the source is
+// numeric, stringify in the scanner. This short-circuits the driver's
+// numeric-C → character-SQL conversion path, which has produced silent data loss
+// in multiple ODBC drivers (FirebirdSQL/firebird-odbc-driver#292 and older
+// MSSQL/MySQL releases). Done here — before binding — so that post-SetExpectedTypes
+// the param's type_id is final, which lets the single-row bind cache compare shapes
+// reliably.
+static void CoalesceNumericToCharsIfNeeded(ScannerValue &param) {
+	if (!Types::IsCharacterSQLType(param.ExpectedType())) {
+		return;
+	}
+	switch (param.ParamType()) {
+	case DUCKDB_TYPE_TINYINT:
+	case DUCKDB_TYPE_UTINYINT:
+	case DUCKDB_TYPE_SMALLINT:
+	case DUCKDB_TYPE_USMALLINT:
+	case DUCKDB_TYPE_INTEGER:
+	case DUCKDB_TYPE_UINTEGER:
+	case DUCKDB_TYPE_BIGINT:
+	case DUCKDB_TYPE_UBIGINT:
+	case DUCKDB_TYPE_FLOAT:
+	case DUCKDB_TYPE_DOUBLE:
+		param.TransformNumericToChars();
+		break;
+	default:
+		break;
+	}
+}
+
 void Params::SetExpectedTypes(QueryContext &ctx, const std::vector<SQLSMALLINT> &expected,
                               std::vector<ScannerValue> &actual) {
 	if (expected.size() != actual.size()) {
@@ -145,6 +174,7 @@ void Params::SetExpectedTypes(QueryContext &ctx, const std::vector<SQLSMALLINT> 
 		ScannerValue &param = actual.at(i);
 		Types::CoalesceParameterType(ctx, param);
 		param.SetExpectedType(expected_type);
+		CoalesceNumericToCharsIfNeeded(param);
 	}
 }
 

@@ -1,5 +1,6 @@
 #include "scanner_value.hpp"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -520,6 +521,60 @@ void ScannerValue::TransformIntegralToDecimal() {
 
 	// invoke move assignment operator
 	*this = ScannerValue(dec, false);
+}
+
+void ScannerValue::TransformNumericToChars() {
+	std::string str;
+	switch (type_id) {
+	case DUCKDB_TYPE_TINYINT:
+		str = std::to_string(static_cast<int32_t>(Value<int8_t>()));
+		break;
+	case DUCKDB_TYPE_UTINYINT:
+		str = std::to_string(static_cast<uint32_t>(Value<uint8_t>()));
+		break;
+	case DUCKDB_TYPE_SMALLINT:
+		str = std::to_string(Value<int16_t>());
+		break;
+	case DUCKDB_TYPE_USMALLINT:
+		str = std::to_string(Value<uint16_t>());
+		break;
+	case DUCKDB_TYPE_INTEGER:
+		str = std::to_string(Value<int32_t>());
+		break;
+	case DUCKDB_TYPE_UINTEGER:
+		str = std::to_string(Value<uint32_t>());
+		break;
+	case DUCKDB_TYPE_BIGINT:
+		str = std::to_string(Value<int64_t>());
+		break;
+	case DUCKDB_TYPE_UBIGINT:
+		str = std::to_string(Value<uint64_t>());
+		break;
+	case DUCKDB_TYPE_FLOAT: {
+		char buf[32];
+		std::snprintf(buf, sizeof(buf), "%.9g", static_cast<double>(Value<float>()));
+		str = buf;
+		break;
+	}
+	case DUCKDB_TYPE_DOUBLE: {
+		char buf[32];
+		std::snprintf(buf, sizeof(buf), "%.17g", Value<double>());
+		str = buf;
+		break;
+	}
+	default:
+		throw ScannerException("Invalid numeric param type for chars transform: " + std::to_string(type_id));
+	}
+
+	// Destroy the current (POD) value and repurpose the union as DecimalChars.
+	this->Destroy();
+	this->type_id = Params::TYPE_DECIMAL_AS_CHARS;
+	new (&this->val.decimal_chars) DecimalChars;
+	DecimalChars &dc = this->val.decimal_chars;
+	dc.characters.resize(str.size() + 1);
+	std::memcpy(dc.characters.data(), str.data(), str.size());
+	dc.characters[str.size()] = '\0';
+	this->len_bytes = static_cast<SQLLEN>(str.size());
 }
 
 } // namespace odbcscanner

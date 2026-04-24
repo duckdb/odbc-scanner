@@ -54,6 +54,10 @@ static void BindOdbcParamInternal(QueryContext &ctx, SQLSMALLINT ctype, SQLSMALL
 	}
 }
 
+// If the expected SQL type is character, Params::SetExpectedTypes transforms the
+// ScannerValue to TYPE_DECIMAL_AS_CHARS before we get here — see the comment in
+// integer_types.cpp for the rationale.
+
 template <>
 void TypeSpecific::BindOdbcParam<float>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_FLOAT;
