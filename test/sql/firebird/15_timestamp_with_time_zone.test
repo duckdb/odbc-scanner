@@ -4,8 +4,6 @@
 
 require odbc_scanner
 
-require-env TIMEZONE_DISABLED
-
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
 
@@ -105,12 +103,14 @@ SELECT * FROM odbc_query(getvariable('conn'),
 ----
 30
 
-# Combining DATE + TIME WITH TIME ZONE = TIMESTAMP WITH TIME ZONE
+# Combining DATE + TIME WITH TIME ZONE = TIMESTAMP WITH TIME ZONE.
+# Uses +00:00 (UTC) to avoid any chance of DST drift from CURRENT_DATE-based
+# resolution in the TIME WITH TIME ZONE operand.
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 
-  'SELECT DATE ''2024-06-15'' + TIME ''14:30:00 +02:00'' FROM rdb$database')
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT DATE ''2024-06-15'' + TIME ''14:30:00 +00:00'' FROM rdb$database')
 ----
-2024-06-15 09:30:00
+2024-06-15 11:30:00
 
 statement ok
 CALL odbc_query(getvariable('conn'), "SET TIME ZONE 'UTC'")
