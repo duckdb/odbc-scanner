@@ -196,4 +196,76 @@ void Params::BindToOdbc(QueryContext &ctx, std::vector<ScannerValue> &params) {
 	}
 }
 
+// Slots whose backing buffer lives in a dynamically sized container (std::vector
+// inside DecimalChars / WideString / ScannerBlob, etc.) can reallocate as the
+// value changes; the previously-bound pointer would then be invalid. Only
+// fixed-width slots are safe to reuse across executes without rebinding.
+static bool IsFixedWidthShape(param_type type_id) {
+	switch (type_id) {
+	case DUCKDB_TYPE_SQLNULL:
+	case DUCKDB_TYPE_BOOLEAN:
+	case DUCKDB_TYPE_TINYINT:
+	case DUCKDB_TYPE_UTINYINT:
+	case DUCKDB_TYPE_SMALLINT:
+	case DUCKDB_TYPE_USMALLINT:
+	case DUCKDB_TYPE_INTEGER:
+	case DUCKDB_TYPE_UINTEGER:
+	case DUCKDB_TYPE_BIGINT:
+	case DUCKDB_TYPE_UBIGINT:
+	case DUCKDB_TYPE_FLOAT:
+	case DUCKDB_TYPE_DOUBLE:
+	case DUCKDB_TYPE_DECIMAL:
+	case DUCKDB_TYPE_DATE:
+	case DUCKDB_TYPE_TIME:
+	case DUCKDB_TYPE_TIMESTAMP:
+	case DUCKDB_TYPE_TIMESTAMP_TZ:
+	case Params::TYPE_TIME_WITH_NANOS:
+	case Params::TYPE_SQL_BIT:
+	case Params::TYPE_SS_TIMESTAMPOFFSET:
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool Params::BindToOdbcIfShapeChanged(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache) {
+	if (params.size() == 0) {
+		return false;
+	}
+
+	std::vector<BindSlotShape> shape;
+	shape.reserve(params.size());
+	bool all_fixed_width = true;
+	for (size_t i = 0; i < params.size(); i++) {
+		ScannerValue &p = params.at(i);
+		BindSlotShape s;
+		s.type_id = p.ParamType();
+		s.expected_type = p.ExpectedType();
+		s.is_null = (s.type_id == DUCKDB_TYPE_SQLNULL);
+		shape.push_back(s);
+		if (!IsFixedWidthShape(s.type_id)) {
+			all_fixed_width = false;
+		}
+	}
+
+	bool can_skip = cache.initialized && all_fixed_width && cache.shape.size() == shape.size();
+	if (can_skip) {
+		for (size_t i = 0; i < shape.size(); i++) {
+			if (cache.shape.at(i) != shape.at(i)) {
+				can_skip = false;
+				break;
+			}
+		}
+	}
+
+	if (can_skip) {
+		return false;
+	}
+
+	BindToOdbc(ctx, params);
+	cache.shape = std::move(shape);
+	cache.initialized = true;
+	return true;
+}
+
 } // namespace odbcscanner

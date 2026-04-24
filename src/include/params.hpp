@@ -15,6 +15,37 @@
 
 namespace odbcscanner {
 
+// Signature of a bound parameter set, used to detect stable shapes across
+// consecutive SQLExecute calls. When every slot matches the previous bind, the
+// full SQLFreeStmt(SQL_RESET_PARAMS) + per-param SQLBindParameter cycle can be
+// skipped — the driver reads the new values from the already-bound addresses
+// on the next SQLExecute. Rebinding every row is the execute shape that turned
+// the Firebird ODBC driver's numeric-write bug (duckdb/odbc-scanner#161 /
+// FirebirdSQL/firebird-odbc-driver#292) into catastrophic row loss, and it is
+// also the least efficient of the three common execute shapes.
+struct BindSlotShape {
+	param_type type_id = DUCKDB_TYPE_INVALID;
+	SQLSMALLINT expected_type = SQL_PARAM_TYPE_UNKNOWN;
+	bool is_null = false;
+
+	bool operator==(const BindSlotShape &other) const {
+		return type_id == other.type_id && expected_type == other.expected_type && is_null == other.is_null;
+	}
+	bool operator!=(const BindSlotShape &other) const {
+		return !(*this == other);
+	}
+};
+
+struct BindCache {
+	std::vector<BindSlotShape> shape;
+	bool initialized = false;
+
+	void Reset() {
+		shape.clear();
+		initialized = false;
+	}
+};
+
 struct Params {
 	static const param_type TYPE_DECIMAL_AS_CHARS = DUCKDB_TYPE_DECIMAL + 1000;
 	static const param_type TYPE_TIME_WITH_NANOS = DUCKDB_TYPE_TIME + 1000;
@@ -32,6 +63,14 @@ struct Params {
 	                             std::vector<ScannerValue> &actual);
 
 	static void BindToOdbc(QueryContext &ctx, std::vector<ScannerValue> &params);
+
+	// Binds only when the current shape differs from the cached one. Returns
+	// true if SQLBindParameter was actually issued. Variable-length slots
+	// (VARCHAR / TYPE_DECIMAL_AS_CHARS / BLOB / UUID) force a rebind because
+	// their backing buffers are not guaranteed to keep a stable address when
+	// the value changes — for those, the caller still benefits from the normal
+	// BindToOdbc path but pays the bind cost every row.
+	static bool BindToOdbcIfShapeChanged(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache);
 };
 
 } // namespace odbcscanner

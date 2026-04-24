@@ -122,5 +122,34 @@ SELECT * FROM odbc_query(getvariable('conn'),
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_int_to_varchar_pk')
 
+# bind-once-execute-many for the single-row path (duckdb/odbc-scanner#163, item 2).
+# batch_size=1 forces the scanner to take the single-row branch of the inner
+# execute loop; with a stable row shape the parameter bindings are now reused
+# across SQLExecute calls instead of being rebuilt every row. The correctness
+# check is that every source row ends up in the destination table with the
+# right value — the min/max/sum triple catches both row loss and value
+# corruption in a single shot.
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'),
+  'CREATE TABLE duckdb_bind_once (col1 INTEGER NOT NULL)')
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_bind_once',
+  batch_size=1,
+  source_query='SELECT i::INTEGER AS col1 FROM range(1, 51) t(i)')
+----
+1	50
+
+query III
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT min(col1), max(col1), sum(col1) FROM duckdb_bind_once')
+----
+1	50	1275
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_bind_once')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))

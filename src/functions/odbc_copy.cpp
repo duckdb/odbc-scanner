@@ -310,6 +310,12 @@ struct LocalInitData {
 	uint32_t last_prepared_batch_size = 0;
 	SQLUINTEGER orig_transaction_mode = SQL_AUTOCOMMIT_DEFAULT;
 	uint64_t inserted_in_transaction = 0;
+	// single_row_buf is held on the LocalInitData so each ScannerValue slot keeps
+	// a stable address across CopyInTransaction calls — that is what makes it
+	// safe for single_row_bind_cache to remember a SQLBindParameter pointer from
+	// a previous execute.
+	std::vector<ScannerValue> single_row_buf;
+	BindCache single_row_bind_cache;
 
 	LocalInitData() {
 	}
@@ -1044,8 +1050,14 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 	row.resize(reader.columns.size());
 	std::vector<ScannerValue> flat_batch;
 	flat_batch.resize(ldata.last_prepared_batch_size * row.size());
-	std::vector<ScannerValue> single_row_buf;
-	single_row_buf.resize(row.size());
+	if (ldata.single_row_buf.size() != row.size()) {
+		// Column-count transition (only relevant on the first call per reader) —
+		// reinit the buffer and drop any stale bind cache.
+		ldata.single_row_buf.clear();
+		ldata.single_row_buf.resize(row.size());
+		ldata.single_row_bind_cache.Reset();
+	}
+	std::vector<ScannerValue> &single_row_buf = ldata.single_row_buf;
 
 	ldata.chunk_start_moment = CurrentTimeMillis();
 	for (;;) {
@@ -1083,27 +1095,45 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 				ldata.last_prepared_batch_size = batch_size;
 				tail_insert_prepared = true;
 				use_batch_insert = batch_size > 1;
+				// The prepared statement has been replaced — any cached bindings
+				// point at the previous statement state and must be dropped.
+				ldata.single_row_bind_cache.Reset();
 			}
 
+			// Track whether the bind was reused so we know to close any implicit
+			// cursor left behind by the previous SQLExecute before the next one.
+			// Without an explicit SQLFreeStmt(SQL_CLOSE), some drivers (DuckDB ODBC
+			// in particular) leave the statement in a state that makes a later
+			// SQLEndTran fail with SQLSTATE HY010 "Function sequence error".
+			// Rebinding implicitly clears that state; reusing bindings does not.
+			bool reused_bindings = false;
 			if (use_batch_insert) {
 				Params::SetExpectedTypes(ctx, ldata.param_types, flat_batch);
 				Params::BindToOdbc(ctx, flat_batch);
+				// Batch binding wipes per-param ODBC state via SQL_RESET_PARAMS, so
+				// any cached single-row shape would no longer be valid.
+				ldata.single_row_bind_cache.Reset();
 			} else {
 				for (size_t i = 0; i < row.size(); i++) {
 					single_row_buf[i] = std::move(flat_batch.at(flat_batch_idx + i));
 				}
 				flat_batch_idx += row.size();
 				Params::SetExpectedTypes(ctx, ldata.param_types, single_row_buf);
-				Params::BindToOdbc(ctx, single_row_buf);
+				// When the per-row shape is stable (same type_id / expected_type /
+				// is_null across rows and all slots are fixed-width), this is a
+				// no-op after the first iteration, collapsing N per-row rebinds
+				// into a single bind. The rebind-per-row shape is what amplified
+				// the Firebird silent-corruption bug into row loss.
+				bool did_bind = Params::BindToOdbcIfShapeChanged(ctx, single_row_buf, ldata.single_row_bind_cache);
+				reused_bindings = !did_bind;
 			}
 
-			if (ctx.quirks.reset_stmt_before_execute) {
+			if (ctx.quirks.reset_stmt_before_execute || reused_bindings) {
 				SQLRETURN ret = SQLFreeStmt(ctx.hstmt(), SQL_CLOSE);
 				if (!SQL_SUCCEEDED(ret)) {
 					std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
-					throw ScannerException("'SQLFreeStmt' with SQL_CLOSE (reset_stmt_before_execute) failed, query: '" +
-					                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
-					                       "'");
+					throw ScannerException("'SQLFreeStmt' with SQL_CLOSE failed, query: '" + ctx.query +
+					                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 				}
 			}
 
@@ -1177,11 +1207,23 @@ static void Copy(duckdb_function_info info, duckdb_data_chunk output) {
 	try {
 		CopyInTransaction(info, output);
 	} catch (const std::exception &e) {
+		std::string primary = e.what();
 		if (bdata.insert_options.copy_in_transaction) {
-			Rollback(conn);
-			SetTransactionMode(conn, ldata.orig_transaction_mode);
+			// Keep the primary CopyInTransaction error even when Rollback / restoring
+			// the auto-commit mode throws on top. Without this, a Rollback-time
+			// SQLSTATE HY010 could hide the actual root cause inside CopyInTransaction.
+			try {
+				Rollback(conn);
+			} catch (const std::exception &re) {
+				throw ScannerException(primary + " (also, Rollback failed: " + re.what() + ")");
+			}
+			try {
+				SetTransactionMode(conn, ldata.orig_transaction_mode);
+			} catch (const std::exception &se) {
+				throw ScannerException(primary + " (also, SetTransactionMode failed: " + se.what() + ")");
+			}
 		}
-		throw ScannerException(e.what());
+		throw ScannerException(primary);
 	}
 }
 
