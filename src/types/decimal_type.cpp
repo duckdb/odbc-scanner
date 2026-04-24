@@ -9,6 +9,7 @@
 #include "connection.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
+#include "widechar.hpp"
 
 DUCKDB_EXTENSION_EXTERN
 
@@ -84,11 +85,34 @@ template <>
 void TypeSpecific::BindOdbcParam<DecimalChars>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT expected = param.ExpectedType();
 	// Preserve the driver's column type when it is a CHAR/VARCHAR/WCHAR family:
-	// binding SQL_C_CHAR → the actual expected type avoids an extra driver-side
-	// coercion. For non-character expected types (e.g. SQL_NUMERIC), fall back to
-	// SQL_VARCHAR — the driver then parses the char buffer into the target type.
+	// binding → the actual expected type avoids an extra driver-side coercion.
+	// For non-character expected types (e.g. SQL_NUMERIC), fall back to SQL_VARCHAR
+	// and let the driver parse the char buffer into the target type.
 	SQLSMALLINT sqltype = Types::IsCharacterSQLType(expected) ? expected : SQL_VARCHAR;
 	DecimalChars &dc = param.Value<DecimalChars>();
+
+	// Wide targets: widen the ASCII digits to SQLWCHAR and bind SQL_C_WCHAR.
+	// Some drivers do not reliably auto-convert SQL_C_CHAR → SQL_W*CHAR.
+	if (Types::IsWideCharacterSQLType(expected)) {
+		if (dc.wide_characters.empty()) {
+			WideString wstr = WideChar::Widen(dc.data(), static_cast<size_t>(dc.size<SQLLEN>()));
+			dc.wide_characters = std::move(wstr.vec);
+		}
+		SQLLEN length_chars = static_cast<SQLLEN>(dc.wide_characters.size() - 1);
+		param.LengthBytes() = length_chars * static_cast<SQLLEN>(sizeof(SQLWCHAR));
+		SQLRETURN ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, sqltype,
+		                                 static_cast<SQLULEN>(length_chars), 0,
+		                                 reinterpret_cast<SQLPOINTER>(dc.wide_data()), param.LengthBytes(),
+		                                 &param.LengthBytes());
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+			throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
+			                       ", index: " + std::to_string(param_idx) + ", query: '" + ctx.query +
+			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
+		return;
+	}
+
 	SQLRETURN ret =
 	    SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_CHAR, sqltype, param.LengthBytes(), 0,
 	                     reinterpret_cast<SQLPOINTER>(dc.data()), param.LengthBytes(), &param.LengthBytes());

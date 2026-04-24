@@ -139,12 +139,10 @@ std::vector<SQLSMALLINT> Params::CollectTypes(QueryContext &ctx) {
 // numeric-C → character-SQL conversion path, which has produced silent data loss
 // in multiple ODBC drivers (FirebirdSQL/firebird-odbc-driver#292 and older
 // MSSQL/MySQL releases). Done here — before binding — so that post-SetExpectedTypes
-// the param's type_id is final. Wide targets (SQL_WCHAR/WVARCHAR/WLONGVARCHAR) are
-// widened to UTF-16 so the bind uses SQL_C_WCHAR; some drivers do not reliably
-// auto-convert SQL_C_CHAR → SQL_WVARCHAR.
+// the param's type_id is final. Wide targets (SQL_WCHAR/WVARCHAR/WLONGVARCHAR)
+// are handled by BindOdbcParam<DecimalChars>, which widens the buffer on demand.
 static void CoalesceNumericToCharsIfNeeded(ScannerValue &param) {
-	SQLSMALLINT expected = param.ExpectedType();
-	if (!Types::IsCharacterSQLType(expected)) {
+	if (!Types::IsCharacterSQLType(param.ExpectedType())) {
 		return;
 	}
 	switch (param.ParamType()) {
@@ -158,7 +156,7 @@ static void CoalesceNumericToCharsIfNeeded(ScannerValue &param) {
 	case DUCKDB_TYPE_UBIGINT:
 	case DUCKDB_TYPE_FLOAT:
 	case DUCKDB_TYPE_DOUBLE:
-		param.TransformNumericToChars(Types::IsWideCharacterSQLType(expected));
+		param.TransformNumericToChars();
 		break;
 	default:
 		break;

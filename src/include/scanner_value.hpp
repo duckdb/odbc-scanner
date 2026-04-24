@@ -163,15 +163,15 @@ public:
 
 	void TransformIntegralToDecimal();
 
-	// Stringifies an integral/float parameter in-place so the scanner can bind
-	// the value as SQL_C_CHAR (narrow) or SQL_C_WCHAR (wide) instead of a numeric
-	// C type. This avoids driver code paths that convert numeric-C → character-SQL,
-	// which are historically a common source of silent data corruption across
-	// ODBC drivers (e.g. Firebird ODBC ≤ 3.5.0, some MSSQL/MySQL releases).
-	// When `wide` is true the buffer is widened to UTF-16 and the value is re-tagged
-	// as DUCKDB_TYPE_VARCHAR (→ SQL_C_WCHAR path); otherwise it is re-tagged as
-	// TYPE_DECIMAL_AS_CHARS (→ SQL_C_CHAR path).
-	void TransformNumericToChars(bool wide);
+	// Stringifies an integral/float parameter in-place and re-tags it as
+	// TYPE_DECIMAL_AS_CHARS so the scanner binds via BindOdbcParam<DecimalChars>
+	// instead of a numeric C type. This avoids driver code paths that convert
+	// numeric-C → character-SQL, which are historically a common source of silent
+	// data corruption across ODBC drivers (e.g. Firebird ODBC ≤ 3.5.0, some
+	// MSSQL/MySQL releases). Wide character columns (SQL_WCHAR/SQL_WVARCHAR/
+	// SQL_WLONGVARCHAR) are handled by BindOdbcParam<DecimalChars> itself, which
+	// widens the buffer on demand.
+	void TransformNumericToChars();
 
 private:
 	void CheckType(param_type expected);

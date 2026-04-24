@@ -29,6 +29,10 @@ char *DecimalChars::data() {
 	return characters.data();
 }
 
+SQLWCHAR *DecimalChars::wide_data() {
+	return wide_characters.data();
+}
+
 ScannerBlob::ScannerBlob() {
 }
 
