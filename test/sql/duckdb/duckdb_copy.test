@@ -88,5 +88,39 @@ _foo_col1_foo_
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
+# int → VARCHAR primary key round-trip (regression test for duckdb/odbc-scanner#161).
+# The Firebird ODBC driver ≤ 3.5.0 silently dropped rows on this exact shape;
+# Params::SetExpectedTypes now stringifies the parameter in the scanner, which
+# sidesteps the driver's numeric-C → character-SQL path on every driver.
+# batch_size=1 exercises the per-row bind that was the most fragile shape.
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE IF EXISTS duckdb_int_to_varchar_pk')
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'),
+  'CREATE TABLE duckdb_int_to_varchar_pk (id VARCHAR(20) NOT NULL PRIMARY KEY)')
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_int_to_varchar_pk',
+  batch_size=1,
+  column_quotes='',
+  source_query='SELECT i::INTEGER AS id FROM range(1, 501) t(i)')
+----
+1	500
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT id FROM duckdb_int_to_varchar_pk WHERE id IN (''1'', ''2'', ''42'', ''500'') ORDER BY id')
+----
+1
+2
+42
+500
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_int_to_varchar_pk')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))

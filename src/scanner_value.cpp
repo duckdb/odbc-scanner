@@ -523,7 +523,7 @@ void ScannerValue::TransformIntegralToDecimal() {
 	*this = ScannerValue(dec, false);
 }
 
-void ScannerValue::TransformNumericToChars() {
+void ScannerValue::TransformNumericToChars(bool wide) {
 	std::string str;
 	switch (type_id) {
 	case DUCKDB_TYPE_TINYINT:
@@ -566,15 +566,27 @@ void ScannerValue::TransformNumericToChars() {
 		throw ScannerException("Invalid numeric param type for chars transform: " + std::to_string(type_id));
 	}
 
-	// Destroy the current (POD) value and repurpose the union as DecimalChars.
-	this->Destroy();
-	this->type_id = Params::TYPE_DECIMAL_AS_CHARS;
-	new (&this->val.decimal_chars) DecimalChars;
-	DecimalChars &dc = this->val.decimal_chars;
-	dc.characters.resize(str.size() + 1);
-	std::memcpy(dc.characters.data(), str.data(), str.size());
-	dc.characters[str.size()] = '\0';
-	this->len_bytes = static_cast<SQLLEN>(str.size());
+	if (wide) {
+		// Widen to UTF-16 and re-tag as DUCKDB_TYPE_VARCHAR so Types::BindOdbcParam
+		// routes to the SQL_C_WCHAR specialization. Numeric digits are pure ASCII,
+		// so WideChar::Widen never produces invalid sequences here.
+		WideString wstr = WideChar::Widen(str.data(), str.size());
+		this->Destroy();
+		this->type_id = DUCKDB_TYPE_VARCHAR;
+		new (&this->val.wstr) WideString;
+		this->val.wstr = std::move(wstr);
+		this->len_bytes = val.wstr.length<SQLLEN>() * sizeof(SQLWCHAR);
+	} else {
+		// Destroy the current (POD) value and repurpose the union as DecimalChars.
+		this->Destroy();
+		this->type_id = Params::TYPE_DECIMAL_AS_CHARS;
+		new (&this->val.decimal_chars) DecimalChars;
+		DecimalChars &dc = this->val.decimal_chars;
+		dc.characters.resize(str.size() + 1);
+		std::memcpy(dc.characters.data(), str.data(), str.size());
+		dc.characters[str.size()] = '\0';
+		this->len_bytes = static_cast<SQLLEN>(str.size());
+	}
 }
 
 } // namespace odbcscanner
