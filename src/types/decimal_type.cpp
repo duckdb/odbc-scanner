@@ -100,10 +100,9 @@ void TypeSpecific::BindOdbcParam<DecimalChars>(QueryContext &ctx, ScannerValue &
 		}
 		SQLLEN length_chars = static_cast<SQLLEN>(dc.wide_characters.size() - 1);
 		param.LengthBytes() = length_chars * static_cast<SQLLEN>(sizeof(SQLWCHAR));
-		SQLRETURN ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, sqltype,
-		                                 static_cast<SQLULEN>(length_chars), 0,
-		                                 reinterpret_cast<SQLPOINTER>(dc.wide_data()), param.LengthBytes(),
-		                                 &param.LengthBytes());
+		SQLRETURN ret = SQLBindParameter(
+		    ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, sqltype, static_cast<SQLULEN>(length_chars), 0,
+		    reinterpret_cast<SQLPOINTER>(dc.wide_data()), param.LengthBytes(), &param.LengthBytes());
 		if (!SQL_SUCCEEDED(ret)) {
 			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
 			throw ScannerException("'SQLBindParameter' failed, type: " + std::to_string(sqltype) +
