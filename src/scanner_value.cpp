@@ -369,7 +369,7 @@ void ScannerValue::AssignByType(param_type type_id, InternalValue &val, ScannerV
 		val.blob = std::move(other.Value<ScannerBlob>());
 		break;
 	case DUCKDB_TYPE_UUID:
-		new (&val.blob) ScannerUuid;
+		new (&val.uuid) ScannerUuid;
 		val.uuid = std::move(other.Value<ScannerUuid>());
 		break;
 	case DUCKDB_TYPE_DATE:
@@ -405,6 +405,12 @@ void ScannerValue::Destroy() {
 		break;
 	case Params::TYPE_DECIMAL_AS_CHARS:
 		this->val.decimal_chars.~DecimalChars();
+		break;
+	case DUCKDB_TYPE_BLOB:
+		this->val.blob.~ScannerBlob();
+		break;
+	case DUCKDB_TYPE_UUID:
+		this->val.uuid.~ScannerUuid();
 		break;
 	default: {
 		// no-op
