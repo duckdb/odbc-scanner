@@ -221,6 +221,7 @@ static bool IsFixedWidthShape(param_type type_id) {
 	case DUCKDB_TYPE_TIMESTAMP_TZ:
 	case Params::TYPE_TIME_WITH_NANOS:
 	case Params::TYPE_SQL_BIT:
+	case Params::TYPE_SQL_GUID:
 	case Params::TYPE_SS_TIMESTAMPOFFSET:
 		return true;
 	default:
@@ -228,7 +229,7 @@ static bool IsFixedWidthShape(param_type type_id) {
 	}
 }
 
-bool Params::BindToOdbcIfShapeChanged(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache) {
+bool Params::BindToOdbcIfShapeUnchanged(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache) {
 	if (params.size() == 0) {
 		return false;
 	}
@@ -241,31 +242,30 @@ bool Params::BindToOdbcIfShapeChanged(QueryContext &ctx, std::vector<ScannerValu
 		BindSlotShape s;
 		s.type_id = p.ParamType();
 		s.expected_type = p.ExpectedType();
-		s.is_null = (s.type_id == DUCKDB_TYPE_SQLNULL);
 		shape.push_back(s);
 		if (!IsFixedWidthShape(s.type_id)) {
 			all_fixed_width = false;
 		}
 	}
 
-	bool can_skip = cache.initialized && all_fixed_width && cache.shape.size() == shape.size();
-	if (can_skip) {
+	bool can_reuse = cache.initialized && all_fixed_width && cache.shape.size() == shape.size();
+	if (can_reuse) {
 		for (size_t i = 0; i < shape.size(); i++) {
 			if (cache.shape.at(i) != shape.at(i)) {
-				can_skip = false;
+				can_reuse = false;
 				break;
 			}
 		}
 	}
 
-	if (can_skip) {
-		return false;
+	if (can_reuse) {
+		return true;
 	}
 
 	BindToOdbc(ctx, params);
 	cache.shape = std::move(shape);
 	cache.initialized = true;
-	return true;
+	return false;
 }
 
 } // namespace odbcscanner

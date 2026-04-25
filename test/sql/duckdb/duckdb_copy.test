@@ -128,7 +128,8 @@ SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_int_to_varchar_
 # across SQLExecute calls instead of being rebuilt every row. The correctness
 # check is that every source row ends up in the destination table with the
 # right value — the min/max/sum triple catches both row loss and value
-# corruption in a single shot.
+# corruption in a single shot. 500 rows is enough for the bind cache to fire
+# the reuse path many times across multiple internal data chunks.
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'),
@@ -138,9 +139,9 @@ query II
 SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
   dest_table='duckdb_bind_once',
   batch_size=1,
-  source_query='SELECT i::INTEGER AS col1 FROM range(1, 51) t(i)')
+  source_query='SELECT i::INTEGER AS col1 FROM range(1, 501) t(i)')
 ----
-1	50
+1	500
 
 # sum() over INTEGER returns HUGEINT in DuckDB, which the scanner cannot map
 # directly; cast to BIGINT so the three columns all come back as integers.
@@ -148,7 +149,7 @@ query III
 SELECT * FROM odbc_query(getvariable('conn'),
   'SELECT min(col1), max(col1), sum(col1)::BIGINT FROM duckdb_bind_once')
 ----
-1	50	1275
+1	500	125250
 
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_bind_once')

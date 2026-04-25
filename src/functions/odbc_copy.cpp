@@ -1119,13 +1119,12 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 				}
 				flat_batch_idx += row.size();
 				Params::SetExpectedTypes(ctx, ldata.param_types, single_row_buf);
-				// When the per-row shape is stable (same type_id / expected_type /
-				// is_null across rows and all slots are fixed-width), this is a
-				// no-op after the first iteration, collapsing N per-row rebinds
-				// into a single bind. The rebind-per-row shape is what amplified
-				// the Firebird silent-corruption bug into row loss.
-				bool did_bind = Params::BindToOdbcIfShapeChanged(ctx, single_row_buf, ldata.single_row_bind_cache);
-				reused_bindings = !did_bind;
+				// When the per-row shape is stable (same type_id / expected_type
+				// across rows and all slots are fixed-width), this is a no-op
+				// after the first iteration, collapsing N per-row rebinds into a
+				// single bind. The rebind-per-row shape is what amplified the
+				// Firebird silent-corruption bug into row loss.
+				reused_bindings = Params::BindToOdbcIfShapeUnchanged(ctx, single_row_buf, ldata.single_row_bind_cache);
 			}
 
 			if (ctx.quirks.reset_stmt_before_execute || reused_bindings) {

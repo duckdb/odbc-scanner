@@ -26,10 +26,9 @@ namespace odbcscanner {
 struct BindSlotShape {
 	param_type type_id = DUCKDB_TYPE_INVALID;
 	SQLSMALLINT expected_type = SQL_PARAM_TYPE_UNKNOWN;
-	bool is_null = false;
 
 	bool operator==(const BindSlotShape &other) const {
-		return type_id == other.type_id && expected_type == other.expected_type && is_null == other.is_null;
+		return type_id == other.type_id && expected_type == other.expected_type;
 	}
 	bool operator!=(const BindSlotShape &other) const {
 		return !(*this == other);
@@ -65,12 +64,16 @@ struct Params {
 	static void BindToOdbc(QueryContext &ctx, std::vector<ScannerValue> &params);
 
 	// Binds only when the current shape differs from the cached one. Returns
-	// true if SQLBindParameter was actually issued. Variable-length slots
-	// (VARCHAR / TYPE_DECIMAL_AS_CHARS / BLOB / UUID) force a rebind because
-	// their backing buffers are not guaranteed to keep a stable address when
-	// the value changes — for those, the caller still benefits from the normal
-	// BindToOdbc path but pays the bind cost every row.
-	static bool BindToOdbcIfShapeChanged(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache);
+	// true when the cached bindings were reused (no SQLBindParameter issued),
+	// false when a full rebind happened. Variable-length slots (VARCHAR /
+	// TYPE_DECIMAL_AS_CHARS / BLOB / UUID) force a rebind because their backing
+	// buffers are not guaranteed to keep a stable address when the value changes
+	// — for those, the caller still benefits from the normal BindToOdbc path but
+	// pays the bind cost every row. This includes integer / float parameters
+	// whose target column is CHAR/VARCHAR/WCHAR family: SetExpectedTypes
+	// coalesces those into TYPE_DECIMAL_AS_CHARS, so they take the same
+	// rebind-per-row fallback.
+	static bool BindToOdbcIfShapeUnchanged(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache);
 };
 
 } // namespace odbcscanner
