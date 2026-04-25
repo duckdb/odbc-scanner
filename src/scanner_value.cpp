@@ -523,48 +523,41 @@ void ScannerValue::TransformIntegralToDecimal() {
 	*this = ScannerValue(dec, false);
 }
 
-void ScannerValue::TransformNumericToChars() {
-	std::string str;
+std::string ScannerValue::NumericToString() {
 	switch (type_id) {
 	case DUCKDB_TYPE_TINYINT:
-		str = std::to_string(static_cast<int32_t>(Value<int8_t>()));
-		break;
+		return std::to_string(static_cast<int32_t>(Value<int8_t>()));
 	case DUCKDB_TYPE_UTINYINT:
-		str = std::to_string(static_cast<uint32_t>(Value<uint8_t>()));
-		break;
+		return std::to_string(static_cast<uint32_t>(Value<uint8_t>()));
 	case DUCKDB_TYPE_SMALLINT:
-		str = std::to_string(Value<int16_t>());
-		break;
+		return std::to_string(Value<int16_t>());
 	case DUCKDB_TYPE_USMALLINT:
-		str = std::to_string(Value<uint16_t>());
-		break;
+		return std::to_string(Value<uint16_t>());
 	case DUCKDB_TYPE_INTEGER:
-		str = std::to_string(Value<int32_t>());
-		break;
+		return std::to_string(Value<int32_t>());
 	case DUCKDB_TYPE_UINTEGER:
-		str = std::to_string(Value<uint32_t>());
-		break;
+		return std::to_string(Value<uint32_t>());
 	case DUCKDB_TYPE_BIGINT:
-		str = std::to_string(Value<int64_t>());
-		break;
+		return std::to_string(Value<int64_t>());
 	case DUCKDB_TYPE_UBIGINT:
-		str = std::to_string(Value<uint64_t>());
-		break;
+		return std::to_string(Value<uint64_t>());
 	case DUCKDB_TYPE_FLOAT: {
 		char buf[32];
 		std::snprintf(buf, sizeof(buf), "%.9g", static_cast<double>(Value<float>()));
-		str = buf;
-		break;
+		return std::string(buf);
 	}
 	case DUCKDB_TYPE_DOUBLE: {
 		char buf[32];
 		std::snprintf(buf, sizeof(buf), "%.17g", Value<double>());
-		str = buf;
-		break;
+		return std::string(buf);
 	}
 	default:
 		throw ScannerException("Invalid numeric param type for chars transform: " + std::to_string(type_id));
 	}
+}
+
+void ScannerValue::TransformNumericToChars() {
+	std::string str = NumericToString();
 
 	// Destroy the current (POD) value and repurpose the union as DecimalChars.
 	// Wide character targets are handled downstream by BindOdbcParam<DecimalChars>.

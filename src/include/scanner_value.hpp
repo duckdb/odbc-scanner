@@ -176,6 +176,8 @@ public:
 private:
 	void CheckType(param_type expected);
 
+	std::string NumericToString();
+
 	static void AssignByType(param_type type_id, InternalValue &val, ScannerValue &other);
 };
 
