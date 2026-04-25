@@ -451,6 +451,10 @@ SQLLEN &ScannerValue::LengthBytes() {
 	return len_bytes;
 }
 
+void ScannerValue::SetLengthBytes(SQLLEN value) {
+	this->len_bytes = value;
+}
+
 SQLSMALLINT ScannerValue::ExpectedType() {
 	return expected_type;
 }

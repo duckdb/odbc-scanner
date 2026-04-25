@@ -95,11 +95,11 @@ void TypeSpecific::BindOdbcParam<DecimalChars>(QueryContext &ctx, ScannerValue &
 	// Some drivers do not reliably auto-convert SQL_C_CHAR → SQL_W*CHAR.
 	if (Types::IsWideCharacterSQLType(expected)) {
 		if (dc.wide_characters.empty()) {
-			WideString wstr = WideChar::Widen(dc.data(), static_cast<size_t>(dc.size<SQLLEN>()));
+			WideString wstr = WideChar::Widen(dc.data(), dc.size<size_t>());
 			dc.wide_characters = std::move(wstr.vec);
 		}
 		SQLLEN length_chars = static_cast<SQLLEN>(dc.wide_characters.size() - 1);
-		param.LengthBytes() = length_chars * static_cast<SQLLEN>(sizeof(SQLWCHAR));
+		param.SetLengthBytes(length_chars * static_cast<SQLLEN>(sizeof(SQLWCHAR)));
 		SQLRETURN ret = SQLBindParameter(
 		    ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_WCHAR, sqltype, static_cast<SQLULEN>(length_chars), 0,
 		    reinterpret_cast<SQLPOINTER>(dc.wide_data()), param.LengthBytes(), &param.LengthBytes());

@@ -154,6 +154,8 @@ public:
 
 	SQLLEN &LengthBytes();
 
+	void SetLengthBytes(SQLLEN value);
+
 	SQLSMALLINT ExpectedType();
 
 	void SetExpectedType(SQLSMALLINT expected_type_in);
