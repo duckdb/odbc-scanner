@@ -41,10 +41,13 @@ static DbmsDriver ResolveDbmsDriver(const std::string &dbms_name, const std::str
 	}
 }
 
+// Note: we don't want to parse the connection string here,
+// if UID or PWD is escaped (starts with '{') - we are filtering out
+// everything until the end of the connection string
 static std::string FilterPwd(const std::string url) {
-	std::regex uid_pattern("UID=[^;]+", std::regex_constants::icase);
+	std::regex uid_pattern("UID=(\\{.*|[^;]+)", std::regex_constants::icase);
 	auto uid_filtered = std::regex_replace(url, uid_pattern, "UID=***");
-	std::regex pwd_pattern("PWD=[^;]+", std::regex_constants::icase);
+	std::regex pwd_pattern("PWD=(\\{.*|[^;]+)", std::regex_constants::icase);
 	return std::regex_replace(uid_filtered, pwd_pattern, "PWD=***");
 }
 
