@@ -154,6 +154,8 @@ public:
 
 	SQLLEN &LengthBytes();
 
+	void SetLengthBytes(SQLLEN value);
+
 	SQLSMALLINT ExpectedType();
 
 	void SetExpectedType(SQLSMALLINT expected_type_in);
@@ -163,8 +165,20 @@ public:
 
 	void TransformIntegralToDecimal();
 
+	// Stringifies an integral/float parameter in-place and re-tags it as
+	// TYPE_DECIMAL_AS_CHARS so the scanner binds via BindOdbcParam<DecimalChars>
+	// instead of a numeric C type. This avoids driver code paths that convert
+	// numeric-C → character-SQL, which are historically a common source of silent
+	// data corruption across ODBC drivers (e.g. Firebird ODBC ≤ 3.5.0, some
+	// MSSQL/MySQL releases). Wide character columns (SQL_WCHAR/SQL_WVARCHAR/
+	// SQL_WLONGVARCHAR) are handled by BindOdbcParam<DecimalChars> itself, which
+	// widens the buffer on demand.
+	void TransformNumericToChars();
+
 private:
 	void CheckType(param_type expected);
+
+	std::string NumericToString();
 
 	static void AssignByType(param_type type_id, InternalValue &val, ScannerValue &other);
 };

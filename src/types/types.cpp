@@ -32,6 +32,15 @@ const std::string Types::SQL_BLOB_TYPE_NAME = "BLOB";
 const std::string Types::SQL_CLOB_TYPE_NAME = "CLOB";
 const std::string Types::SQL_DB2_DBCLOB_TYPE_NAME = "DBCLOB";
 
+bool Types::IsCharacterSQLType(SQLSMALLINT t) {
+	return t == SQL_CHAR || t == SQL_VARCHAR || t == SQL_LONGVARCHAR || t == SQL_WCHAR || t == SQL_WVARCHAR ||
+	       t == SQL_WLONGVARCHAR;
+}
+
+bool Types::IsWideCharacterSQLType(SQLSMALLINT t) {
+	return t == SQL_WCHAR || t == SQL_WVARCHAR || t == SQL_WLONGVARCHAR;
+}
+
 ScannerValue Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec, idx_t row_idx,
                                         idx_t param_idx) {
 	switch (type_id) {

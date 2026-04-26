@@ -487,5 +487,38 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT sum("col1") FROM DUCKDB_TE
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE DUCKDB_TEST_COPY')
 
+# int → VARCHAR2 primary key round-trip (regression test for duckdb/odbc-scanner#161).
+# Oracle folds unquoted identifiers to upper case; column_quotes='' keeps the
+# INSERT column names unquoted so the INSERT's `id` resolves to the `ID` column
+# created here.
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE INT_TO_VARCHAR_PK', ignore_exec_failure=TRUE)
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'),
+  'CREATE TABLE INT_TO_VARCHAR_PK (id VARCHAR2(20) NOT NULL PRIMARY KEY)')
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='INT_TO_VARCHAR_PK',
+  batch_size=1,
+  column_quotes='',
+  source_query='SELECT i::INTEGER AS id FROM range(1, 501) t(i)')
+----
+1	500
+
+query I
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT id FROM INT_TO_VARCHAR_PK WHERE id IN (''1'', ''2'', ''42'', ''500'') ORDER BY id')
+----
+1
+2
+42
+500
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE INT_TO_VARCHAR_PK')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))

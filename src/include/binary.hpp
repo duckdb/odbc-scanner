@@ -4,11 +4,17 @@
 #include <vector>
 
 #include "duckdb_extension_api.hpp"
+#include "odbc_api.hpp"
 
 namespace odbcscanner {
 
 struct DecimalChars {
 	std::vector<char> characters;
+	// Optional wide buffer populated by BindOdbcParam<DecimalChars> when the
+	// prepared parameter's expected SQL type is SQL_WCHAR / SQL_WVARCHAR /
+	// SQL_WLONGVARCHAR. Kept alongside `characters` so the binding's lifetime
+	// matches the ScannerValue.
+	std::vector<SQLWCHAR> wide_characters;
 
 	DecimalChars();
 
@@ -26,6 +32,8 @@ struct DecimalChars {
 	}
 
 	char *data();
+
+	SQLWCHAR *wide_data();
 };
 
 struct ScannerBlob {

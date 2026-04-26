@@ -474,5 +474,40 @@ SELECT * FROM odbc_query(getvariable('conn'), 'SELECT * FROM ##duckdb_test_copy_
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE ##duckdb_test_copy_temp_global')
 
+# int → VARCHAR primary key round-trip (regression test for duckdb/odbc-scanner#161).
+# batch_size=1 forces the single-row bind shape that exposed the original Firebird
+# silent-corruption bug; the scanner now stringifies the parameter so every driver
+# skips its numeric-C → character-SQL path. The NVARCHAR column additionally
+# exercises the wide (SQL_C_WCHAR) branch of BindOdbcParam<DecimalChars>.
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'),
+  'IF OBJECT_ID(''int_to_varchar_pk'', ''U'') IS NOT NULL DROP TABLE int_to_varchar_pk')
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'),
+  'CREATE TABLE int_to_varchar_pk (id VARCHAR(20) NOT NULL PRIMARY KEY, id_n NVARCHAR(20) NOT NULL)')
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='int_to_varchar_pk',
+  batch_size=1,
+  column_quotes='',
+  source_query='SELECT i::INTEGER AS id, i::INTEGER AS id_n FROM range(1, 501) t(i)')
+----
+1	500
+
+query II
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT id, id_n FROM int_to_varchar_pk WHERE id IN (''1'', ''2'', ''42'', ''500'') ORDER BY id')
+----
+1	1
+2	2
+42	42
+500	500
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE int_to_varchar_pk')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))

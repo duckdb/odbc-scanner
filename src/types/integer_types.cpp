@@ -174,6 +174,15 @@ static SQLSMALLINT IntegralSQLType(ScannerValue &param, SQLSMALLINT def_sqltype)
 	return def_sqltype;
 }
 
+// Note: if the prepared-parameter's expected SQL type is a character type
+// (CHAR / VARCHAR / WCHAR family), the ScannerValue is expected to have been
+// transformed to TYPE_DECIMAL_AS_CHARS by Params::SetExpectedTypes before we get
+// here — dispatch will then route to BindOdbcParam<DecimalChars> instead of one of
+// the integer specializations below. Stringifying in the scanner avoids the
+// driver's numeric-C → character-SQL path, which has shipped silent-corruption bugs
+// across several ODBC drivers (Firebird ≤ 3.5.0 in
+// FirebirdSQL/firebird-odbc-driver#292; older MSSQL / MySQL releases too).
+
 template <>
 void TypeSpecific::BindOdbcParam<int8_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = IntegralSQLType(param, SQL_TINYINT);

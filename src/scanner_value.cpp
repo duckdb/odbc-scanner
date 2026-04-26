@@ -1,5 +1,6 @@
 #include "scanner_value.hpp"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -450,6 +451,10 @@ SQLLEN &ScannerValue::LengthBytes() {
 	return len_bytes;
 }
 
+void ScannerValue::SetLengthBytes(SQLLEN value) {
+	this->len_bytes = value;
+}
+
 SQLSMALLINT ScannerValue::ExpectedType() {
 	return expected_type;
 }
@@ -520,6 +525,54 @@ void ScannerValue::TransformIntegralToDecimal() {
 
 	// invoke move assignment operator
 	*this = ScannerValue(dec, false);
+}
+
+std::string ScannerValue::NumericToString() {
+	switch (type_id) {
+	case DUCKDB_TYPE_TINYINT:
+		return std::to_string(static_cast<int32_t>(Value<int8_t>()));
+	case DUCKDB_TYPE_UTINYINT:
+		return std::to_string(static_cast<uint32_t>(Value<uint8_t>()));
+	case DUCKDB_TYPE_SMALLINT:
+		return std::to_string(Value<int16_t>());
+	case DUCKDB_TYPE_USMALLINT:
+		return std::to_string(Value<uint16_t>());
+	case DUCKDB_TYPE_INTEGER:
+		return std::to_string(Value<int32_t>());
+	case DUCKDB_TYPE_UINTEGER:
+		return std::to_string(Value<uint32_t>());
+	case DUCKDB_TYPE_BIGINT:
+		return std::to_string(Value<int64_t>());
+	case DUCKDB_TYPE_UBIGINT:
+		return std::to_string(Value<uint64_t>());
+	case DUCKDB_TYPE_FLOAT: {
+		char buf[32];
+		std::snprintf(buf, sizeof(buf), "%.9g", static_cast<double>(Value<float>()));
+		return std::string(buf);
+	}
+	case DUCKDB_TYPE_DOUBLE: {
+		char buf[32];
+		std::snprintf(buf, sizeof(buf), "%.17g", Value<double>());
+		return std::string(buf);
+	}
+	default:
+		throw ScannerException("Invalid numeric param type for chars transform: " + std::to_string(type_id));
+	}
+}
+
+void ScannerValue::TransformNumericToChars() {
+	std::string str = NumericToString();
+
+	// Destroy the current (POD) value and repurpose the union as DecimalChars.
+	// Wide character targets are handled downstream by BindOdbcParam<DecimalChars>.
+	this->Destroy();
+	this->type_id = Params::TYPE_DECIMAL_AS_CHARS;
+	new (&this->val.decimal_chars) DecimalChars;
+	DecimalChars &dc = this->val.decimal_chars;
+	dc.characters.resize(str.size() + 1);
+	std::memcpy(dc.characters.data(), str.data(), str.size());
+	dc.characters[str.size()] = '\0';
+	this->len_bytes = static_cast<SQLLEN>(str.size());
 }
 
 } // namespace odbcscanner
