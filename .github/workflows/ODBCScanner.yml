@@ -13,7 +13,7 @@ jobs:
     name: Format Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: |
           python -m pip install --user clang_format==11.0.1
           python ./resources/scripts/format.py --check 
@@ -32,7 +32,7 @@ jobs:
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
@@ -81,7 +81,7 @@ jobs:
           python ./resources/scripts/run_sqllogic_tests.py --dbms DuckDB
 
       - name: Save Cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -98,7 +98,7 @@ jobs:
       DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/latest/download/libduckdb-osx-universal.zip
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.dylib
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
@@ -162,7 +162,7 @@ jobs:
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/duckdb.lib
       DUCKDB_CAPI_LIB_SHARED_PATH: ${{ github.workspace }}/libduckdb/duckdb.dll
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
@@ -230,7 +230,7 @@ jobs:
           ./configure/venv/Scripts/python.exe ./resources/scripts/run_sqllogic_tests.py --dbms DuckDB
 
       - name: Save Cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -248,13 +248,13 @@ jobs:
       MSSQL_ODBC_LIB_PATH: /opt/microsoft/msodbcsql18/lib64/libmsodbcsql-18.6.so.2.1
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
 
       - name: Restore Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -332,13 +332,13 @@ jobs:
       POSTGRES_ODBC_LIB_PATH: /usr/lib/x86_64-linux-gnu/odbc/psqlodbcw.so
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
 
       - name: Restore Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -403,13 +403,13 @@ jobs:
       MARIADB_ODBC_LIB_PATH: /usr/lib/x86_64-linux-gnu/odbc/libmaodbc.so
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
 
       - name: Restore Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -477,13 +477,13 @@ jobs:
       MYSQL_ODBC_LIB_PATH: ${{ github.workspace }}/mysql_odbc_9.4.0_ubuntu_24.04_amd64/lib/libmyodbc9w.so
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
 
       - name: Restore Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -550,13 +550,13 @@ jobs:
       LD_LIBRARY_PATH: ${{ github.workspace }}/instantclient_23_26/
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
 
       - name: Restore Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -630,13 +630,13 @@ jobs:
       DB2_ODBC_LIB_PATH: ${{ github.workspace }}/odbc_cli/clidriver/lib/libdb2o.so
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
 
       - name: Restore Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -712,13 +712,13 @@ jobs:
       CLICKHOUSE_ODBC_LIB_PATH: ${{ github.workspace }}/clickhouse-odbc-1.4.3-Linux/lib/libclickhouseodbcw.so
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
 
       - name: Restore Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -790,13 +790,13 @@ jobs:
       SPARK_ODBC_LIB_PATH: /opt/simba/spark/lib/64/libsparkodbc_sb64.so
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
 
       - name: Restore Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -865,13 +865,13 @@ jobs:
       SNOWFLAKE_ODBC_LIB_PATH: ${{ github.workspace }}/snowflake_odbc/lib/libSnowflake.so
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
 
       - name: Restore Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -931,13 +931,13 @@ jobs:
       FLIGHTSQL_ODBC_LIB_PATH: ${{ github.workspace }}/opt/arrow-flight-sql-odbc-driver/lib64/libarrow-odbc.so.0.9.7.479
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
 
       - name: Restore Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
@@ -1007,13 +1007,13 @@ jobs:
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/duckdb.lib
       DUCKDB_CAPI_LIB_SHARED_PATH: ${{ github.workspace }}/libduckdb/duckdb.dll
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: 'true'
 
       - name: Restore Cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ github.workspace }}/ccache
           key: ${{ runner.os }}-${{ runner.arch }}-${{ github.sha }}
