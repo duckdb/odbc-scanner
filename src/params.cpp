@@ -197,8 +197,8 @@ void Params::BindToOdbc(QueryContext &ctx, std::vector<ScannerValue> &params) {
 }
 
 // Slots whose backing buffer lives in a dynamically sized container (std::vector
-// inside DecimalChars / WideString / ScannerBlob, etc.) can reallocate as the
-// value changes; the previously-bound pointer would then be invalid. Only
+// inside DecimalChars / WideString / ScannerBlob / ScannerUuid) can move as the
+// value is reassigned — the previously bound pointer would then dangle. Only
 // fixed-width slots are safe to reuse across executes without rebinding.
 static bool IsFixedWidthShape(param_type type_id) {
 	switch (type_id) {
@@ -229,43 +229,33 @@ static bool IsFixedWidthShape(param_type type_id) {
 	}
 }
 
-bool Params::BindToOdbcIfShapeUnchanged(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache) {
-	if (params.size() == 0) {
-		return false;
+void Params::BindToOdbcWithCache(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache) {
+	if (params.empty()) {
+		return;
 	}
 
-	std::vector<BindSlotShape> shape;
-	shape.reserve(params.size());
-	bool all_fixed_width = true;
+	// Size mismatch (first call after Reset, or column-count change) — clear the
+	// cache so every slot gets bound fresh.
+	if (cache.shape.size() != params.size()) {
+		cache.shape.assign(params.size(), BindSlotShape());
+	}
+
 	for (size_t i = 0; i < params.size(); i++) {
 		ScannerValue &p = params.at(i);
-		BindSlotShape s;
-		s.type_id = p.ParamType();
-		s.expected_type = p.ExpectedType();
-		shape.push_back(s);
-		if (!IsFixedWidthShape(s.type_id)) {
-			all_fixed_width = false;
+		BindSlotShape current(p.ParamType(), p.ExpectedType());
+		// Rebind when the slot's logical shape changed, OR when the slot is
+		// variable-width (its buffer pointer may have moved even with the same
+		// shape). Fixed-width + same-shape slots are intentionally left bound to
+		// their previous address — the value at that address has been updated
+		// in-place by the caller and the next SQLExecute will pick it up.
+		bool needs_rebind = (cache.shape.at(i) != current) || !IsFixedWidthShape(current.type_id);
+		if (!needs_rebind) {
+			continue;
 		}
+		SQLSMALLINT idx = static_cast<SQLSMALLINT>(i + 1);
+		Types::BindOdbcParam(ctx, p, idx);
+		cache.shape.at(i) = current;
 	}
-
-	bool can_reuse = cache.initialized && all_fixed_width && cache.shape.size() == shape.size();
-	if (can_reuse) {
-		for (size_t i = 0; i < shape.size(); i++) {
-			if (cache.shape.at(i) != shape.at(i)) {
-				can_reuse = false;
-				break;
-			}
-		}
-	}
-
-	if (can_reuse) {
-		return true;
-	}
-
-	BindToOdbc(ctx, params);
-	cache.shape = std::move(shape);
-	cache.initialized = true;
-	return false;
 }
 
 } // namespace odbcscanner

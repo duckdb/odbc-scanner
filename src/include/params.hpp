@@ -15,17 +15,22 @@
 
 namespace odbcscanner {
 
-// Signature of a bound parameter set, used to detect stable shapes across
-// consecutive SQLExecute calls. When every slot matches the previous bind, the
-// full SQLFreeStmt(SQL_RESET_PARAMS) + per-param SQLBindParameter cycle can be
-// skipped — the driver reads the new values from the already-bound addresses
-// on the next SQLExecute. Rebinding every row is the execute shape that turned
-// the Firebird ODBC driver's numeric-write bug (duckdb/odbc-scanner#161 /
+// Per-slot signature captured the last time a parameter index was bound. The
+// pair (type_id, expected_type) is everything BindOdbcParam looks at; if both
+// match the current value, the slot's previous SQLBindParameter is still valid
+// (modulo buffer-pointer stability — see IsFixedWidthShape in params.cpp).
+// Rebinding every row is the execute shape that turned the Firebird ODBC
+// driver's numeric-write bug (duckdb/odbc-scanner#161 /
 // FirebirdSQL/firebird-odbc-driver#292) into catastrophic row loss, and it is
 // also the least efficient of the three common execute shapes.
 struct BindSlotShape {
 	param_type type_id = DUCKDB_TYPE_INVALID;
 	SQLSMALLINT expected_type = SQL_PARAM_TYPE_UNKNOWN;
+
+	BindSlotShape() = default;
+	BindSlotShape(param_type type_id_in, SQLSMALLINT expected_type_in)
+	    : type_id(type_id_in), expected_type(expected_type_in) {
+	}
 
 	bool operator==(const BindSlotShape &other) const {
 		return type_id == other.type_id && expected_type == other.expected_type;
@@ -35,13 +40,15 @@ struct BindSlotShape {
 	}
 };
 
+// Per-prepared-statement bind state. `shape[i]` is the last-bound shape for
+// param index i+1; an empty vector means "nothing bound yet". Caller MUST call
+// Reset() whenever the prepared statement changes (SQLPrepare invalidates all
+// existing bindings).
 struct BindCache {
 	std::vector<BindSlotShape> shape;
-	bool initialized = false;
 
 	void Reset() {
 		shape.clear();
-		initialized = false;
 	}
 };
 
@@ -63,17 +70,25 @@ struct Params {
 
 	static void BindToOdbc(QueryContext &ctx, std::vector<ScannerValue> &params);
 
-	// Binds only when the current shape differs from the cached one. Returns
-	// true when the cached bindings were reused (no SQLBindParameter issued),
-	// false when a full rebind happened. Variable-length slots (VARCHAR /
-	// TYPE_DECIMAL_AS_CHARS / BLOB / UUID) force a rebind because their backing
-	// buffers are not guaranteed to keep a stable address when the value changes
-	// — for those, the caller still benefits from the normal BindToOdbc path but
-	// pays the bind cost every row. This includes integer / float parameters
-	// whose target column is CHAR/VARCHAR/WCHAR family: SetExpectedTypes
-	// coalesces those into TYPE_DECIMAL_AS_CHARS, so they take the same
-	// rebind-per-row fallback.
-	static bool BindToOdbcIfShapeUnchanged(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache);
+	// Per-slot incremental bind. Issues SQLBindParameter only for slots whose
+	// shape changed since the cached bind, or whose backing buffer is variable-
+	// length (DecimalChars / WideString / ScannerBlob / ScannerUuid — the
+	// `std::vector` inside can move on value reassignment, so the previously
+	// bound pointer would dangle). Fixed-width slots whose shape is unchanged
+	// keep their existing SQLBindParameter — the driver reads the new value
+	// from the same address on the next SQLExecute.
+	//
+	// This includes integer / float parameters whose target column is the
+	// CHAR/VARCHAR/WCHAR family: SetExpectedTypes coalesces those into
+	// TYPE_DECIMAL_AS_CHARS, so each such row still rebinds that slot but
+	// fixed-width siblings on the same row stay cached.
+	//
+	// Does NOT call SQLFreeStmt(SQL_RESET_PARAMS); per-slot SQLBindParameter
+	// overwrites the previous binding for that index. Caller must Reset(cache)
+	// whenever the prepared statement changes (SQLPrepare wipes bindings) or
+	// the params vector's storage may have moved (different `std::vector`
+	// instance, capacity-changing resize, etc.).
+	static void BindToOdbcWithCache(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache);
 };
 
 } // namespace odbcscanner
