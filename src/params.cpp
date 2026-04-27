@@ -196,4 +196,77 @@ void Params::BindToOdbc(QueryContext &ctx, std::vector<ScannerValue> &params) {
 	}
 }
 
+// Slots whose backing buffer lives in a dynamically sized container (std::vector
+// inside DecimalChars / WideString / ScannerBlob / ScannerUuid) can move as the
+// value is reassigned — the previously bound pointer would then dangle. Only
+// fixed-width slots are safe to reuse across executes without rebinding.
+static bool IsFixedWidthShape(param_type type_id) {
+	switch (type_id) {
+	case DUCKDB_TYPE_SQLNULL:
+	case DUCKDB_TYPE_BOOLEAN:
+	case DUCKDB_TYPE_TINYINT:
+	case DUCKDB_TYPE_UTINYINT:
+	case DUCKDB_TYPE_SMALLINT:
+	case DUCKDB_TYPE_USMALLINT:
+	case DUCKDB_TYPE_INTEGER:
+	case DUCKDB_TYPE_UINTEGER:
+	case DUCKDB_TYPE_BIGINT:
+	case DUCKDB_TYPE_UBIGINT:
+	case DUCKDB_TYPE_FLOAT:
+	case DUCKDB_TYPE_DOUBLE:
+	case DUCKDB_TYPE_DECIMAL:
+	case DUCKDB_TYPE_DATE:
+	case DUCKDB_TYPE_TIME:
+	case DUCKDB_TYPE_TIMESTAMP:
+	case DUCKDB_TYPE_TIMESTAMP_TZ:
+	case Params::TYPE_TIME_WITH_NANOS:
+	case Params::TYPE_SQL_BIT:
+	case Params::TYPE_SQL_GUID:
+	case Params::TYPE_SS_TIMESTAMPOFFSET:
+		return true;
+	default:
+		return false;
+	}
+}
+
+void Params::BindToOdbcWithCache(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache) {
+	if (params.empty()) {
+		return;
+	}
+
+	// Size mismatch (first call after Reset, or column-count change) — clear the
+	// cache so every slot gets bound fresh, and call SQL_RESET_PARAMS first to
+	// drop any leftover bindings from a previous prepared statement on the same
+	// hstmt. SQLPrepare does NOT release parameter bindings — only
+	// SQL_RESET_PARAMS (or rebinding the same index) does — so without this a
+	// 16-row batch statement transitioning to a 1-row tail statement leaves 15
+	// stale bindings pointing at addresses the new statement has no parameter
+	// indices for, which segfaults at least the DuckDB ODBC driver.
+	if (cache.shape.size() != params.size()) {
+		SQLRETURN ret = SQLFreeStmt(ctx.hstmt(), SQL_RESET_PARAMS);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+			throw ScannerException("'SQLFreeStmt' SQL_RESET_PARAMS failed, diagnostics: '" + diag + "'");
+		}
+		cache.shape.assign(params.size(), BindSlotShape());
+	}
+
+	for (size_t i = 0; i < params.size(); i++) {
+		ScannerValue &p = params.at(i);
+		BindSlotShape current(p.ParamType(), p.ExpectedType());
+		// Rebind when the slot's logical shape changed, OR when the slot is
+		// variable-width (its buffer pointer may have moved even with the same
+		// shape). Fixed-width + same-shape slots are intentionally left bound to
+		// their previous address — the value at that address has been updated
+		// in-place by the caller and the next SQLExecute will pick it up.
+		bool needs_rebind = (cache.shape.at(i) != current) || !IsFixedWidthShape(current.type_id);
+		if (!needs_rebind) {
+			continue;
+		}
+		SQLSMALLINT idx = static_cast<SQLSMALLINT>(i + 1);
+		Types::BindOdbcParam(ctx, p, idx);
+		cache.shape.at(i) = current;
+	}
+}
+
 } // namespace odbcscanner
