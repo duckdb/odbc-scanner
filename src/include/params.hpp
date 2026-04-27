@@ -42,8 +42,9 @@ struct BindSlotShape {
 
 // Per-prepared-statement bind state. `shape[i]` is the last-bound shape for
 // param index i+1; an empty vector means "nothing bound yet". Caller MUST call
-// Reset() whenever the prepared statement changes (SQLPrepare invalidates all
-// existing bindings).
+// Reset() whenever the prepared statement changes — SQLPrepare does NOT clear
+// parameter bindings on the hstmt, so BindToOdbcWithCache will issue
+// SQL_RESET_PARAMS itself the next time it sees an empty cache.
 struct BindCache {
 	std::vector<BindSlotShape> shape;
 
@@ -83,10 +84,13 @@ struct Params {
 	// TYPE_DECIMAL_AS_CHARS, so each such row still rebinds that slot but
 	// fixed-width siblings on the same row stay cached.
 	//
-	// Does NOT call SQLFreeStmt(SQL_RESET_PARAMS); per-slot SQLBindParameter
-	// overwrites the previous binding for that index. Caller must Reset(cache)
-	// whenever the prepared statement changes (SQLPrepare wipes bindings) or
-	// the params vector's storage may have moved (different `std::vector`
+	// In the steady state (cache populated, same `params.size()`), per-slot
+	// SQLBindParameter overwrites the previous binding for that index — no
+	// SQL_RESET_PARAMS needed. On the first call after Reset() (or when
+	// `params.size()` changes), SQL_RESET_PARAMS is issued first to drop any
+	// leftover bindings from a previous prepared statement on the same hstmt.
+	// Caller must Reset(cache) whenever the prepared statement changes or the
+	// params vector's storage may have moved (different `std::vector`
 	// instance, capacity-changing resize, etc.).
 	static void BindToOdbcWithCache(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache);
 };

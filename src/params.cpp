@@ -235,8 +235,19 @@ void Params::BindToOdbcWithCache(QueryContext &ctx, std::vector<ScannerValue> &p
 	}
 
 	// Size mismatch (first call after Reset, or column-count change) — clear the
-	// cache so every slot gets bound fresh.
+	// cache so every slot gets bound fresh, and call SQL_RESET_PARAMS first to
+	// drop any leftover bindings from a previous prepared statement on the same
+	// hstmt. SQLPrepare does NOT release parameter bindings — only
+	// SQL_RESET_PARAMS (or rebinding the same index) does — so without this a
+	// 16-row batch statement transitioning to a 1-row tail statement leaves 15
+	// stale bindings pointing at addresses the new statement has no parameter
+	// indices for, which segfaults at least the DuckDB ODBC driver.
 	if (cache.shape.size() != params.size()) {
+		SQLRETURN ret = SQLFreeStmt(ctx.hstmt(), SQL_RESET_PARAMS);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
+			throw ScannerException("'SQLFreeStmt' SQL_RESET_PARAMS failed, diagnostics: '" + diag + "'");
+		}
 		cache.shape.assign(params.size(), BindSlotShape());
 	}
 
