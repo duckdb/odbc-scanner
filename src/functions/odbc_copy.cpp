@@ -310,6 +310,14 @@ struct LocalInitData {
 	uint32_t last_prepared_batch_size = 0;
 	SQLUINTEGER orig_transaction_mode = SQL_AUTOCOMMIT_DEFAULT;
 	uint64_t inserted_in_transaction = 0;
+	// single_row_buf and flat_batch are held on the LocalInitData so each
+	// ScannerValue slot keeps a stable address across CopyInTransaction calls —
+	// that is what makes it safe for the bind caches to remember a
+	// SQLBindParameter pointer from a previous execute.
+	std::vector<ScannerValue> single_row_buf;
+	std::vector<ScannerValue> flat_batch;
+	BindCache single_row_bind_cache;
+	BindCache batch_bind_cache;
 
 	LocalInitData() {
 	}
@@ -1042,10 +1050,23 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 
 	std::vector<ScannerValue> row;
 	row.resize(reader.columns.size());
-	std::vector<ScannerValue> flat_batch;
-	flat_batch.resize(ldata.last_prepared_batch_size * row.size());
-	std::vector<ScannerValue> single_row_buf;
-	single_row_buf.resize(row.size());
+	size_t needed_flat_batch_size = ldata.last_prepared_batch_size * row.size();
+	if (ldata.flat_batch.size() != needed_flat_batch_size) {
+		// First call, batch-size transition, or column-count transition. Vector
+		// may reallocate; any cached batch bindings now point at stale storage.
+		ldata.flat_batch.clear();
+		ldata.flat_batch.resize(needed_flat_batch_size);
+		ldata.batch_bind_cache.Reset();
+	}
+	if (ldata.single_row_buf.size() != row.size()) {
+		// Column-count transition (only relevant on the first call per reader) —
+		// reinit the buffer and drop any stale bind cache.
+		ldata.single_row_buf.clear();
+		ldata.single_row_buf.resize(row.size());
+		ldata.single_row_bind_cache.Reset();
+	}
+	std::vector<ScannerValue> &single_row_buf = ldata.single_row_buf;
+	std::vector<ScannerValue> &flat_batch = ldata.flat_batch;
 
 	ldata.chunk_start_moment = CurrentTimeMillis();
 	for (;;) {
@@ -1083,27 +1104,39 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 				ldata.last_prepared_batch_size = batch_size;
 				tail_insert_prepared = true;
 				use_batch_insert = batch_size > 1;
+				// The prepared statement has been replaced — SQLPrepare invalidates
+				// any existing bindings, so both caches must be dropped.
+				ldata.single_row_bind_cache.Reset();
+				ldata.batch_bind_cache.Reset();
 			}
 
 			if (use_batch_insert) {
 				Params::SetExpectedTypes(ctx, ldata.param_types, flat_batch);
-				Params::BindToOdbc(ctx, flat_batch);
+				Params::BindToOdbcWithCache(ctx, flat_batch, ldata.batch_bind_cache);
 			} else {
 				for (size_t i = 0; i < row.size(); i++) {
 					single_row_buf[i] = std::move(flat_batch.at(flat_batch_idx + i));
 				}
 				flat_batch_idx += row.size();
 				Params::SetExpectedTypes(ctx, ldata.param_types, single_row_buf);
-				Params::BindToOdbc(ctx, single_row_buf);
+				Params::BindToOdbcWithCache(ctx, single_row_buf, ldata.single_row_bind_cache);
 			}
 
-			if (ctx.quirks.reset_stmt_before_execute) {
+			// Always close any cursor / result-set state left by the previous
+			// SQLExecute before the next one. Without this, some drivers (DuckDB
+			// ODBC in particular) leave the statement in a state that makes a
+			// later SQLEndTran fail with SQLSTATE HY010 "Function sequence
+			// error". The previous implementation only did this on the
+			// reset_stmt_before_execute quirk path or when cached bindings were
+			// reused; doing it unconditionally simplifies the loop and matches
+			// the spec — SQL_CLOSE on a statement with no open cursor is a
+			// no-op.
+			{
 				SQLRETURN ret = SQLFreeStmt(ctx.hstmt(), SQL_CLOSE);
 				if (!SQL_SUCCEEDED(ret)) {
 					std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
-					throw ScannerException("'SQLFreeStmt' with SQL_CLOSE (reset_stmt_before_execute) failed, query: '" +
-					                       ctx.query + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
-					                       "'");
+					throw ScannerException("'SQLFreeStmt' with SQL_CLOSE failed, query: '" + ctx.query +
+					                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 				}
 			}
 
@@ -1150,6 +1183,10 @@ static void CopyInTransaction(duckdb_function_info info, duckdb_data_chunk outpu
 			ctx.query = PrepareInsert(ctx.hstmt(), bdata, reader.columns, batch_size);
 			ldata.param_types = Params::CollectTypes(ctx);
 			ldata.last_prepared_batch_size = batch_size;
+			// SQLPrepare invalidated the existing bindings on the statement
+			// handle; both caches must be dropped before the next bind.
+			ldata.single_row_bind_cache.Reset();
+			ldata.batch_bind_cache.Reset();
 		}
 	}
 }
@@ -1177,11 +1214,23 @@ static void Copy(duckdb_function_info info, duckdb_data_chunk output) {
 	try {
 		CopyInTransaction(info, output);
 	} catch (const std::exception &e) {
+		std::string primary = e.what();
 		if (bdata.insert_options.copy_in_transaction) {
-			Rollback(conn);
-			SetTransactionMode(conn, ldata.orig_transaction_mode);
+			// Keep the primary CopyInTransaction error even when Rollback / restoring
+			// the auto-commit mode throws on top. Without this, a Rollback-time
+			// SQLSTATE HY010 could hide the actual root cause inside CopyInTransaction.
+			try {
+				Rollback(conn);
+			} catch (const std::exception &re) {
+				throw ScannerException(primary + " (also, Rollback failed: " + re.what() + ")");
+			}
+			try {
+				SetTransactionMode(conn, ldata.orig_transaction_mode);
+			} catch (const std::exception &se) {
+				throw ScannerException(primary + " (also, SetTransactionMode failed: " + se.what() + ")");
+			}
 		}
-		throw ScannerException(e.what());
+		throw ScannerException(primary);
 	}
 }
 
