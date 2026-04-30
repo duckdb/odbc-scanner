@@ -78,7 +78,7 @@ static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 	//   (1)  odbc_connect(conn_string)
 	//   (2)  odbc_connect(conn_string, access_token)
 	//   (3)  odbc_connect(conn_string, username, password)
-	if (args_count < 1 || args_count > 4) {
+	if (args_count < 1 || args_count > 3) {
 		throw ScannerException(
 		    "'odbc_connect' error: invalid number of arguments specified, count: " + std::to_string(args_count) +
 		    ", supported signatures:"
