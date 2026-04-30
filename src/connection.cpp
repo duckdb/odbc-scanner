@@ -101,9 +101,8 @@ OdbcConnection::OdbcConnection(const std::string &url, const std::string &access
 		memcpy(access_token_buf.data(), &token_byte_len, sizeof(uint32_t));
 		memcpy(access_token_buf.data() + sizeof(uint32_t), wtoken.data(), token_byte_len);
 
-		SQLRETURN ret = SQLSetConnectAttrW(
-    								dbc, SQL_COPT_SS_ACCESS_TOKEN,
-    								reinterpret_cast<SQLPOINTER>(access_token_buf.data()), SQL_IS_POINTER);
+		SQLRETURN ret = SQLSetConnectAttrW(dbc, SQL_COPT_SS_ACCESS_TOKEN,
+		                                   reinterpret_cast<SQLPOINTER>(access_token_buf.data()), SQL_IS_POINTER);
 		if (!SQL_SUCCEEDED(ret)) {
 			std::string diag = Diagnostics::Read(dbc, SQL_HANDLE_DBC);
 			throw ScannerException("'SQLSetConnectAttrW' failed for SQL_COPT_SS_ACCESS_TOKEN, connection string: '" +
