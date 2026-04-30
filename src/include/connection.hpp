@@ -33,7 +33,12 @@ struct OdbcConnection {
 	SQLHANDLE dbc = nullptr;
 	DbmsDriver driver;
 
-	OdbcConnection(const std::string &url);
+	// access_token is optional; when non-empty it is passed to the SQL Server ODBC driver via
+	// SQL_COPT_SS_ACCESS_TOKEN (connection attribute 1256) before the connection is opened.
+	// The token must be a raw OAuth/AAD bearer token string (UTF-8).  The driver requires it
+	// in UTF-16LE form preceded by a 4-byte byte-length field (the ACCESSTOKEN struct from
+	// msodbcsql.h); that encoding is handled internally.
+	OdbcConnection(const std::string &url, const std::string &access_token = "");
 	~OdbcConnection() noexcept;
 
 	OdbcConnection(OdbcConnection &other) = delete;

@@ -1,6 +1,7 @@
 #include "connection.hpp"
 
 #include <cstdint>
+#include <cstring>
 #include <regex>
 #include <vector>
 
@@ -10,6 +11,13 @@
 #include "registries.hpp"
 #include "scanner_exception.hpp"
 #include "widechar.hpp"
+
+// SQL_COPT_SS_ACCESS_TOKEN is a Microsoft SQL Server-specific pre-connect attribute
+// (value 1256, defined in msodbcsql.h).  We define it here so that the Microsoft
+// ODBC header is not a build dependency on non-Windows platforms.
+#ifndef SQL_COPT_SS_ACCESS_TOKEN
+#define SQL_COPT_SS_ACCESS_TOKEN 1256
+#endif
 
 namespace odbcscanner {
 
@@ -51,7 +59,7 @@ static std::string FilterPwd(const std::string url) {
 	return std::regex_replace(uid_filtered, pwd_pattern, "PWD=***");
 }
 
-OdbcConnection::OdbcConnection(const std::string &url) {
+OdbcConnection::OdbcConnection(const std::string &url, const std::string &access_token) {
 	{
 		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, nullptr, &env);
 		if (!SQL_SUCCEEDED(ret)) {
@@ -73,6 +81,33 @@ OdbcConnection::OdbcConnection(const std::string &url) {
 		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_DBC, env, &dbc);
 		if (!SQL_SUCCEEDED(ret)) {
 			throw ScannerException("'SQLAllocHandle' failed for DBC handle, return: " + std::to_string(ret));
+		}
+	}
+
+	// Set SQL_COPT_SS_ACCESS_TOKEN before connecting when an access token is provided.
+	// The Microsoft ODBC Driver for SQL Server requires the attribute value to point to an
+	// ACCESSTOKEN structure: a 4-byte unsigned integer holding the byte length of the token
+	// data, immediately followed by that many bytes of the token encoded in UTF-16LE.
+	// We build the structure in a local buffer that lives until after SQLDriverConnectW.
+	std::vector<unsigned char> access_token_buf;
+	if (!access_token.empty()) {
+		auto wtoken = WideChar::Widen(access_token.data(), access_token.length());
+		// wtoken.length<size_t>() = number of SQLWCHAR code units, WITHOUT the null terminator
+		size_t wtoken_len = wtoken.length<size_t>();
+		uint32_t token_byte_len = static_cast<uint32_t>(wtoken_len * sizeof(SQLWCHAR));
+
+		// Allocate: 4-byte size field + token bytes (no null terminator)
+		access_token_buf.resize(sizeof(uint32_t) + token_byte_len);
+		memcpy(access_token_buf.data(), &token_byte_len, sizeof(uint32_t));
+		memcpy(access_token_buf.data() + sizeof(uint32_t), wtoken.data(), token_byte_len);
+
+		SQLRETURN ret = SQLSetConnectAttrW(dbc, SQL_COPT_SS_ACCESS_TOKEN,
+		                                   reinterpret_cast<SQLPOINTER>(access_token_buf.data()), SQL_IS_POINTER);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(dbc, SQL_HANDLE_DBC);
+			throw ScannerException("'SQLSetConnectAttrW' failed for SQL_COPT_SS_ACCESS_TOKEN, connection string: '" +
+			                       FilterPwd(url) + "', return: " + std::to_string(ret) + ", diagnostics: '" + diag +
+			                       "'");
 		}
 	}
 
@@ -149,7 +184,7 @@ ExtractedConnection OdbcConnection::ExtractOrOpen(const std::string &function_na
 		throw ScannerException("'" + function_name +
 		                       "' error: invalid first argument specified, type ID: " + std::to_string(type_id) +
 		                       ", must be either 'BIGINT' as an output of 'odbc_connect()' (example: 'FROM "
-		                       "odbc_query(getvariable('conn'), ...)')" +
+		                       "odbc_query(getvariable(\'conn\'), ...)')" +
 		                       " or an ODBC connection string (for one-off queries)");
 	}
 

@@ -32,6 +32,11 @@ Invalid Input Error: 'SQLDriverConnect' failed
 statement error
 SET VARIABLE conn = odbc_connect('Driver=fail', 'foo')
 ----
+Invalid Input Error: 'SQLDriverConnect' failed
+
+statement error
+SET VARIABLE conn = odbc_connect('Driver=fail', 'foo', 'bar', 'baz')
+----
 invalid number of arguments specified
 
 statement error
