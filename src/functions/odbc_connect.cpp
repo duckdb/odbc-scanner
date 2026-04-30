@@ -58,16 +58,33 @@ static void AppendUsernameAndPassword(duckdb_data_chunk input, std::string &conn
 	conn_str.append(";");
 }
 
+// Extract an optional access_token string from the given argument index.
+// Returns an empty string when the argument is absent or NULL.
+static std::string ExtractAccessToken(duckdb_data_chunk input, idx_t arg_idx) {
+	auto pair = Types::ExtractFunctionArg<std::string>(input, arg_idx);
+	if (pair.second) {
+		// NULL value - treat as "no token"
+		return "";
+	}
+	return pair.first;
+}
+
 static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
 	(void)info;
 
 	idx_t args_count = duckdb_data_chunk_get_column_count(input);
 
-	if (args_count != 1 && args_count != 3) {
+	// Supported call signatures:
+	//   (1)  odbc_connect(conn_string)
+	//   (2)  odbc_connect(conn_string, access_token)
+	//   (3)  odbc_connect(conn_string, username, password)
+	if (args_count < 1 || args_count > 4) {
 		throw ScannerException(
 		    "'odbc_connect' error: invalid number of arguments specified, count: " + std::to_string(args_count) +
-		    ", supported arguments: 'odbc_connect(conn_string: VARCHAR)', 'odbc_connect(conn_string: "
-		    "VARCHAR, username: VARCHAR, password: VARCHAR)'");
+		    ", supported signatures:"
+		    " odbc_connect(conn_string VARCHAR),"
+		    " odbc_connect(conn_string VARCHAR, access_token VARCHAR),"
+		    " odbc_connect(conn_string VARCHAR, username VARCHAR, password VARCHAR),");
 	}
 
 	auto conn_str_pair = Types::ExtractFunctionArg<std::string>(input, 0);
@@ -76,7 +93,13 @@ static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 	}
 	std::string conn_str = conn_str_pair.first;
 
-	if (args_count == 3) {
+	std::string access_token;
+
+	if (args_count == 2) {
+		// Signature: (conn_string, access_token)
+		access_token = ExtractAccessToken(input, 1);
+	} else if (args_count == 3) {
+		// Signature: (conn_string, username, password)
 		AppendUsernameAndPassword(input, conn_str);
 	}
 
@@ -91,7 +114,7 @@ static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 		}
 	}
 
-	auto oc_ptr = std_make_unique<OdbcConnection>(conn_str);
+	auto oc_ptr = std_make_unique<OdbcConnection>(conn_str, access_token);
 
 	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
 	result_data[0] = ConnectionsRegistry::Add(std::move(oc_ptr));
