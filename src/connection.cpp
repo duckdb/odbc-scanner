@@ -26,7 +26,7 @@ static DbmsDriver ResolveDbmsDriver(const std::string &dbms_name, const std::str
 		return DbmsDriver::ORACLE;
 	} else if (dbms_name == "Microsoft SQL Server") {
 		return DbmsDriver::MSSQL;
-	} else if (dbms_name.rfind("DB2/", 0) == 0) {
+	} else if (dbms_name.rfind("DB2", 0) == 0) {
 		return DbmsDriver::DB2;
 
 	} else if (dbms_name == "MariaDB") {

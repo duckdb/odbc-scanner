@@ -75,7 +75,7 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 			continue;
 		}
 		if (en.first == "decimal_columns_as_chars") {
-			this->timestamp_columns_as_timestamp_ns = duckdb_get_bool(val.get());
+			this->decimal_columns_as_chars = duckdb_get_bool(val.get());
 		} else if (en.first == "decimal_columns_precision_through_ard") {
 			this->decimal_columns_precision_through_ard = duckdb_get_bool(val.get());
 		} else if (en.first == "decimal_columns_as_ard_type") {

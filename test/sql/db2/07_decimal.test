@@ -26,6 +26,12 @@ SELECT column_type from (
 ----
 DECIMAL(4,3)
 
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS DECIMAL(4,3)) FROM sysibm.sysdummy1',
+  decimal_columns_as_chars=FALSE)
+----
+CLI0122E  Program type out of range. SQLSTATE=HY003
+
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''123456.789'' AS DECIMAL(9,3)) FROM sysibm.sysdummy1')
 ----
