@@ -46,6 +46,19 @@ struct Types {
 
 	static bool IsWideCharacterSQLType(SQLSMALLINT t);
 
+	// TINYINT..UBIGINT: the parameter types Types::CoalesceParameterType turns into
+	// DECIMAL under the integral_params_as_decimals quirk.
+	static bool IsIntegralParamType(param_type t);
+
+	// IsIntegralParamType plus FLOAT and DOUBLE: the parameter types
+	// Params::SetExpectedTypes stringifies when the target column is a character
+	// type. Single source of truth for that set — Types::NullCType has to mirror
+	// both coalescing steps to pick a NULL's C type.
+	static bool IsNumericParamType(param_type t);
+
+	// The C type to bind a NULL parameter of a `column_type` column with.
+	static SQLSMALLINT NullCType(DbmsQuirks &quirks, param_type column_type, SQLSMALLINT expected_type);
+
 	static const SQLSMALLINT SQL_SS_TIME2 = -154;
 	static const SQLSMALLINT SQL_SS_TIMESTAMPOFFSET = -155;
 

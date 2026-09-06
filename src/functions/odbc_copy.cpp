@@ -286,11 +286,11 @@ struct SourceReader {
 			duckdb_vector vec = vectors.at(col_idx);
 			uint64_t *validity = validities.at(col_idx);
 			// todo: faster validity check
+			SourceColumn &fc = columns.at(col_idx);
 			if (validity == nullptr || duckdb_validity_row_is_valid(validity, row_idx)) {
-				SourceColumn &fc = columns.at(col_idx);
 				row[col_idx] = Types::ExtractNotNullParam(ctx.quirks, fc.type_id, vec, row_idx, col_idx);
 			} else {
-				row[col_idx] = ScannerValue();
+				row[col_idx] = ScannerValue::Null(fc.type_id);
 			}
 		}
 		this->row_idx++;

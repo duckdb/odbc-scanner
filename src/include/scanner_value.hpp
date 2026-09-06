@@ -21,6 +21,10 @@ class ScannerValue {
 	param_type type_id = DUCKDB_TYPE_INVALID;
 	SQLLEN len_bytes = 0;
 	SQLSMALLINT expected_type = SQL_PARAM_TYPE_UNKNOWN;
+	// Only meaningful when type_id is DUCKDB_TYPE_SQLNULL: the DuckDB type of the
+	// column this NULL came from, used to bind it with the same C type the
+	// column's non-NULL values use. DUCKDB_TYPE_INVALID means "unknown".
+	param_type null_column_type = DUCKDB_TYPE_INVALID;
 
 	union InternalValue {
 		bool null_val;
@@ -136,6 +140,12 @@ public:
 	explicit ScannerValue(SqlBit value);
 	explicit ScannerValue(SQLGUID value);
 
+	// A SQL NULL parameter that remembers the DuckDB type of its source column.
+	// Prefer this over the default constructor wherever the column type is known:
+	// it is what lets Types::NullCType bind the NULL with the column's own C type
+	// instead of SQL_C_DEFAULT.
+	static ScannerValue Null(param_type column_type_id);
+
 	ScannerValue(ScannerValue &other) = delete;
 	ScannerValue(ScannerValue &&other);
 
@@ -157,6 +167,8 @@ public:
 	void SetLengthBytes(SQLLEN value);
 
 	SQLSMALLINT ExpectedType();
+
+	param_type NullColumnType();
 
 	void SetExpectedType(SQLSMALLINT expected_type_in);
 

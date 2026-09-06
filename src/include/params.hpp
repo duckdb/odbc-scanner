@@ -23,6 +23,11 @@ namespace odbcscanner {
 // driver's numeric-write bug (duckdb/odbc-scanner#161 /
 // FirebirdSQL/firebird-odbc-driver#292) into catastrophic row loss, and it is
 // also the least efficient of the three common execute shapes.
+//
+// A SQLNULL slot needs no separate entry for the NULL's column type (which now
+// selects its C type): within one prepared statement a slot index always maps to
+// the same source column, and the cache is Reset() whenever the statement
+// changes, so a slot's NULL C type cannot change while a cached shape stands.
 struct BindSlotShape {
 	param_type type_id = DUCKDB_TYPE_INVALID;
 	SQLSMALLINT expected_type = SQL_PARAM_TYPE_UNKNOWN;

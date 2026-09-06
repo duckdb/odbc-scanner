@@ -7,16 +7,21 @@ DUCKDB_EXTENSION_EXTERN
 
 namespace odbcscanner {
 
+// Binds SQL NULL with the C type of the column the NULL came from, so that a
+// parameter slot keeps one C type across NULL and non-NULL rows. Only the C type
+// changes: the ODBC spec ignores the data pointer and buffer length when the
+// indicator is SQL_NULL_DATA, so they stay as they were.
 template <>
 void TypeSpecific::BindOdbcParam<std::nullptr_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
-	SQLRETURN ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_DEFAULT, param.ExpectedType(), 1, 0,
+	SQLSMALLINT ctype = Types::NullCType(ctx.quirks, param.NullColumnType(), param.ExpectedType());
+	SQLRETURN ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, ctype, param.ExpectedType(), 1, 0,
 	                                 nullptr, 0, &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
 		std::string diag = Diagnostics::Read(ctx.hstmt(), SQL_HANDLE_STMT);
-		throw ScannerException(
-		    "'SQLBindParameter' NULL failed, expected type: " + std::to_string(param.ExpectedType()) +
-		    " index: " + std::to_string(param_idx) + ", query: '" + ctx.query + "', return: " + std::to_string(ret) +
-		    ", diagnostics: '" + diag + "'");
+		throw ScannerException("'SQLBindParameter' NULL failed, C type: " + std::to_string(ctype) +
+		                       ", expected type: " + std::to_string(param.ExpectedType()) +
+		                       " index: " + std::to_string(param_idx) + ", query: '" + ctx.query +
+		                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 	}
 }
 

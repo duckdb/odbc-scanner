@@ -41,6 +41,104 @@ bool Types::IsWideCharacterSQLType(SQLSMALLINT t) {
 	return t == SQL_WCHAR || t == SQL_WVARCHAR || t == SQL_WLONGVARCHAR;
 }
 
+bool Types::IsIntegralParamType(param_type t) {
+	switch (t) {
+	case DUCKDB_TYPE_TINYINT:
+	case DUCKDB_TYPE_UTINYINT:
+	case DUCKDB_TYPE_SMALLINT:
+	case DUCKDB_TYPE_USMALLINT:
+	case DUCKDB_TYPE_INTEGER:
+	case DUCKDB_TYPE_UINTEGER:
+	case DUCKDB_TYPE_BIGINT:
+	case DUCKDB_TYPE_UBIGINT:
+		return true;
+	default:
+		return false;
+	}
+}
+
+bool Types::IsNumericParamType(param_type t) {
+	return IsIntegralParamType(t) || t == DUCKDB_TYPE_FLOAT || t == DUCKDB_TYPE_DOUBLE;
+}
+
+// The C type a NULL parameter of a `column_type` column must be bound with: the
+// same one the column's non-NULL values get, so that a parameter slot keeps a
+// single C type across NULL and non-NULL rows.
+//
+// Each arm mirrors a BindOdbcParam specialization in this directory, after the
+// two coalescing steps Params::SetExpectedTypes applies to a value before
+// binding it. Order matters and follows SetExpectedTypes: an integral is turned
+// into a DECIMAL first (Types::CoalesceParameterType), and only a value that is
+// still integral or floating point is then stringified for a character target
+// (CoalesceNumericToCharsIfNeeded).
+//
+// Unknown and unmapped column types keep SQL_C_DEFAULT, which is what every NULL
+// used to bind with. That is safe as long as the values of the same column bind
+// with the driver's default C type too; it is precisely when they do not that a
+// NULL can re-type the parameter. Drivers may legitimately change a parameter's
+// transfer type on a character bind, and SQL_C_DEFAULT resolves to a character
+// type for SQL_NUMERIC / SQL_DECIMAL / SQL_BIGINT, so on the Firebird ODBC driver
+// a NULL rewrote the prepared statement's parameter descriptor and every value
+// bound into that slot afterwards was silently stored as NULL
+// (FirebirdSQL/firebird-odbc-driver#300).
+SQLSMALLINT Types::NullCType(DbmsQuirks &quirks, param_type column_type, SQLSMALLINT expected_type) {
+	SQLSMALLINT chars_type = IsWideCharacterSQLType(expected_type) ? SQL_C_WCHAR : SQL_C_CHAR;
+
+	if (IsIntegralParamType(column_type) && quirks.integral_params_as_decimals && !quirks.decimal_params_as_chars) {
+		return SQL_C_NUMERIC;
+	}
+	if (IsNumericParamType(column_type) && IsCharacterSQLType(expected_type)) {
+		return chars_type;
+	}
+
+	switch (column_type) {
+	case DUCKDB_TYPE_BOOLEAN:
+		return SQL_C_BIT;
+	case DUCKDB_TYPE_TINYINT:
+		return SQL_C_STINYINT;
+	case DUCKDB_TYPE_UTINYINT:
+		return SQL_C_UTINYINT;
+	case DUCKDB_TYPE_SMALLINT:
+		return SQL_C_SSHORT;
+	case DUCKDB_TYPE_USMALLINT:
+		return SQL_C_USHORT;
+	case DUCKDB_TYPE_INTEGER:
+		return SQL_C_SLONG;
+	case DUCKDB_TYPE_UINTEGER:
+		return SQL_C_ULONG;
+	case DUCKDB_TYPE_BIGINT:
+		return SQL_C_SBIGINT;
+	case DUCKDB_TYPE_UBIGINT:
+		return SQL_C_UBIGINT;
+	case DUCKDB_TYPE_FLOAT:
+		return SQL_C_FLOAT;
+	case DUCKDB_TYPE_DOUBLE:
+		return SQL_C_DOUBLE;
+	case DUCKDB_TYPE_DECIMAL:
+		// ExtractNotNullParam<duckdb_decimal> picks the representation from this
+		// same quirk: DecimalChars (character) or SQL_NUMERIC_STRUCT.
+		return quirks.decimal_params_as_chars ? chars_type : SQL_C_NUMERIC;
+	case DUCKDB_TYPE_VARCHAR:
+		return SQL_C_WCHAR;
+	case DUCKDB_TYPE_BLOB:
+		return SQL_C_BINARY;
+	case DUCKDB_TYPE_UUID:
+		return SQL_C_GUID;
+	case DUCKDB_TYPE_DATE:
+		return SQL_C_TYPE_DATE;
+	case DUCKDB_TYPE_TIME:
+		return quirks.time_params_as_ss_time2 ? SQL_C_BINARY : SQL_C_TYPE_TIME;
+	case DUCKDB_TYPE_TIMESTAMP:
+	case DUCKDB_TYPE_TIMESTAMP_TZ:
+	case DUCKDB_TYPE_TIMESTAMP_NS:
+		// TIMESTAMP_NS values are extracted into a TimestampNsStruct, which is a
+		// DUCKDB_TYPE_TIMESTAMP parameter and binds as SQL_C_TYPE_TIMESTAMP.
+		return SQL_C_TYPE_TIMESTAMP;
+	default:
+		return SQL_C_DEFAULT;
+	}
+}
+
 ScannerValue Types::ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec, idx_t row_idx,
                                         idx_t param_idx) {
 	switch (type_id) {

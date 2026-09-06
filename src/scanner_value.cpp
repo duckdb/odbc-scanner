@@ -158,6 +158,12 @@ SQLGUID &ScannerValue::Value<SQLGUID>() {
 ScannerValue::ScannerValue() : type_id(DUCKDB_TYPE_SQLNULL), len_bytes(SQL_NULL_DATA) {
 }
 
+ScannerValue ScannerValue::Null(param_type column_type_id) {
+	ScannerValue res;
+	res.null_column_type = column_type_id;
+	return res;
+}
+
 ScannerValue::ScannerValue(bool value) : type_id(DUCKDB_TYPE_BOOLEAN), len_bytes(sizeof(value)), val(value) {
 }
 
@@ -419,7 +425,8 @@ void ScannerValue::Destroy() {
 }
 
 ScannerValue::ScannerValue(ScannerValue &&other)
-    : type_id(other.type_id), len_bytes(other.len_bytes), expected_type(other.expected_type) {
+    : type_id(other.type_id), len_bytes(other.len_bytes), expected_type(other.expected_type),
+      null_column_type(other.null_column_type) {
 	AssignByType(type_id, this->val, other);
 }
 
@@ -428,6 +435,7 @@ ScannerValue &ScannerValue::operator=(ScannerValue &&other) {
 	this->type_id = other.type_id;
 	this->len_bytes = other.len_bytes;
 	this->expected_type = other.expected_type;
+	this->null_column_type = other.null_column_type;
 	AssignByType(type_id, this->val, other);
 	return *this;
 }
@@ -463,6 +471,10 @@ void ScannerValue::SetLengthBytes(SQLLEN value) {
 
 SQLSMALLINT ScannerValue::ExpectedType() {
 	return expected_type;
+}
+
+param_type ScannerValue::NullColumnType() {
+	return null_column_type;
 }
 
 void ScannerValue::SetExpectedType(SQLSMALLINT expected_type_in) {

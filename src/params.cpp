@@ -63,14 +63,17 @@ std::vector<ScannerValue> Params::Extract(DbmsQuirks &quirks, duckdb_data_chunk 
 			    ", column: " + std::to_string(col_idx) + ", columns count: " + std::to_string(col_count));
 		}
 
+		// Resolved before the NULL check: a NULL parameter is bound with its
+		// column's own C type, so it needs the STRUCT field's declared type too.
+		auto child_type = LogicalTypePtr(duckdb_struct_type_child_type(struct_type.get(), i), LogicalTypeDeleter);
+		auto child_type_id = duckdb_get_type_id(child_type.get());
+
 		uint64_t *child_validity = duckdb_vector_get_validity(child_vec);
 		if (child_validity != nullptr && !duckdb_validity_row_is_valid(child_validity, 0)) {
-			params.emplace_back(ScannerValue());
+			params.emplace_back(ScannerValue::Null(child_type_id));
 			continue;
 		}
 
-		auto child_type = LogicalTypePtr(duckdb_struct_type_child_type(struct_type.get(), i), LogicalTypeDeleter);
-		auto child_type_id = duckdb_get_type_id(child_type.get());
 		ScannerValue sp = Types::ExtractNotNullParam(quirks, child_type_id, child_vec, 0, i);
 		params.emplace_back(std::move(sp));
 	}
@@ -91,9 +94,14 @@ std::vector<ScannerValue> Params::Extract(DbmsQuirks &quirks, duckdb_value struc
 
 	std::vector<ScannerValue> params;
 	for (idx_t i = 0; i < params_count; i++) {
+		// The STRUCT's declared field type, not the child value's own type: a NULL
+		// value reports DUCKDB_TYPE_SQLNULL, which carries no column information.
+		auto child_type = LogicalTypePtr(duckdb_struct_type_child_type(struct_type, i), LogicalTypeDeleter);
+		auto child_type_id = duckdb_get_type_id(child_type.get());
+
 		auto child_val = ValuePtr(duckdb_get_struct_child(struct_value, i), ValueDeleter);
 		if (duckdb_is_null_value(child_val.get())) {
-			params.emplace_back(ScannerValue());
+			params.emplace_back(ScannerValue::Null(child_type_id));
 			continue;
 		}
 
@@ -145,21 +153,8 @@ static void CoalesceNumericToCharsIfNeeded(ScannerValue &param) {
 	if (!Types::IsCharacterSQLType(param.ExpectedType())) {
 		return;
 	}
-	switch (param.ParamType()) {
-	case DUCKDB_TYPE_TINYINT:
-	case DUCKDB_TYPE_UTINYINT:
-	case DUCKDB_TYPE_SMALLINT:
-	case DUCKDB_TYPE_USMALLINT:
-	case DUCKDB_TYPE_INTEGER:
-	case DUCKDB_TYPE_UINTEGER:
-	case DUCKDB_TYPE_BIGINT:
-	case DUCKDB_TYPE_UBIGINT:
-	case DUCKDB_TYPE_FLOAT:
-	case DUCKDB_TYPE_DOUBLE:
+	if (Types::IsNumericParamType(param.ParamType())) {
 		param.TransformNumericToChars();
-		break;
-	default:
-		break;
 	}
 }
 
