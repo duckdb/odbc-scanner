@@ -435,5 +435,183 @@ SELECT * FROM odbc_query(getvariable('conn'),
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE INT_TO_VARCHAR_PK')
 
+# NULL parameter followed by a value on a NUMERIC / DECIMAL / BIGINT column
+# (regression test for FirebirdSQL/firebird-odbc-driver#300)
+#
+# NULL parameters used to be bound with SQL_C_DEFAULT, which leaves the C type
+# up to the driver. The ODBC-spec default for SQL_NUMERIC, SQL_DECIMAL and
+# SQL_BIGINT is a *character* type, so a numeric column's parameter slot
+# alternated between a character bind (NULL rows) and a numeric bind (value
+# rows) inside a single prepared statement. On the Firebird ODBC driver the
+# character bind rewrites the prepared XSQLVAR to SQL_TEXT and nothing restores
+# it, so every value bound after a NULL in that slot was silently stored as
+# NULL — every driver call returned SQL_SUCCESS and the row counts were right.
+#
+# NULLs now carry the source column's own C type, so a slot's C type no longer
+# changes between NULL and non-NULL rows. INTEGER targets never lost data and
+# are kept here as a control column.
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE NULL_PARAM_TYPES', ignore_exec_failure=TRUE)
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'),
+  'CREATE TABLE NULL_PARAM_TYPES (
+    id INTEGER NOT NULL PRIMARY KEY,
+    v_numeric NUMERIC(9,3),
+    v_decimal DECIMAL(18,2),
+    v_bigint BIGINT,
+    v_integer INTEGER
+  )')
+
+# INTEGER source, NULL in the first row, single-row path (batch_size=1) — the
+# shape that lost roughly 485k values in a production merge.
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='NULL_PARAM_TYPES',
+  batch_size=1,
+  column_quotes='',
+  source_query='SELECT * FROM (VALUES
+      (1, NULL::INTEGER, NULL::INTEGER, NULL::INTEGER, NULL::INTEGER),
+      (2, 60::INTEGER, 60::INTEGER, 60::INTEGER, 60::INTEGER)
+    ) t(id, v_numeric, v_decimal, v_bigint, v_integer) ORDER BY id')
+----
+1	2
+
+query IIIII
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT id, v_numeric, v_decimal, v_bigint, v_integer FROM NULL_PARAM_TYPES ORDER BY id')
+----
+1	NULL	NULL	NULL	NULL
+2	60.0	60.0	60	60
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DELETE FROM NULL_PARAM_TYPES')
+
+# Same columns through the batched multi-row VALUES path: with batch_size=2 the
+# first execute binds (NULL, 60) and the second (61, 62), so the first row's
+# parameter slots go NULL → value between two executes of one prepared
+# statement — the batched equivalent of the transition above.
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='NULL_PARAM_TYPES',
+  batch_size=2,
+  column_quotes='',
+  source_query='SELECT * FROM (VALUES
+      (1, NULL::INTEGER, NULL::INTEGER, NULL::INTEGER, NULL::INTEGER),
+      (2, 60::INTEGER, 60::INTEGER, 60::INTEGER, 60::INTEGER),
+      (3, 61::INTEGER, 61::INTEGER, 61::INTEGER, 61::INTEGER),
+      (4, 62::INTEGER, 62::INTEGER, 62::INTEGER, 62::INTEGER)
+    ) t(id, v_numeric, v_decimal, v_bigint, v_integer) ORDER BY id')
+----
+1	4
+
+query IIIII
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT id, v_numeric, v_decimal, v_bigint, v_integer FROM NULL_PARAM_TYPES ORDER BY id')
+----
+1	NULL	NULL	NULL	NULL
+2	60.0	60.0	60	60
+3	61.0	61.0	61	61
+4	62.0	62.0	62	62
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DELETE FROM NULL_PARAM_TYPES')
+
+# DOUBLE source (SQL_C_DOUBLE values) with the NULL between two values, so each
+# slot transitions value → NULL → value.
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='NULL_PARAM_TYPES',
+  batch_size=1,
+  column_quotes='',
+  source_query='SELECT * FROM (VALUES
+      (1, 60::DOUBLE, 60::DOUBLE, 60::DOUBLE, 60::DOUBLE),
+      (2, NULL::DOUBLE, NULL::DOUBLE, NULL::DOUBLE, NULL::DOUBLE),
+      (3, 61::DOUBLE, 61::DOUBLE, 61::DOUBLE, 61::DOUBLE)
+    ) t(id, v_numeric, v_decimal, v_bigint, v_integer) ORDER BY id')
+----
+1	3
+
+query IIIII
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT id, v_numeric, v_decimal, v_bigint, v_integer FROM NULL_PARAM_TYPES ORDER BY id')
+----
+1	60.0	60.0	60	60
+2	NULL	NULL	NULL	NULL
+3	61.0	61.0	61	61
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DELETE FROM NULL_PARAM_TYPES')
+
+# DECIMAL source: the scanner already binds these as characters on Firebird
+# (the decimal_params_as_chars quirk), so the slot's C type never changed and
+# this shape passed before the fix as well. Kept as a control.
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='NULL_PARAM_TYPES',
+  batch_size=1,
+  column_quotes='',
+  source_query='SELECT * FROM (VALUES
+      (1, NULL::DECIMAL(9,3), NULL::DECIMAL(18,2), NULL::DECIMAL(18,0), NULL::DECIMAL(9,0)),
+      (2, 60::DECIMAL(9,3), 60::DECIMAL(18,2), 60::DECIMAL(18,0), 60::DECIMAL(9,0))
+    ) t(id, v_numeric, v_decimal, v_bigint, v_integer) ORDER BY id')
+----
+1	2
+
+query IIIII
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT id, v_numeric, v_decimal, v_bigint, v_integer FROM NULL_PARAM_TYPES ORDER BY id')
+----
+1	NULL	NULL	NULL	NULL
+2	60.0	60.0	60	60
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE NULL_PARAM_TYPES')
+
+# Typed NULLs on the non-numeric branches of the C-type mapping: an INTEGER
+# source bound to a character column (the scanner stringifies those, so the NULL
+# must use a character C type too), a VARCHAR source and a DATE source. These
+# passed before the fix; they guard the rest of the mapping against a wrong C
+# type being chosen for the NULL.
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE NULL_PARAM_MIXED', ignore_exec_failure=TRUE)
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'),
+  'CREATE TABLE NULL_PARAM_MIXED (
+    id INTEGER NOT NULL PRIMARY KEY,
+    v_int_to_char VARCHAR(10),
+    v_char VARCHAR(10),
+    v_date DATE
+  )')
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='NULL_PARAM_MIXED',
+  batch_size=1,
+  column_quotes='',
+  source_query='SELECT * FROM (VALUES
+      (1, NULL::INTEGER, NULL::VARCHAR, NULL::DATE),
+      (2, 60::INTEGER, ''s2'', DATE ''2024-03-01'')
+    ) t(id, v_int_to_char, v_char, v_date) ORDER BY id')
+----
+1	2
+
+query IIII
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT id, v_int_to_char, v_char, v_date FROM NULL_PARAM_MIXED ORDER BY id')
+----
+1	NULL	NULL	NULL
+2	60	s2	2024-03-01
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE NULL_PARAM_MIXED')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))

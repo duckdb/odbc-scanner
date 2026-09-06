@@ -154,5 +154,90 @@ SELECT * FROM odbc_query(getvariable('conn'),
 statement ok
 SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_bind_once')
 
+# NULL parameter followed by a value in the same parameter slot
+# (driver-independent half of the regression test for
+# FirebirdSQL/firebird-odbc-driver#300).
+#
+# NULL parameters are bound with the source column's own C type instead of
+# SQL_C_DEFAULT, so a slot keeps one C type across NULL and non-NULL rows rather
+# than alternating between the driver's default character type for a NULL and a
+# numeric type for the value. The Firebird ODBC driver silently dropped every
+# value that followed a NULL on NUMERIC / DECIMAL / BIGINT parameters because of
+# that alternation (see test/sql/firebird/firebird_copy.test); this block passes
+# on the DuckDB ODBC driver before and after the change and keeps the typed-NULL
+# bind path covered — with one column per bound C type — in every CI job.
+#
+# The DECIMAL column deliberately uses values with non-zero fractional digits:
+# whole-number DECIMAL parameters (60.00) come back from the DuckDB ODBC driver
+# scaled down to 0.60, with or without NULLs in the source — a separate,
+# pre-existing issue that this block is not about.
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE IF EXISTS duckdb_null_params')
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'),
+  'CREATE TABLE duckdb_null_params (
+    id INTEGER NOT NULL,
+    v_decimal DECIMAL(18,2),
+    v_bigint BIGINT,
+    v_integer INTEGER,
+    v_double DOUBLE,
+    v_varchar VARCHAR,
+    v_date DATE
+  )')
+
+# single-row path, NULL in the first row
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_null_params',
+  batch_size=1,
+  source_query='SELECT * FROM (VALUES
+      (1, NULL::DECIMAL(18,2), NULL::BIGINT, NULL::INTEGER, NULL::DOUBLE, NULL::VARCHAR, NULL::DATE),
+      (2, 60.25::DECIMAL(18,2), 60::BIGINT, 60::INTEGER, 60::DOUBLE, ''s2'', DATE ''2024-03-01'')
+    ) t(id, v_decimal, v_bigint, v_integer, v_double, v_varchar, v_date) ORDER BY id')
+----
+1	2
+
+query IIIIIII
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT id, v_decimal, v_bigint, v_integer, v_double, v_varchar, v_date FROM duckdb_null_params ORDER BY id')
+----
+1	NULL	NULL	NULL	NULL	NULL	NULL
+2	60.25	60	60	60.0	s2	2024-03-01
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DELETE FROM duckdb_null_params')
+
+# batched multi-row VALUES path: with batch_size=2 the first execute binds
+# (NULL, 60) and the second (61, 62), so the first row's slots go NULL → value
+# between two executes of one prepared statement.
+
+query II
+SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
+  dest_table='duckdb_null_params',
+  batch_size=2,
+  source_query='SELECT * FROM (VALUES
+      (1, NULL::DECIMAL(18,2), NULL::BIGINT, NULL::INTEGER, NULL::DOUBLE, NULL::VARCHAR, NULL::DATE),
+      (2, 60.25::DECIMAL(18,2), 60::BIGINT, 60::INTEGER, 60::DOUBLE, ''s2'', DATE ''2024-03-01''),
+      (3, 61.25::DECIMAL(18,2), 61::BIGINT, 61::INTEGER, 61::DOUBLE, ''s3'', DATE ''2024-03-02''),
+      (4, 62.25::DECIMAL(18,2), 62::BIGINT, 62::INTEGER, 62::DOUBLE, ''s4'', DATE ''2024-03-03'')
+    ) t(id, v_decimal, v_bigint, v_integer, v_double, v_varchar, v_date) ORDER BY id')
+----
+1	4
+
+query IIIIIII
+SELECT * FROM odbc_query(getvariable('conn'),
+  'SELECT id, v_decimal, v_bigint, v_integer, v_double, v_varchar, v_date FROM duckdb_null_params ORDER BY id')
+----
+1	NULL	NULL	NULL	NULL	NULL	NULL
+2	60.25	60	60	60.0	s2	2024-03-01
+3	61.25	61	61	61.0	s3	2024-03-02
+4	62.25	62	62	62.0	s4	2024-03-03
+
+statement ok
+SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_null_params')
+
 statement ok
 SELECT odbc_close(getvariable('conn'))
