@@ -14,6 +14,7 @@ static void Initialize(duckdb_connection connection, duckdb_extension_info, duck
 	Registries::Initialize();
 	OdbcBeginTransactionFunction::Register(connection);
 	OdbcBindParamsFunction::Register(connection);
+	OdbcCancelQueryFunction::Register(connection);
 	OdbcCloseFunction::Register(connection);
 	OdbcCommitFunction::Register(connection);
 	OdbcConnectFunction::Register(connection);

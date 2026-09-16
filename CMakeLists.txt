@@ -94,6 +94,7 @@ set(EXTENSION_SOURCES
     src/strings.cpp
     src/widechar.cpp
     src/functions/odbc_begin_transaction.cpp
+    src/functions/odbc_cancel_query.cpp
     src/functions/odbc_commit.cpp
     src/functions/odbc_bind_params.cpp
     src/functions/odbc_close.cpp

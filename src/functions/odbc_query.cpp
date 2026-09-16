@@ -88,15 +88,17 @@ struct GlobalInitData {
 	std::unique_ptr<OdbcConnection> conn_ptr;
 	bool close_connection = false;
 
-	GlobalInitData(int64_t conn_id, std::unique_ptr<OdbcConnection> conn_ptr_in, bool close_connection_in)
+	GlobalInitData(int64_t conn_id, std::unique_ptr<OdbcConnection> conn_ptr_in, bool close_connection_in, HSTMT stmt)
 	    : conn_id(conn_id), conn_ptr(std::move(conn_ptr_in)), close_connection(close_connection_in) {
 		if (!conn_ptr) {
 			throw ScannerException("'odbc_query' error: ODBC connection not found on global init, id: " +
 			                       std::to_string(conn_id));
 		}
+		CancellationRegistry::Add(conn_id, stmt);
 	}
 
 	~GlobalInitData() {
+		CancellationRegistry::Remove(conn_id);
 		if (!close_connection) {
 			// We are not closing the connection, even in case of error,
 			// so need to return connection to registry
@@ -235,8 +237,8 @@ static void GlobalInit(duckdb_init_info info) {
 	// Keep the connection in global data while the function is running
 	// to not allow other threads operate on it or close it.
 	auto conn_ptr = ConnectionsRegistry::Remove(bdata.conn_id);
-	auto gdata_ptr =
-	    std_make_unique<GlobalInitData>(bdata.conn_id, std::move(conn_ptr), bdata.query_options.close_connection);
+	auto gdata_ptr = std_make_unique<GlobalInitData>(bdata.conn_id, std::move(conn_ptr),
+	                                                 bdata.query_options.close_connection, bdata.ctx.hstmt());
 	duckdb_init_set_init_data(info, gdata_ptr.release(), GlobalInitData::Destroy);
 }
 

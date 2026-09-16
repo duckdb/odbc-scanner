@@ -22,7 +22,7 @@ ScannerConn::ScannerConn(bool establish_odbc_connection) {
 	duckdb_state state_config_set_2 = duckdb_set_config(config, "threads", "1");
 	REQUIRE(state_config_set_2 == DuckDBSuccess);
 
-	duckdb_state state_db = duckdb_open_ext(NULL, &db, config, nullptr);
+	duckdb_state state_db = duckdb_open_ext(nullptr, &db, config, nullptr);
 	REQUIRE(state_db == DuckDBSuccess);
 
 	duckdb_destroy_config(&config);

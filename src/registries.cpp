@@ -2,6 +2,7 @@
 
 #include <mutex>
 #include <set>
+#include <unordered_map>
 
 #include "scanner_exception.hpp"
 
@@ -41,6 +42,12 @@ static void SharedParamsRegistryDeleter(std::set<int64_t> *reg_ptr) {
 	}
 	reg.clear();
 	delete reg_ptr;
+}
+
+// initialized from DUCKDB_EXTENSION_ENTRYPOINT
+static std::shared_ptr<std::unordered_map<int64_t, SQLHANDLE>> SharedCancellationRegistry() {
+	static auto registry = std::make_shared<std::unordered_map<int64_t, SQLHANDLE>>();
+	return registry;
 }
 
 // initialized from DUCKDB_EXTENSION_ENTRYPOINT
@@ -127,6 +134,40 @@ std::unique_ptr<std::vector<ScannerValue>> ParamsRegistry::Remove(int64_t params
 
 	std::vector<ScannerValue> *params_ptr = reinterpret_cast<std::vector<ScannerValue> *>(params_id);
 	return std::unique_ptr<std::vector<ScannerValue>>(params_ptr);
+}
+
+void CancellationRegistry::Add(int64_t conn_id, HSTMT stmt) {
+	auto mtx = SharedMutex();
+	std::lock_guard<std::mutex> guard(*mtx);
+
+	auto shared_reg_ptr = SharedCancellationRegistry();
+	auto &shared_reg = *shared_reg_ptr;
+
+	shared_reg.emplace(conn_id, stmt);
+}
+
+HSTMT CancellationRegistry::Get(int64_t conn_id) {
+	auto mtx = SharedMutex();
+	std::lock_guard<std::mutex> guard(*mtx);
+
+	auto shared_reg_ptr = SharedCancellationRegistry();
+	auto &shared_reg = *shared_reg_ptr;
+
+	auto it = shared_reg.find(conn_id);
+	if (it != shared_reg.end()) {
+		return it->second;
+	}
+	return nullptr;
+}
+
+void CancellationRegistry::Remove(int64_t conn_id) {
+	auto mtx = SharedMutex();
+	std::lock_guard<std::mutex> guard(*mtx);
+
+	auto shared_reg_ptr = SharedCancellationRegistry();
+	auto &shared_reg = *shared_reg_ptr;
+
+	shared_reg.erase(conn_id);
 }
 
 void Registries::Initialize() {
