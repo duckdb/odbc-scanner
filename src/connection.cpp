@@ -21,6 +21,9 @@
 
 namespace odbcscanner {
 
+OdbcConnectionAttribute::OdbcConnectionAttribute(int32_t key_p, int64_t value_p) : key(key_p), value(value_p) {
+}
+
 static DbmsDriver ResolveDbmsDriver(const std::string &dbms_name, const std::string &driver_name) {
 	if (dbms_name == "Oracle") {
 		return DbmsDriver::ORACLE;
@@ -59,31 +62,7 @@ static std::string FilterPwd(const std::string url) {
 	return std::regex_replace(uid_filtered, pwd_pattern, "PWD=***");
 }
 
-OdbcConnection::OdbcConnection(const std::string &url, const std::string &access_token) {
-	{
-		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, nullptr, &env);
-		if (!SQL_SUCCEEDED(ret)) {
-			throw ScannerException("'SQLAllocHandle' failed for ENV handle, return: " + std::to_string(ret));
-		}
-	}
-
-	{
-		SQLRETURN ret = SQLSetEnvAttr(env, SQL_ATTR_ODBC_VERSION,
-		                              reinterpret_cast<SQLPOINTER>(static_cast<uintptr_t>(SQL_OV_ODBC3)), 0);
-		if (!SQL_SUCCEEDED(ret)) {
-			std::string diag = Diagnostics::Read(env, SQL_HANDLE_ENV);
-			throw ScannerException("'SQLSetEnvAttr' failed, return: " + std::to_string(ret) + ", diagnostics: '" +
-			                       diag + "'");
-		}
-	}
-
-	{
-		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_DBC, env, &dbc);
-		if (!SQL_SUCCEEDED(ret)) {
-			throw ScannerException("'SQLAllocHandle' failed for DBC handle, return: " + std::to_string(ret));
-		}
-	}
-
+static void ApplyAccessToken(SQLHANDLE dbc, const std::string &url, const std::string &access_token) {
 	// Set SQL_COPT_SS_ACCESS_TOKEN before connecting when an access token is provided.
 	// The Microsoft ODBC Driver for SQL Server requires the attribute value to point to an
 	// ACCESSTOKEN structure: a 4-byte unsigned integer holding the byte length of the token
@@ -110,6 +89,49 @@ OdbcConnection::OdbcConnection(const std::string &url, const std::string &access
 			                       "'");
 		}
 	}
+}
+
+static void ApplyAttributes(SQLHANDLE dbc, const std::string &url, const std::vector<OdbcConnectionAttribute> &attrs) {
+	for (const OdbcConnectionAttribute &attr : attrs) {
+		SQLRETURN ret =
+		    SQLSetConnectAttr(dbc, static_cast<SQLINTEGER>(attr.key), reinterpret_cast<SQLPOINTER>(attr.value), 0);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(dbc, SQL_HANDLE_DBC);
+			throw ScannerException("'SQLSetConnectAttr' failed, attribute key: " + std::to_string(attr.key) +
+			                       " value: " + std::to_string(attr.value) + ", connection string: '" + FilterPwd(url) +
+			                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
+		}
+	}
+}
+
+OdbcConnection::OdbcConnection(const std::string &url, const std::string &access_token,
+                               const std::vector<OdbcConnectionAttribute> &attrs) {
+	{
+		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, nullptr, &env);
+		if (!SQL_SUCCEEDED(ret)) {
+			throw ScannerException("'SQLAllocHandle' failed for ENV handle, return: " + std::to_string(ret));
+		}
+	}
+
+	{
+		SQLRETURN ret = SQLSetEnvAttr(env, SQL_ATTR_ODBC_VERSION,
+		                              reinterpret_cast<SQLPOINTER>(static_cast<uintptr_t>(SQL_OV_ODBC3)), 0);
+		if (!SQL_SUCCEEDED(ret)) {
+			std::string diag = Diagnostics::Read(env, SQL_HANDLE_ENV);
+			throw ScannerException("'SQLSetEnvAttr' failed, return: " + std::to_string(ret) + ", diagnostics: '" +
+			                       diag + "'");
+		}
+	}
+
+	{
+		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_DBC, env, &dbc);
+		if (!SQL_SUCCEEDED(ret)) {
+			throw ScannerException("'SQLAllocHandle' failed for DBC handle, return: " + std::to_string(ret));
+		}
+	}
+
+	ApplyAccessToken(dbc, url, access_token);
+	ApplyAttributes(dbc, url, attrs);
 
 	{
 		auto wurl = WideChar::Widen(url.data(), url.length());

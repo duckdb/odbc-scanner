@@ -59,8 +59,40 @@ SET VARIABLE conn = odbc_connect('Driver=fail;', 'foo', 'bar')
 ----
 'SQLDriverConnect' failed, connection string: 'Driver=fail;UID=***;PWD=***;'
 
+statement error
+SET VARIABLE conn = odbc_connect('Driver=fail', MAP {0 : 0}, MAP {0 : 0})
+----
+Invalid Input Error: Cannot extract VARCHAR function argument: invalid column type: 26, expected: 17, column: 1, columns count: 3
+
+statement error
+SET VARIABLE conn = odbc_connect('Driver=fail', MAP {0 : NULL::BIGINT })
+----
+Invalid Input Error: 'odbc_connect' error: specified connection attribute map entries must not be NULL
+
+statement error
+SET VARIABLE conn = odbc_connect('Driver=fail', MAP {0 : 'foo' })
+----
+Invalid Input Error: 'odbc_connect' error: specified connection attribute map values must be INTEGER or BIGINT
+
 statement ok
 SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
+
+# connection attributes
+# SQL_ATTR_CONNECTION_TIMEOUT 113
+# SQL_ATTR_AUTOCOMMIT 102
+# SQL_AUTOCOMMIT_ON 1UL
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING', MAP {113 : 10, 102: 1})
+
+statement ok
+SELECT odbc_close(getvariable('conn'))
+
+statement ok
+SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING', MAP {113 : 10::BIGINT, 102: 1::BIGINT})
 
 statement ok
 SELECT odbc_close(getvariable('conn'))

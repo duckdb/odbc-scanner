@@ -69,22 +69,94 @@ static std::string ExtractAccessToken(duckdb_data_chunk input, idx_t arg_idx) {
 	return pair.first;
 }
 
+static bool HasNulls(uint64_t *validity, idx_t attrs_count) {
+	if (validity == nullptr) {
+		return false;
+	}
+	for (idx_t i = 0; i < attrs_count; i++) {
+		if (!duckdb_validity_row_is_valid(validity, i)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+static std::pair<std::vector<OdbcConnectionAttribute>, bool> ExtractAttrs(duckdb_data_chunk input, idx_t args_count) {
+	if (args_count <= 1) {
+		return std::make_pair(std::vector<OdbcConnectionAttribute>(), false);
+	}
+	duckdb_vector vec = duckdb_data_chunk_get_vector(input, args_count - 1);
+	if (!vec) {
+		return std::make_pair(std::vector<OdbcConnectionAttribute>(), false);
+	}
+	auto vec_type = LogicalTypePtr(duckdb_vector_get_column_type(vec), LogicalTypeDeleter);
+	duckdb_type type_id = duckdb_get_type_id(vec_type.get());
+	if (type_id != DUCKDB_TYPE_MAP) {
+		return std::make_pair(std::vector<OdbcConnectionAttribute>(), false);
+	}
+
+	{
+		auto key_type = LogicalTypePtr(duckdb_map_type_key_type(vec_type.get()), LogicalTypeDeleter);
+		duckdb_type key_type_id = duckdb_get_type_id(key_type.get());
+		if (key_type_id != DUCKDB_TYPE_INTEGER) {
+			throw ScannerException("'odbc_connect' error: specified connection attribute map keys must be INTEGER");
+		}
+	}
+
+	auto value_type = LogicalTypePtr(duckdb_map_type_value_type(vec_type.get()), LogicalTypeDeleter);
+	duckdb_type value_type_id = duckdb_get_type_id(value_type.get());
+	if (value_type_id != DUCKDB_TYPE_INTEGER && value_type_id != DUCKDB_TYPE_BIGINT) {
+		throw ScannerException(
+		    "'odbc_connect' error: specified connection attribute map values must be INTEGER or BIGINT");
+	}
+
+	duckdb_vector struct_vec = duckdb_list_vector_get_child(vec);
+	uint64_t *struct_validity = duckdb_vector_get_validity(struct_vec);
+	duckdb_vector key_vec = duckdb_struct_vector_get_child(struct_vec, 0);
+	uint64_t *keys_validity = duckdb_vector_get_validity(key_vec);
+	duckdb_vector value_vec = duckdb_struct_vector_get_child(struct_vec, 1);
+	uint64_t *values_validity = duckdb_vector_get_validity(value_vec);
+	idx_t attrs_count = duckdb_list_vector_get_size(vec);
+
+	if (HasNulls(struct_validity, attrs_count) || HasNulls(keys_validity, attrs_count) ||
+	    HasNulls(values_validity, attrs_count)) {
+		throw ScannerException("'odbc_connect' error: specified connection attribute map entries must not be NULL");
+	}
+
+	std::vector<OdbcConnectionAttribute> attrs;
+	attrs.reserve(attrs_count);
+	int32_t *keys = reinterpret_cast<int32_t *>(duckdb_vector_get_data(key_vec));
+	for (idx_t i = 0; i < attrs_count; i++) {
+		int32_t key = keys[i];
+		int64_t val = 0;
+		if (value_type_id == DUCKDB_TYPE_INTEGER) {
+			int32_t *values = reinterpret_cast<int32_t *>(duckdb_vector_get_data(value_vec));
+			val = static_cast<int64_t>(values[i]);
+		} else if (value_type_id == DUCKDB_TYPE_BIGINT) {
+			int64_t *values = reinterpret_cast<int64_t *>(duckdb_vector_get_data(value_vec));
+			val = values[i];
+		}
+		attrs.emplace_back(OdbcConnectionAttribute(key, val));
+	}
+
+	return std::make_pair(std::move(attrs), true);
+}
+
 static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
 	(void)info;
 
 	idx_t args_count = duckdb_data_chunk_get_column_count(input);
+	auto attrs = ExtractAttrs(input, args_count);
+	idx_t varchar_args_count = attrs.second ? args_count - 1 : args_count;
 
-	// Supported call signatures:
-	//   (1)  odbc_connect(conn_string)
-	//   (2)  odbc_connect(conn_string, access_token)
-	//   (3)  odbc_connect(conn_string, username, password)
-	if (args_count < 1 || args_count > 3) {
+	if (varchar_args_count < 1 || varchar_args_count > 3) {
 		throw ScannerException(
 		    "'odbc_connect' error: invalid number of arguments specified, count: " + std::to_string(args_count) +
-		    ", supported signatures:"
-		    " odbc_connect(conn_string VARCHAR),"
-		    " odbc_connect(conn_string VARCHAR, access_token VARCHAR),"
-		    " odbc_connect(conn_string VARCHAR, username VARCHAR, password VARCHAR),");
+		    ", supported signatures:'n"
+		    " odbc_connect(conn_string VARCHAR, [conn_attributes MAP(INTEGER -> BIGINT)]),\n"
+		    " odbc_connect(conn_string VARCHAR, access_token VARCHAR, [conn_attributes MAP(INTEGER -> BIGINT)]),\n"
+		    " odbc_connect(conn_string VARCHAR, username VARCHAR, password VARCHAR), [conn_attributes MAP(INTEGER -> "
+		    "BIGINT)])");
 	}
 
 	auto conn_str_pair = Types::ExtractFunctionArg<std::string>(input, 0);
@@ -95,10 +167,10 @@ static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 
 	std::string access_token;
 
-	if (args_count == 2) {
+	if (varchar_args_count == 2) {
 		// Signature: (conn_string, access_token)
 		access_token = ExtractAccessToken(input, 1);
-	} else if (args_count == 3) {
+	} else if (varchar_args_count == 3) {
 		// Signature: (conn_string, username, password)
 		AppendUsernameAndPassword(input, conn_str);
 	}
@@ -114,7 +186,7 @@ static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 		}
 	}
 
-	auto oc_ptr = std_make_unique<OdbcConnection>(conn_str, access_token);
+	auto oc_ptr = std_make_unique<OdbcConnection>(conn_str, access_token, attrs.first);
 
 	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
 	result_data[0] = ConnectionsRegistry::Add(std::move(oc_ptr));
@@ -125,9 +197,9 @@ void OdbcConnectFunction::Register(duckdb_connection conn) {
 	duckdb_scalar_function_set_name(fun.get(), "odbc_connect");
 
 	// parameters and return
-	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
+	auto any_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_ANY), LogicalTypeDeleter);
 	auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
-	duckdb_scalar_function_set_varargs(fun.get(), varchar_type.get());
+	duckdb_scalar_function_set_varargs(fun.get(), any_type.get());
 	duckdb_scalar_function_set_return_type(fun.get(), bigint_type.get());
 
 	// callbacks

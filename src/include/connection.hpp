@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "duckdb_extension_api.hpp"
 #include "odbc_api.hpp"
@@ -28,6 +29,13 @@ enum class DbmsDriver {
 
 struct ExtractedConnection;
 
+struct OdbcConnectionAttribute {
+	int32_t key;
+	int64_t value;
+
+	OdbcConnectionAttribute(int32_t key, int64_t value);
+};
+
 struct OdbcConnection {
 	SQLHANDLE env = nullptr;
 	SQLHANDLE dbc = nullptr;
@@ -38,7 +46,8 @@ struct OdbcConnection {
 	// The token must be a raw OAuth/AAD bearer token string (UTF-8).  The driver requires it
 	// in UTF-16LE form preceded by a 4-byte byte-length field (the ACCESSTOKEN struct from
 	// msodbcsql.h); that encoding is handled internally.
-	OdbcConnection(const std::string &url, const std::string &access_token = "");
+	OdbcConnection(const std::string &url, const std::string &access_token = "",
+	               const std::vector<OdbcConnectionAttribute> &attrs = std::vector<OdbcConnectionAttribute>());
 	~OdbcConnection() noexcept;
 
 	OdbcConnection(OdbcConnection &other) = delete;

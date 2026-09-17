@@ -37,6 +37,20 @@ std::pair<std::string, bool> Types::ExtractFunctionArg<std::string>(duckdb_data_
 		return std::make_pair("", true);
 	}
 
+	auto vec_type = LogicalTypePtr(duckdb_vector_get_column_type(vec), LogicalTypeDeleter);
+	if (!vec_type) {
+		throw ScannerException("Cannot extract VARCHAR function argument: column type is NULL, column: " +
+		                       std::to_string(col_idx) + ", columns count: " + std::to_string(col_count));
+	}
+
+	duckdb_type vec_type_id = duckdb_get_type_id(vec_type.get());
+	if (vec_type_id != DUCKDB_TYPE_VARCHAR) {
+		throw ScannerException(
+		    "Cannot extract VARCHAR function argument: invalid column type: " + std::to_string(vec_type_id) +
+		    ", expected: " + std::to_string(DUCKDB_TYPE_VARCHAR) + ", column: " + std::to_string(col_idx) +
+		    ", columns count: " + std::to_string(col_count));
+	}
+
 	duckdb_string_t *str_data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(vec));
 	duckdb_string_t str_t = str_data[0];
 

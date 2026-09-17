@@ -12,8 +12,8 @@ DUCKDB_EXTENSION_EXTERN
 namespace odbcscanner {
 
 template <typename INT_TYPE>
-static std::pair<INT_TYPE, bool> ExtractFunctionArgInternal(const std::string &type_name, duckdb_data_chunk chunk,
-                                                            idx_t col_idx) {
+static std::pair<INT_TYPE, bool> ExtractFunctionArgInternal(duckdb_type expected_type, const std::string &type_name,
+                                                            duckdb_data_chunk chunk, idx_t col_idx) {
 	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
 	if (col_idx >= col_count) {
 		throw ScannerException("Cannot extract " + type_name + " function argument: column not found, column: " +
@@ -37,6 +37,20 @@ static std::pair<INT_TYPE, bool> ExtractFunctionArgInternal(const std::string &t
 		return std::make_pair(0, true);
 	}
 
+	auto vec_type = LogicalTypePtr(duckdb_vector_get_column_type(vec), LogicalTypeDeleter);
+	if (!vec_type) {
+		throw ScannerException("Cannot extract " + type_name + " function argument: column type is NULL, column: " +
+		                       std::to_string(col_idx) + ", columns count: " + std::to_string(col_count));
+	}
+
+	duckdb_type vec_type_id = duckdb_get_type_id(vec_type.get());
+	if (vec_type_id != expected_type) {
+		throw ScannerException("Cannot extract " + type_name +
+		                       " function argument: invalid column type: " + std::to_string(vec_type_id) +
+		                       ", expected: " + std::to_string(expected_type) + ", column: " + std::to_string(col_idx) +
+		                       ", columns count: " + std::to_string(col_count));
+	}
+
 	INT_TYPE *data = reinterpret_cast<INT_TYPE *>(duckdb_vector_get_data(vec));
 	INT_TYPE res = data[0];
 	return std::make_pair(res, false);
@@ -44,12 +58,12 @@ static std::pair<INT_TYPE, bool> ExtractFunctionArgInternal(const std::string &t
 
 template <>
 std::pair<int32_t, bool> Types::ExtractFunctionArg<int32_t>(duckdb_data_chunk chunk, idx_t col_idx) {
-	return ExtractFunctionArgInternal<int32_t>("INTEGER", chunk, col_idx);
+	return ExtractFunctionArgInternal<int32_t>(DUCKDB_TYPE_INTEGER, "INTEGER", chunk, col_idx);
 }
 
 template <>
 std::pair<int64_t, bool> Types::ExtractFunctionArg<int64_t>(duckdb_data_chunk chunk, idx_t col_idx) {
-	return ExtractFunctionArgInternal<int64_t>("BIGINT", chunk, col_idx);
+	return ExtractFunctionArgInternal<int64_t>(DUCKDB_TYPE_BIGINT, "BIGINT", chunk, col_idx);
 }
 
 template <typename INT_TYPE>

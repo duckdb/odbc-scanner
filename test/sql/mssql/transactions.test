@@ -44,6 +44,40 @@ SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transaction
 ----
 42
 
+# check passing transaction isolation as an attribute
+# SQL_ATTR_AUTOCOMMIT 102
+# SQL_AUTOCOMMIT_ON 1UL
+# SQL_COPT_SS_TXN_ISOLATION 1227
+# SQL_TXN_READ_COMMITTED 2
+# SQL_TXN_SS_SNAPSHOT 32
+
+statement error
+SELECT odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING', MAP {102: 3, 1227: 32})
+----
+Invalid attribute value
+
+statement ok
+SET VARIABLE conn3 = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING', MAP {102: 0, 1227: 2})
+
+query I
+SELECT * FROM odbc_query(getvariable('conn3'), 'SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id = @@SPID')
+----
+2
+
+statement ok
+SELECT odbc_close(getvariable('conn3'))
+
+statement ok
+SET VARIABLE conn3 = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING', MAP {102: 0, 1227: 32})
+
+query I
+SELECT * FROM odbc_query(getvariable('conn3'), 'SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id = @@SPID')
+----
+5
+
+statement ok
+SELECT odbc_close(getvariable('conn3'))
+
 # check transactions enabled, cannot check isolation as second connection hangs
 # in default MSSQL mode with disabled MVCC
 
