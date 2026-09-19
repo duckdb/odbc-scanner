@@ -23,6 +23,7 @@ enum class DbmsDriver {
 	SPARK,
 	CLICKHOUSE,
 	FLIGTHSQL,
+	INFORMIX,
 
 	GENERIC
 };

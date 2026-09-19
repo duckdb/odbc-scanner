@@ -126,3 +126,23 @@ SELECT * FROM odbc_query(
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
 }
+
+TEST_CASE("Informix version query", group_name) {
+	if (!(DBMSConfigured("Informix"))) {
+		return;
+	}
+	ScannerConn sc;
+	Result res;
+	duckdb_state st = duckdb_query(sc.conn, R"(
+SELECT * FROM odbc_query(
+	getvariable('conn'), 
+	'
+		SELECT FIRST 1 dbinfo(''version'', ''full'') FROM sysmaster:sysshmvals
+	'
+	)
+)",
+	                               res.Get());
+	REQUIRE(QuerySuccess(res.Get(), st));
+	REQUIRE(res.NextChunk());
+	std::cout << res.Value<std::string>(0, 0) << std::endl;
+}

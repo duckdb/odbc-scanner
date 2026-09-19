@@ -61,6 +61,9 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 	case DbmsDriver::FLIGTHSQL:
 		this->decimal_columns_as_chars = true;
 		break;
+	case DbmsDriver::INFORMIX:
+		this->var_len_params_long_threshold_bytes = 65478;
+		break;
 
 	case DbmsDriver::GENERIC:
 		break;

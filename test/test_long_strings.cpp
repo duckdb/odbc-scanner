@@ -37,6 +37,8 @@ TEST_CASE("Long string query", group_name) {
 		cast = "CAST(? AS VARCHAR(20000) CHARACTER SET NONE) FROM RDB$DATABASE";
 	} else if (DBMSConfigured("FlightSQL")) {
 		return;
+	} else if (DBMSConfigured("Informix")) {
+		cast = "CAST(? AS LVARCHAR(32739))";
 	}
 	ScannerConn sc;
 	duckdb_prepared_statement ps_ptr = nullptr;

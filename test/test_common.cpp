@@ -323,6 +323,10 @@ std::string CastAsDateSQL(const std::string &value_in, const std::string &alias)
 		postfix = " FROM sysibm.sysdummy1";
 	} else if (DBMSConfigured("Firebird")) {
 		postfix = " FROM rdb$database";
+	} else if (DBMSConfigured("Informix")) {
+		if (value != "?") {
+			value = "(" + value + "::DATETIME YEAR TO DAY)::DATE";
+		}
 	}
 	return "CAST(" + value + " AS " + type_name + ") " + alias + postfix;
 }

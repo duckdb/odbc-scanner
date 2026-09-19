@@ -60,6 +60,12 @@ def run_firebird():
   exec_sql(cur, "SELECT rdb$get_context('SYSTEM', 'ENGINE_VERSION') as version FROM rdb$database")
   print(cur.fetchone())
 
+def run_informix():
+  conn = connect_await_db_startup()
+  cur = conn.cursor()
+  exec_sql(cur, "SELECT FIRST 1 dbinfo('version', 'full') FROM sysmaster:sysshmvals")
+  print(cur.fetchone())
+
 if __name__ == "__main__":
   if args.dbms in [
     "DuckDB",
@@ -83,5 +89,7 @@ if __name__ == "__main__":
     run_snowflake()
   elif "Firebird" == args.dbms:
     run_firebird()
+  elif "Informix" == args.dbms:
+    run_informix()
   else:
     raise Exception("Unsupported DBMS: " + args.dbms)

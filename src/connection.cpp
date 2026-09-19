@@ -47,6 +47,8 @@ static DbmsDriver ResolveDbmsDriver(const std::string &dbms_name, const std::str
 		return DbmsDriver::CLICKHOUSE;
 	} else if (driver_name == "Arrow Flight ODBC Driver") {
 		return DbmsDriver::FLIGTHSQL;
+	} else if (dbms_name == "Informix") {
+		return DbmsDriver::INFORMIX;
 	} else {
 		return DbmsDriver::GENERIC;
 	}
