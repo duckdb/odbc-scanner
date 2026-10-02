@@ -125,6 +125,32 @@ set(EXTENSION_SOURCES
 
 add_library(${EXTENSION_NAME} SHARED ${EXTENSION_SOURCES})
 
+if(APPLE)
+    # unixODBC's install name is an absolute path into whichever package manager
+    # provided it at build time, so the extension would load only where that same
+    # path exists. Refer to it through @rpath instead, and search the prefixes
+    # unixODBC is installed under: Homebrew on Apple silicon and on Intel, and
+    # MacPorts.
+    list(GET ODBC_LIBRARIES 0 ODBC_LIBRARY_FOR_INSTALL_NAME)
+    execute_process(
+        COMMAND otool -D ${ODBC_LIBRARY_FOR_INSTALL_NAME}
+        OUTPUT_VARIABLE ODBC_INSTALL_NAME_OUT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY)
+    string(REGEX REPLACE "^[^\n]*\n" "" ODBC_INSTALL_NAME "${ODBC_INSTALL_NAME_OUT}")
+    get_filename_component(ODBC_INSTALL_LEAF ${ODBC_INSTALL_NAME} NAME)
+    message(STATUS "unixODBC install name: ${ODBC_INSTALL_NAME}, linked as @rpath/${ODBC_INSTALL_LEAF}")
+    target_link_options(${EXTENSION_NAME} PRIVATE -Wl,-headerpad_max_install_names)
+    set_target_properties(${EXTENSION_NAME} PROPERTIES
+        BUILD_RPATH "/opt/homebrew/opt/unixodbc/lib;/usr/local/opt/unixodbc/lib;/opt/local/lib")
+    add_custom_command(
+        TARGET ${EXTENSION_NAME}
+        POST_BUILD
+        COMMAND install_name_tool -change ${ODBC_INSTALL_NAME} @rpath/${ODBC_INSTALL_LEAF}
+            $<TARGET_FILE:${EXTENSION_NAME}>
+    )
+endif()
+
 if(DEFINED ${EXTENSION_NAME}_CMAKE_ONLY_BUILD)
     add_dependencies(${EXTENSION_NAME} duckdb_platform)
     add_dependencies(duckdb_local_extension_repo ${EXTENSION_NAME})
