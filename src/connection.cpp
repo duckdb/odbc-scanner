@@ -7,6 +7,7 @@
 
 #include "capi_pointers.hpp"
 #include "diagnostics.hpp"
+#include "driver_manager.hpp"
 #include "make_unique.hpp"
 #include "registries.hpp"
 #include "scanner_exception.hpp"
@@ -108,6 +109,8 @@ static void ApplyAttributes(SQLHANDLE dbc, const std::string &url, const std::ve
 
 OdbcConnection::OdbcConnection(const std::string &url, const std::string &access_token,
                                const std::vector<OdbcConnectionAttribute> &attrs) {
+	DriverManager::Load();
+
 	{
 		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, nullptr, &env);
 		if (!SQL_SUCCEEDED(ret)) {
