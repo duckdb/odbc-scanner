@@ -5,6 +5,7 @@
 
 #include "capi_pointers.hpp"
 #include "diagnostics.hpp"
+#include "driver_manager.hpp"
 #include "make_unique.hpp"
 #include "odbc_api.hpp"
 #include "scanner_exception.hpp"
@@ -168,6 +169,8 @@ static std::vector<DataSource> ReadDataSourcesOfKind(SQLHANDLE env, DataSourceKi
 
 static std::vector<DataSource> ReadDataSources() {
 	SQLHANDLE env_handle = nullptr;
+	DriverManager::Load();
+
 	{
 		SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, nullptr, &env_handle);
 		if (!SQL_SUCCEEDED(ret)) {
