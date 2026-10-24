@@ -7,7 +7,7 @@ TEST_CASE("Date query with a DATE literal", group_name) {
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               (R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + CastAsDateSQL("''2020-12-31''") +
@@ -31,7 +31,7 @@ TEST_CASE("Date query with a DATE literal parameter", group_name) {
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               (R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + CastAsDateSQL("?", "AS col1") +
@@ -54,35 +54,26 @@ TEST_CASE("Date query with a DATE parameter", group_name) {
 	}
 	ScannerConn sc;
 
-	Result res_create_params;
-	duckdb_state st_create_params = duckdb_query(sc.conn, R"(
-SET VARIABLE params1 = odbc_create_params()
-)",
-	                                             res_create_params.Get());
-	REQUIRE(QuerySuccess(res_create_params.Get(), st_create_params));
-
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn,
 	                                         (R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + CastAsDateSQL("?", "AS col1") +
 	                                          R"(
   ', 
-  params_handle=getvariable('params1'))
+  params=row(?))
 )")
 	                                             .c_str(),
 	                                         &ps_ptr);
 	REQUIRE(PreparedSuccess(ps_ptr, st_prepare));
 	auto ps = PreparedStatementPtr(ps_ptr, PreparedStatementDeleter);
 
-	Result res_bind_params;
-	duckdb_state st_bind_params = duckdb_query(sc.conn, R"(
-SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row('2020-12-31'::DATE))
-)",
-	                                           res_bind_params.Get());
-	REQUIRE(QuerySuccess(res_bind_params.Get(), st_bind_params));
+	duckdb_date_struct date_struct = {2020, 12, 31};
+	auto param_val = ValuePtr(duckdb_create_date(duckdb_to_date(date_struct)), ValueDeleter);
+	duckdb_state st_bind = duckdb_bind_value(ps.get(), 1, param_val.get());
+	REQUIRE(PreparedSuccess(ps_ptr, st_bind));
 
 	Result res;
 	duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());

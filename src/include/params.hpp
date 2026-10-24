@@ -60,8 +60,6 @@ struct Params {
 	static const param_type TYPE_SQL_GUID = DUCKDB_TYPE_UUID + 1000;
 	static const param_type TYPE_SS_TIMESTAMPOFFSET = DUCKDB_TYPE_TIME_TZ + 1000;
 
-	static std::vector<ScannerValue> Extract(DbmsQuirks &quirks, duckdb_data_chunk chunk, idx_t col_idx);
-
 	static std::vector<ScannerValue> Extract(DbmsQuirks &quirks, duckdb_value struct_value);
 
 	static std::vector<SQLSMALLINT> CollectTypes(QueryContext &ctx);

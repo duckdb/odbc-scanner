@@ -10,84 +10,66 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:58:59.123456'' AS TIME)')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:58:59.123456'' AS TIME)')
 ----
 23:58:59.123456
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:58:59.1234567'' AS TIME)')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:58:59.1234567'' AS TIME)')
 ----
 23:58:59.123456
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:58:59.123456'' AS TIME)')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:58:59.123456'' AS TIME)')
 )
 ----
 TIME
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:58:59.123456'' AS TIME)',
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''23:58:59.123456'' AS TIME)',
   enable_columns_binding=TRUE)
 ----
 23:58:59.123456
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(''23:58:59.123456'' AS TIME)',
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(''23:58:59.123456'' AS TIME)',
   enable_columns_binding=TRUE)
 ----
 Invalid Descriptor Index
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIME)', params=row('23:58:59.123456'::TIME))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIME)', params=row('23:58:59.123456'::TIME))
 ----
 23:58:59.123456
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIME(3))', params=row('23:58:59.123456'::TIME))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIME(3))', params=row('23:58:59.123456'::TIME))
 ----
 23:58:59.123
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIME)', params=row('23:58:59.023456'::TIME))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIME)', params=row('23:58:59.023456'::TIME))
 ----
 23:58:59.023456
 
 statement ok
-SET VARIABLE params1 = odbc_create_params()
-
-statement ok
-PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIME)', params_handle=getvariable('params1'))
-
-statement ok
-PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
-
-statement ok
-EXECUTE p1_bind('23:58:59.123456'::TIME)
+PREPARE p1 AS FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS TIME)', params=row(?))
 
 query I
-EXECUTE p1
+EXECUTE p1('23:58:59.123456'::TIME)
 ----
 23:58:59.123456
 
-statement ok
-EXECUTE p1_bind('00:00:00'::TIME)
-
 query I
-EXECUTE p1
+EXECUTE p1('00:00:00'::TIME)
 ----
 00:00:00
 
-statement ok
-EXECUTE p1_bind('23:58:59.123'::TIME)
-
 query I
-EXECUTE p1
+EXECUTE p1('23:58:59.123'::TIME)
 ----
 23:58:59.123
-
-statement ok
-DEALLOCATE p1_bind
 
 statement ok
 DEALLOCATE p1

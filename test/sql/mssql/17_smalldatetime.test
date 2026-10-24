@@ -10,133 +10,97 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:00'' AS SMALLDATETIME)')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:00'' AS SMALLDATETIME)')
 ----
 2020-12-31 23:58:00
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:00'' AS SMALLDATETIME)')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:00'' AS SMALLDATETIME)')
 )
 ----
 TIMESTAMP
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:00'' AS SMALLDATETIME)',
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:00'' AS SMALLDATETIME)',
     timestamp_columns_as_timestamp_ns=TRUE)
 )
 ----
 TIMESTAMP_NS
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:00'' AS SMALLDATETIME)',
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''2020-12-31 23:58:00'' AS SMALLDATETIME)',
   enable_columns_binding=TRUE)
 ----
 2020-12-31 23:58:00
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(''2020-12-31 23:58:00'' AS SMALLDATETIME)',
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(''2020-12-31 23:58:00'' AS SMALLDATETIME)',
   enable_columns_binding=TRUE)
 ----
 Invalid Descriptor Index
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)', params=row('2020-12-31 23:58:00'::TIMESTAMP))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)', params=row('2020-12-31 23:58:00'::TIMESTAMP))
 ----
 2020-12-31 23:58:00
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)', params=row('2020-12-31 23:58:59.123456'::TIMESTAMP))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)', params=row('2020-12-31 23:58:59.123456'::TIMESTAMP))
 ----
 2020-12-31 23:59:00
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)', params=row('1900-01-01 00:00:00.000000'::TIMESTAMP))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)', params=row('1900-01-01 00:00:00.000000'::TIMESTAMP))
 ----
 1900-01-01 00:00:00
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)', params=row('2079-06-06 23:59:00'::TIMESTAMP))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)', params=row('2079-06-06 23:59:00'::TIMESTAMP))
 ----
 2079-06-06 23:59:00
 
 statement ok
-SET VARIABLE params1 = odbc_create_params()
-
-statement ok
-PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)', params_handle=getvariable('params1'))
-
-statement ok
-PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
-
-statement ok
-EXECUTE p1_bind('2020-12-31 23:58:00'::TIMESTAMP)
+PREPARE p1 AS FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)', params=row(?))
 
 query I
-EXECUTE p1
+EXECUTE p1('2020-12-31 23:58:00'::TIMESTAMP)
 ----
 2020-12-31 23:58:00
 
-statement ok
-EXECUTE p1_bind('2020-12-31 23:58:59.123456'::TIMESTAMP)
-
 query I
-EXECUTE p1
+EXECUTE p1('2020-12-31 23:58:59.123456'::TIMESTAMP)
 ----
 2020-12-31 23:59:00
-
-statement ok
-DEALLOCATE p1_bind
 
 statement ok
 DEALLOCATE p1
 
 statement ok
-SET VARIABLE params2 = odbc_create_params()
-
-statement ok
-PREPARE p2 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)',
-  params_handle=getvariable('params2'),
+PREPARE p2 AS FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLDATETIME)',
+  params=row(?),
   timestamp_columns_as_timestamp_ns=TRUE)
 
-statement ok
-PREPARE p2_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params2'), row(?))
-
-statement ok
-EXECUTE p2_bind('2020-12-31 23:58:59.123456'::TIMESTAMP)
-
 query I
-EXECUTE p2
+EXECUTE p2('2020-12-31 23:58:59.123456'::TIMESTAMP)
 ----
 2020-12-31 23:59:00
 
-statement ok
-EXECUTE p2_bind('2020-12-31 23:58:59.123456789'::TIMESTAMP_NS)
-
 query I
-EXECUTE p2
+EXECUTE p2('2020-12-31 23:58:59.123456789'::TIMESTAMP_NS)
 ----
 2020-12-31 23:59:00
 
-statement ok
-EXECUTE p2_bind('1900-01-01 00:00:00.000000'::TIMESTAMP)
-
 query I
-EXECUTE p2
+EXECUTE p2('1900-01-01 00:00:00.000000'::TIMESTAMP)
 ----
 1900-01-01 00:00:00
 
-statement ok
-EXECUTE p2_bind('2079-06-06 23:59:00.000000'::TIMESTAMP)
-
 query I
-EXECUTE p2
+EXECUTE p2('2079-06-06 23:59:00.000000'::TIMESTAMP)
 ----
 2079-06-06 23:59:00
-
-statement ok
-DEALLOCATE p2_bind
 
 statement ok
 DEALLOCATE p2

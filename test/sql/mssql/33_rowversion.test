@@ -19,12 +19,12 @@ statement ok
 CALL odbc_query(getvariable('conn'), 'INSERT INTO test_rowversion(col1) VALUES(42)')
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT col2 FROM test_rowversion')
+FROM odbc_query(getvariable('conn'), 'SELECT col2 FROM test_rowversion')
 -- \x00\x00\x00\x00\x00\x00e\x98
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT col2 FROM test_rowversion')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT col2 FROM test_rowversion')
 )
 ----
 BLOB

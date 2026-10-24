@@ -13,13 +13,11 @@ namespace odbcscanner {
 static void Initialize(duckdb_connection connection, duckdb_extension_info, duckdb_extension_access *) {
 	Registries::Initialize();
 	OdbcBeginTransactionFunction::Register(connection);
-	OdbcBindParamsFunction::Register(connection);
 	OdbcCancelQueryFunction::Register(connection);
 	OdbcCloseFunction::Register(connection);
 	OdbcCommitFunction::Register(connection);
 	OdbcConnectFunction::Register(connection);
 	OdbcCopyFunction::Register(connection);
-	OdbcCreateParamsFunction::Register(connection);
 	OdbcListDataSourcesFunction::Register(connection);
 	OdbcListDriversFunction::Register(connection);
 	OdbcQueryFunction::Register(connection);

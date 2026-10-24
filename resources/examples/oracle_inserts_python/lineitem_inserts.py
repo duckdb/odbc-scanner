@@ -87,81 +87,6 @@ def insert_records_batched_direct_params(cur_reader, cur):
   cur.execute("SELECT odbc_commit(getvariable('conn'))")
   return count
 
-def insert_records_one_by_one_params_handle(cur_reader, cur):
-  print("Inserting records one by one using params handle")
-  cur.execute("SET VARIABLE params = odbc_create_params()")
-  lineitem_insert_single_sql = read_sql("ora_lineitem_insert_single.sql")
-  cur.execute(f"PREPARE prep_stmt AS FROM odbc_query(getvariable('conn'), 'INSERT {lineitem_insert_single_sql}', params_handle=getvariable('params'))")
-  questionmarks = lineitem_questionmarks()
-
-  cur.execute("SELECT odbc_begin_transaction(getvariable('conn'))")
-
-  count = 0
-  while True:
-    row = cur_reader.fetchone()
-    if row is None:
-      break
-    cur.execute(f"SELECT odbc_bind_params(getvariable('conn'), getvariable('params'), row({questionmarks}))", row)
-    cur.execute("EXECUTE prep_stmt")
-    count += 1
-    if 0 == count % 1024:
-      print(f"Inserted: {count}")
-
-  cur.execute("SELECT odbc_commit(getvariable('conn'))")
-  return count
-
-def insert_records_batched_params_handle(cur_reader, cur):
-  print("Inserting records batched using params handle")
-  lineitem_insert_single_sql = read_sql("ora_lineitem_insert_single.sql")
-  questionmarks_single = lineitem_questionmarks()
-
-  sql_arr = ["INSERT ALL"]
-  for i in range(batch_size):
-    sql_arr.append(lineitem_insert_single_sql)
-  sql_arr.append("SELECT 1 FROM DUAL")
-  sql_full_batch = "\n".join(sql_arr)
-  cur.execute("SET VARIABLE params = odbc_create_params()")
-  cur.execute(f"PREPARE prep_stmt AS FROM odbc_query(getvariable('conn'), '{sql_full_batch}', params_handle=getvariable('params'))")
-
-  cur.execute("SELECT odbc_begin_transaction(getvariable('conn'))")
-
-  count = 0
-  part_count = 0
-  while True:
-    batch = cur_reader.fetchmany(batch_size)
-    if len(batch) == 0:
-      break
-    row = []
-    qmarks_arr = []
-    for i in range(len(batch)):
-      row.extend(batch[i])
-      qmarks_arr.append(questionmarks_single)
-    questionmarks = ",".join(qmarks_arr)
-
-    if len(batch) < batch_size:
-      sql_arr = ["INSERT ALL"]
-      for i in range(len(batch)):
-        sql_arr.append(lineitem_insert_single_sql)
-      sql_arr.append("SELECT 1 FROM DUAL")
-      sql = "\n".join(sql_arr)
-      cur.execute(f"DEALLOCATE prep_stmt")
-      cur.execute("SET VARIABLE params = odbc_create_params()")
-      cur.execute(f"PREPARE prep_stmt AS FROM odbc_query(getvariable('conn'), '{sql}', params_handle=getvariable('params'))")
-    else:
-      sql = sql_full_batch
-
-    cur.execute(f"SELECT odbc_bind_params(getvariable('conn'), getvariable('params'), row({questionmarks}))", row)
-    cur.execute("EXECUTE prep_stmt")
-
-    count += len(batch)
-    part_count += len(batch)
-    if part_count >= 1024:
-      print(f"Inserted: {count}")
-      part_count = 0
-
-  cur.execute("SELECT odbc_commit(getvariable('conn'))")
-  return count
-
 def list_inserted(cur):
   cur.execute("FROM odbc_query(getvariable('conn'), 'SELECT count(*) FROM LINEITEM')")
   count = cur.fetchone()[0]
@@ -183,18 +108,13 @@ if __name__ == "__main__":
   start = time.time()
 
   # Records/second: 403
-  # count = insert_records_one_by_one_direct_params(cur_reader, cur)
+  count = insert_records_one_by_one_direct_params(cur_reader, cur)
   # Records/second: 418
   # count = insert_records_batched_direct_params(cur_reader, cur)
-  # Records/second: 566
-  count = insert_records_one_by_one_params_handle(cur_reader, cur)
-  # Records/second: 1703
-  # count = insert_records_batched_params_handle(cur_reader, cur)
 
   elapsed = time.time() - start
   print(f"Elapsed seconds: {elapsed // 1}")
   print(f"Records/second: {count // elapsed}")
 
   list_inserted(cur)
-  cur.execute("DEALLOCATE prep_stmt")
   cur.execute("SELECT odbc_close(getvariable('conn'))")

@@ -33,7 +33,7 @@ TEST_CASE("Query cancellation", group_name) {
 	duckdb_state st1;
 	std::thread th([&sc1, &res1, &st1] {
 		st1 = duckdb_query(sc1.conn, R"(
-  SELECT * FROM odbc_query(
+  FROM odbc_query(
     getvariable('conn'), 
     '
       WAITFOR DELAY ''00:00:10''

@@ -8,10 +8,6 @@ struct OdbcBeginTransactionFunction {
 	static void Register(duckdb_connection connection);
 };
 
-struct OdbcBindParamsFunction {
-	static void Register(duckdb_connection connection);
-};
-
 struct OdbcCancelQueryFunction {
 	static void Register(duckdb_connection connection);
 };
@@ -29,10 +25,6 @@ struct OdbcConnectFunction {
 };
 
 struct OdbcCopyFunction {
-	static void Register(duckdb_connection connection);
-};
-
-struct OdbcCreateParamsFunction {
 	static void Register(duckdb_connection connection);
 };
 

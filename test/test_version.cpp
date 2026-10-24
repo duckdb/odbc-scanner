@@ -11,7 +11,7 @@ TEST_CASE("Common version query", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
 	getvariable('conn'), 
 	'
 		SELECT version()
@@ -31,7 +31,7 @@ TEST_CASE("MSSQL version query", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
 	getvariable('conn'), 
 	'
 		SELECT @@version
@@ -51,7 +51,7 @@ TEST_CASE("Oracle version query", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
 	getvariable('conn'), 
 	'
 		SELECT * FROM PRODUCT_COMPONENT_VERSION
@@ -74,7 +74,7 @@ TEST_CASE("DB2 version query", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
 	getvariable('conn'), 
 	'
 		SELECT SERVICE_LEVEL FROM SYSIBMADM.ENV_INST_INFO
@@ -94,7 +94,7 @@ TEST_CASE("Snowflake version query", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
 	getvariable('conn'), 
 	'
 		SELECT current_version() 
@@ -114,7 +114,7 @@ TEST_CASE("Firebird version query", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
 	getvariable('conn'), 
 	'
 		SELECT ''Firebird '' || rdb$get_context(''SYSTEM'', ''ENGINE_VERSION'') as version FROM rdb$database
@@ -134,7 +134,7 @@ TEST_CASE("Informix version query", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
 	getvariable('conn'), 
 	'
 		SELECT FIRST 1 dbinfo(''version'', ''full'') FROM sysmaster:sysshmvals

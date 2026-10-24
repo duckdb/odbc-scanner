@@ -10,13 +10,13 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::BIGINT')
+FROM odbc_query(getvariable('conn'), 'SELECT 42::BIGINT')
 ----
 42
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::BIGINT')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT 42::BIGINT')
 )
 ----
 BIGINT

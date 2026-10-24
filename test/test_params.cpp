@@ -10,7 +10,7 @@ TEST_CASE("Params query with a single param literal", group_name) {
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               (R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + CastAsBigintSQL("?", "AS col1") +
@@ -44,7 +44,7 @@ TEST_CASE("Params query with a varchar param literal", group_name) {
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               (R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + cast + R"(
@@ -66,7 +66,7 @@ TEST_CASE("Params query with an unsigned integer param", group_name) {
 	ScannerConn sc;
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT ?::UTINYINT AS col1
@@ -87,7 +87,7 @@ TEST_CASE("Params query NULL BIGINT parameter", group_name) {
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               (R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + CastAsBigintSQL("?", "AS col1") +
@@ -111,7 +111,7 @@ TEST_CASE("Params query with multiple params including NULL", group_name) {
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn,
 		                               R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT CAST(? AS BIGINT) AS c1, CAST(? AS BIGINT) AS c2 FROM rdb$database
@@ -129,7 +129,7 @@ SELECT * FROM odbc_query(
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               (R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + CastAsBigintSQL("?", "AS c1") +
@@ -153,7 +153,7 @@ TEST_CASE("Params query Oracle with multiple params including NULL", group_name)
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT CAST(? AS NUMBER(18)) AS c1, CAST(? AS NUMBER(18)) AS c2 FROM dual
@@ -175,7 +175,7 @@ TEST_CASE("Params query DB2 with multiple params including NULL", group_name) {
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT CAST(? AS BIGINT) AS c1, CAST(? AS BIGINT) AS c2 FROM sysibm.sysdummy1
@@ -197,7 +197,7 @@ TEST_CASE("Params query with rebinding", group_name) {
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn,
 	                                         (R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + CastAsBigintSQL("?", "AS col1") +
@@ -227,72 +227,6 @@ SELECT * FROM odbc_query(
 		duckdb_state st_bind = duckdb_bind_value(ps.get(), 1, param_val.get());
 		REQUIRE(PreparedSuccess(ps_ptr, st_bind));
 
-		Result res;
-		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st_exec));
-		REQUIRE(res.NextChunk());
-		REQUIRE(res.Value<int64_t>(0, 0) == 43);
-	}
-}
-
-TEST_CASE("Params query without rebinding", group_name) {
-	if (DBMSConfigured("FlightSQL")) {
-		return;
-	}
-	ScannerConn sc;
-
-	{
-		Result res;
-		duckdb_state st = duckdb_query(sc.conn, R"(
-SET VARIABLE params1 = odbc_create_params()
-)",
-		                               res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st));
-	}
-
-	duckdb_prepared_statement ps_ptr = nullptr;
-	duckdb_state st_prepare = duckdb_prepare(sc.conn,
-	                                         (R"(
-SELECT * FROM odbc_query(
-  getvariable('conn'),
-  '
-    SELECT )" + CastAsBigintSQL("?", "AS col1") +
-	                                          R"(
-  ', 
-  params_handle=getvariable('params1'))
-)")
-	                                             .c_str(),
-	                                         &ps_ptr);
-	REQUIRE(PreparedSuccess(ps_ptr, st_prepare));
-	auto ps = PreparedStatementPtr(ps_ptr, PreparedStatementDeleter);
-
-	{
-		Result res;
-		duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(42))
-)",
-		                               res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st));
-	}
-
-	{
-		Result res;
-		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st_exec));
-		REQUIRE(res.NextChunk());
-		REQUIRE(res.Value<int64_t>(0, 0) == 42);
-	}
-
-	{
-		Result res;
-		duckdb_state st = duckdb_query(sc.conn, R"(
-SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(43))
-)",
-		                               res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st));
-	}
-
-	{
 		Result res;
 		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
 		REQUIRE(QuerySuccess(res.Get(), st_exec));

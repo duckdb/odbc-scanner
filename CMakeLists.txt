@@ -97,11 +97,9 @@ set(EXTENSION_SOURCES
     src/functions/odbc_begin_transaction.cpp
     src/functions/odbc_cancel_query.cpp
     src/functions/odbc_commit.cpp
-    src/functions/odbc_bind_params.cpp
     src/functions/odbc_close.cpp
     src/functions/odbc_connect.cpp
     src/functions/odbc_copy.cpp
-    src/functions/odbc_create_params.cpp
     src/functions/odbc_list_data_sources.cpp
     src/functions/odbc_list_drivers.cpp
     src/functions/odbc_query.cpp

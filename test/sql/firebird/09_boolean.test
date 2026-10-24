@@ -11,36 +11,36 @@ SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 # Basic BOOLEAN test
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(TRUE AS BOOLEAN) FROM rdb$database')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(TRUE AS BOOLEAN) FROM rdb$database')
 ----
 true
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(FALSE AS BOOLEAN) FROM rdb$database')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(FALSE AS BOOLEAN) FROM rdb$database')
 ----
 false
 
 # BOOLEAN expressions
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT (1 = 1) FROM rdb$database')
+FROM odbc_query(getvariable('conn'), 'SELECT (1 = 1) FROM rdb$database')
 ----
 true
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT (1 = 2) FROM rdb$database')
+FROM odbc_query(getvariable('conn'), 'SELECT (1 = 2) FROM rdb$database')
 ----
 false
 
 # NULL value
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS BOOLEAN) FROM rdb$database')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(NULL AS BOOLEAN) FROM rdb$database')
 ----
 NULL
 
 # Verify column type
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(TRUE AS BOOLEAN) FROM rdb$database')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT CAST(TRUE AS BOOLEAN) FROM rdb$database')
 )
 ----
 BOOLEAN
