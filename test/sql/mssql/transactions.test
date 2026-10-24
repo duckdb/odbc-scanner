@@ -13,23 +13,23 @@ statement ok
 SET VARIABLE conn2 = odbc_connect('${ODBC_CONN_STRING}')
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn1'), 'DROP TABLE IF EXISTS duckdb_transactions_test')
+FROM odbc_query(getvariable('conn1'), 'DROP TABLE IF EXISTS duckdb_transactions_test')
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn1'), 'CREATE TABLE duckdb_transactions_test(col1 INT)')
+FROM odbc_query(getvariable('conn1'), 'CREATE TABLE duckdb_transactions_test(col1 INT)')
 
 # check auto-commit enabled by default
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn1'), 'INSERT INTO duckdb_transactions_test VALUES(42)')
+FROM odbc_query(getvariable('conn1'), 'INSERT INTO duckdb_transactions_test VALUES(42)')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 
 query I
-SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 
@@ -37,12 +37,12 @@ statement ok
 SELECT odbc_rollback(getvariable('conn1'))
 
 query I
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 
 query I
-SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 
@@ -62,7 +62,7 @@ statement ok
 SET VARIABLE conn3 = odbc_connect('${ODBC_CONN_STRING}', MAP {102: 0, 1227: 2})
 
 query I
-SELECT * FROM odbc_query(getvariable('conn3'), 'SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id = @@SPID')
+FROM odbc_query(getvariable('conn3'), 'SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id = @@SPID')
 ----
 2
 
@@ -73,7 +73,7 @@ statement ok
 SET VARIABLE conn3 = odbc_connect('${ODBC_CONN_STRING}', MAP {102: 0, 1227: 32})
 
 query I
-SELECT * FROM odbc_query(getvariable('conn3'), 'SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id = @@SPID')
+FROM odbc_query(getvariable('conn3'), 'SELECT transaction_isolation_level FROM sys.dm_exec_sessions WHERE session_id = @@SPID')
 ----
 5
 
@@ -87,10 +87,10 @@ statement ok
 SELECT odbc_begin_transaction(getvariable('conn1'))
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn1'), 'INSERT INTO duckdb_transactions_test VALUES(43)')
+FROM odbc_query(getvariable('conn1'), 'INSERT INTO duckdb_transactions_test VALUES(43)')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 43
@@ -99,20 +99,20 @@ statement ok
 SELECT odbc_rollback(getvariable('conn1'))
 
 query I
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 
 query I
-SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn1'), 'INSERT INTO duckdb_transactions_test VALUES(44)')
+FROM odbc_query(getvariable('conn1'), 'INSERT INTO duckdb_transactions_test VALUES(44)')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 44
@@ -121,17 +121,17 @@ statement ok
 SELECT odbc_commit(getvariable('conn1'))
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn2'), 'INSERT INTO duckdb_transactions_test VALUES(45)')
+FROM odbc_query(getvariable('conn2'), 'INSERT INTO duckdb_transactions_test VALUES(45)')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 44
 45
 
 query I
-SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 44
@@ -142,14 +142,14 @@ SELECT odbc_rollback(getvariable('conn2'))
 
 
 query I
-SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn1'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 44
 45
 
 query I
-SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
+FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transactions_test ORDER BY col1')
 ----
 42
 44
@@ -158,7 +158,7 @@ SELECT * FROM odbc_query(getvariable('conn2'), 'SELECT * FROM duckdb_transaction
 # cleanup
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn1'), 'DROP TABLE duckdb_transactions_test')
+FROM odbc_query(getvariable('conn1'), 'DROP TABLE duckdb_transactions_test')
 
 statement ok
 SELECT odbc_close(getvariable('conn1'))

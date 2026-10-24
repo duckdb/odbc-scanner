@@ -44,7 +44,7 @@ TEST_CASE("Long string query", group_name) {
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn,
 	                                         std::string(R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + cast + R"(
@@ -100,7 +100,7 @@ TEST_CASE("Long string query Oracle", group_name) {
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn,
 	                                         R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT
@@ -163,7 +163,7 @@ TEST_CASE("Long string query FlightSQL", group_name) {
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn,
 		                               (R"(
-	SELECT * FROM odbc_query(
+	FROM odbc_query(
 		getvariable('conn'), 
 		'
 			SELECT repeat(''0123456789'', )" +
@@ -196,7 +196,7 @@ TEST_CASE("Long binary query", group_name) {
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn,
 	                                         std::string(R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
     SELECT )" + cast + R"(

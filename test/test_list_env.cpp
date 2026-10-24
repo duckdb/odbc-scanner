@@ -7,7 +7,7 @@ TEST_CASE("List drivers", group_name) {
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               R"(
-SELECT * FROM odbc_list_drivers()
+FROM odbc_list_drivers()
 )",
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));
@@ -18,7 +18,7 @@ TEST_CASE("List data sources", group_name) {
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               R"(
-SELECT * FROM odbc_list_data_sources()
+FROM odbc_list_data_sources()
 )",
 	                               res.Get());
 	REQUIRE(QuerySuccess(res.Get(), st));

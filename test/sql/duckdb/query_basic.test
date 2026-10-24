@@ -3,7 +3,7 @@
 # group: [duckdb_query_basic]
 
 statement error
-SELECT * FROM odbc_query()
+FROM odbc_query()
 ----
 Catalog Error: Table Function
 
@@ -12,27 +12,27 @@ require odbc_scanner
 require-env ODBC_CONN_STRING
 
 statement error
-SELECT * FROM odbc_query()
+FROM odbc_query()
 ----
 <REGEX>:.*Binder Error: No function matches the given name and argument types 'odbc_query\(\)'.*
 
 statement error
-SELECT * FROM odbc_query(NULL, 'SELECT 42')
+FROM odbc_query(NULL, 'SELECT 42')
 ----
 Binder Error: 'odbc_query' error: specified ODBC connection must be not NULL
 
 statement error
-SELECT * FROM odbc_query(getvariable('fail'), 'SELECT 42')
+FROM odbc_query(getvariable('fail'), 'SELECT 42')
 ----
 Binder Error: 'odbc_query' error: specified ODBC connection must be not NULL
 
 statement error
-SELECT * FROM odbc_query(42::BIGINT, 'SELECT 42')
+FROM odbc_query(42::BIGINT, 'SELECT 42')
 ----
 Binder Error: 'odbc_query' error: ODBC connection not found on bind, id: 42
 
 statement error
-SELECT * FROM odbc_query(42::FLOAT, 'SELECT 42')
+FROM odbc_query(42::FLOAT, 'SELECT 42')
 ----
 Binder Error: 'odbc_query' error: invalid first argument specified, type ID: 10
 
@@ -40,36 +40,36 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), NULL)
+FROM odbc_query(getvariable('conn'), NULL)
 ----
 Binder Error: 'odbc_query' error: specified SQL query must be not NULL
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'FAIL')
+FROM odbc_query(getvariable('conn'), 'FAIL')
 ----
 <REGEX>:.*Binder Error:.*FAIL.*
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42, ''foo'' UNION ALL SELECT 43, ''bar'' ORDER BY 1')
+FROM odbc_query(getvariable('conn'), 'SELECT 42, ''foo'' UNION ALL SELECT 43, ''bar'' ORDER BY 1')
 ----
 42	foo
 43	bar
 
 query II
 SELECT column_name, column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42 AS col1, ''foo'' AS col2')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT 42 AS col1, ''foo'' AS col2')
 )
 ----
 col1	INTEGER
 col2	VARCHAR
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT NULL')
+FROM odbc_query(getvariable('conn'), 'SELECT NULL')
 ----
 NULL
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT NULL::INTEGER')
+FROM odbc_query(getvariable('conn'), 'SELECT NULL::INTEGER')
 ----
 NULL
 

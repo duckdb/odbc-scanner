@@ -10,69 +10,54 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARCHAR(3))')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARCHAR(3))')
 ----
 foo
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARCHAR(6))')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARCHAR(6))')
 ----
 foo
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARCHAR(MAX))')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARCHAR(MAX))')
 ----
 foo
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARCHAR(MAX))')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS VARCHAR(MAX))')
 )
 ----
 VARCHAR
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARCHAR(MAX))', params=row('foo'::VARCHAR))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARCHAR(MAX))', params=row('foo'::VARCHAR))
 ----
 foo
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARCHAR(MAX))', params=row('🌌'::VARCHAR))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARCHAR(MAX))', params=row('🌌'::VARCHAR))
 ----
 ??
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARCHAR(MAX))', params=row(NULL::VARCHAR))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARCHAR(MAX))', params=row(NULL::VARCHAR))
 ----
 NULL
 
 statement ok
-SET VARIABLE params1 = odbc_create_params()
-
-statement ok
-PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARCHAR(MAX))', params_handle=getvariable('params1'))
-
-statement ok
-PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
-
-statement ok
-EXECUTE p1_bind('foo'::VARCHAR)
+PREPARE p1 AS FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS VARCHAR(MAX))', params=row(?))
 
 query I
-EXECUTE p1
+EXECUTE p1('foo'::VARCHAR)
 ----
 foo
 
-statement ok
-EXECUTE p1_bind('bar'::VARCHAR)
-
 query I
-EXECUTE p1
+EXECUTE p1('bar'::VARCHAR)
 ----
 bar
-
-statement ok
-DEALLOCATE p1_bind
 
 statement ok
 DEALLOCATE p1

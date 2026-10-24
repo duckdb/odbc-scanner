@@ -10,13 +10,13 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMERIC(4,3))')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMERIC(4,3))')
 ----
 1.234
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMERIC(4,3))')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS NUMERIC(4,3))')
 )
 ----
 DECIMAL(4,3)

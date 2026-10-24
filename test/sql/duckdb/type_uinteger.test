@@ -10,51 +10,39 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::UINTEGER')
+FROM odbc_query(getvariable('conn'), 'SELECT 42::UINTEGER')
 ----
 42
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::UINTEGER')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT 42::UINTEGER')
 )
 ----
 UINTEGER
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::UINTEGER', params=row(42::UINTEGER))
+FROM odbc_query(getvariable('conn'), 'SELECT ?::UINTEGER', params=row(42::UINTEGER))
 ----
 42
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::UINTEGER', params=row(0::UINTEGER))
+FROM odbc_query(getvariable('conn'), 'SELECT ?::UINTEGER', params=row(0::UINTEGER))
 ----
 0
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::UINTEGER', params=row(4294967295::UINTEGER))
+FROM odbc_query(getvariable('conn'), 'SELECT ?::UINTEGER', params=row(4294967295::UINTEGER))
 ----
 4294967295
 
 statement ok
-SET VARIABLE params1 = odbc_create_params()
-
-statement ok
-PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::UINTEGER', params_handle=getvariable('params1'))
-
-statement ok
-PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
-
-statement ok
-EXECUTE p1_bind(4294967295::UINTEGER)
+PREPARE p1 AS FROM odbc_query(getvariable('conn'), 'SELECT ?::UINTEGER', params=row(?))
 
 query I
-EXECUTE p1
+EXECUTE p1(4294967295::UINTEGER)
 ----
 4294967295
-
-statement ok
-DEALLOCATE p1_bind
 
 statement ok
 DEALLOCATE p1

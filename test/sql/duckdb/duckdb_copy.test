@@ -38,7 +38,7 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 1	1
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
+FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # batch tail query single
 
@@ -55,7 +55,7 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 1	18
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
+FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # batch tail gen
 
@@ -69,7 +69,7 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 1	18
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
+FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # custom quotes
 query II
@@ -88,7 +88,7 @@ SELECT column_name FROM odbc_query(getvariable('conn'), 'SUMMARIZE duckdb_test_c
 _foo_col1_foo_
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
+FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 
 # int → VARCHAR primary key round-trip (regression test for duckdb/odbc-scanner#161).
 # The Firebird ODBC driver ≤ 3.5.0 silently dropped rows on this exact shape;
@@ -97,10 +97,10 @@ SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_test_copy')
 # batch_size=1 exercises the per-row bind that was the most fragile shape.
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE IF EXISTS duckdb_int_to_varchar_pk')
+FROM odbc_query(getvariable('conn'), 'DROP TABLE IF EXISTS duckdb_int_to_varchar_pk')
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'),
+FROM odbc_query(getvariable('conn'),
   'CREATE TABLE duckdb_int_to_varchar_pk (id VARCHAR(20) NOT NULL PRIMARY KEY)')
 
 query II
@@ -113,7 +113,7 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 1	500
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'),
+FROM odbc_query(getvariable('conn'),
   'SELECT id FROM duckdb_int_to_varchar_pk WHERE id IN (''1'', ''2'', ''42'', ''500'') ORDER BY id')
 ----
 1
@@ -122,7 +122,7 @@ SELECT * FROM odbc_query(getvariable('conn'),
 500
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_int_to_varchar_pk')
+FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_int_to_varchar_pk')
 
 # bind-once-execute-many for the single-row path (duckdb/odbc-scanner#163, item 2).
 # batch_size=1 forces the scanner to take the single-row branch of the inner
@@ -134,7 +134,7 @@ SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_int_to_varchar_
 # the reuse path many times across multiple internal data chunks.
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'),
+FROM odbc_query(getvariable('conn'),
   'CREATE TABLE duckdb_bind_once (col1 INTEGER NOT NULL)')
 
 query II
@@ -148,13 +148,13 @@ SELECT completed, rows_processed FROM odbc_copy(getvariable('conn'),
 # sum() over INTEGER returns HUGEINT in DuckDB, which the scanner cannot map
 # directly; cast to BIGINT so the three columns all come back as integers.
 query III
-SELECT * FROM odbc_query(getvariable('conn'),
+FROM odbc_query(getvariable('conn'),
   'SELECT min(col1), max(col1), sum(col1)::BIGINT FROM duckdb_bind_once')
 ----
 1	500	125250
 
 statement ok
-SELECT * FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_bind_once')
+FROM odbc_query(getvariable('conn'), 'DROP TABLE duckdb_bind_once')
 
 statement ok
 SELECT odbc_close(getvariable('conn'))

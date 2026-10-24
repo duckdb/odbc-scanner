@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
 
 env:
-  DUCKDB_CAPI_LIB_URL_LINUX_AMD64: https://github.com/duckdb/duckdb/releases/download/v1.5.6/libduckdb-linux-amd64.zip
+  DUCKDB_CAPI_LIB_URL_LINUX_AMD64: https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-shared-libs-linux-amd64.tar.gz
   CCACHE_DIR: ${{ github.workspace }}/ccache
-  DUCKDB_TEST_VERSION: v1.5.6
+  DUCKDB_TEST_VERSION: v2.0.0
 
 jobs:
   format-check:
@@ -28,7 +28,7 @@ jobs:
       CC: 'ccache gcc'
       CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={DuckDB Driver};
-      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v1.5.6.0/duckdb_odbc-linux-amd64.zip
+      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v2.0.0.0/duckdb_odbc-linux-amd64.zip
       DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.so
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
     steps:
@@ -65,7 +65,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build
@@ -79,7 +79,7 @@ jobs:
 
       - name: SQL Tests
         run: |
-          python ./resources/scripts/run_sqllogic_tests.py --dbms DuckDB
+          python ./resources/scripts/run_sqllogic_tests.py #--dbms DuckDB
 
       - name: Save Cache
         uses: actions/cache/save@v5
@@ -94,9 +94,9 @@ jobs:
     env:
       GEN: ninja
       ODBC_CONN_STRING: Driver={DuckDB Driver};
-      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v1.5.6.0/duckdb_odbc-osx-universal.zip
+      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v2.0.0.0/duckdb_odbc-macos-arm64.zip
       DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.dylib
-      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v1.5.6/libduckdb-osx-universal.zip
+      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-shared-libs-osx-arm64.tar.gz
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.dylib
     steps:
       - uses: actions/checkout@v6
@@ -123,7 +123,7 @@ jobs:
           mkdir odbc
           pushd odbc
           curl --no-progress-meter -LO "${DUCKDB_ODBC_LIB_URL}"
-          unzip -q duckdb_odbc-osx-universal.zip
+          unzip -q duckdb_odbc-macos-arm64.zip
           ls -laR
           popd
           ./resources/scripts/macos_update_downloaded_lib.sh ${DUCKDB_ODBC_LIB_PATH}
@@ -136,7 +136,7 @@ jobs:
           mkdir libduckdb
           pushd libduckdb
           curl --no-progress-meter -LO "${DUCKDB_CAPI_LIB_URL}"
-          unzip -q libduckdb-osx-universal.zip
+          tar xzvf duckdb-shared-libs-osx-arm64.tar.gz
           ls -laR
           popd
 
@@ -162,8 +162,8 @@ jobs:
       CXX: 'ccache cl'
       CCACHE_DIR: ${{ github.workspace }}/ccache
       ODBC_CONN_STRING: Driver={DuckDB Driver};
-      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v1.5.6.0/duckdb_odbc-windows-amd64.zip
-      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v1.5.6/libduckdb-windows-amd64.zip
+      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v2.0.0.0/duckdb_odbc-windows-amd64.zip
+      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-shared-libs-windows-amd64.tar.gz 
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/duckdb.lib
       DUCKDB_CAPI_LIB_SHARED_PATH: ${{ github.workspace }}/libduckdb/duckdb.dll
     steps:
@@ -205,7 +205,7 @@ jobs:
           mkdir libduckdb
           pushd libduckdb
           curl --no-progress-meter -LO "${DUCKDB_CAPI_LIB_URL}"
-          unzip -q libduckdb-windows-amd64.zip
+          tar xzvf duckdb-shared-libs-windows-amd64.tar.gz 
           ls -laR
           popd
 
@@ -308,7 +308,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build
@@ -379,7 +379,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build
@@ -452,7 +452,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build
@@ -523,7 +523,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build
@@ -605,7 +605,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build
@@ -687,7 +687,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build
@@ -764,7 +764,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build
@@ -839,7 +839,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build
@@ -905,7 +905,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build
@@ -981,7 +981,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build
@@ -1008,7 +1008,7 @@ jobs:
       CXX: 'ccache cl'
       CCACHE_DIR: ${{ github.workspace }}/ccache
       ODBC_CONN_STRING: Driver={Firebird ODBC Driver};Database=localhost:C:/tmp/test.fdb;UID=SYSDBA;PWD=masterkey;CHARSET=UTF8;
-      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v1.5.6/libduckdb-windows-amd64.zip
+      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-shared-libs-windows-amd64.tar.gz
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/duckdb.lib
       DUCKDB_CAPI_LIB_SHARED_PATH: ${{ github.workspace }}/libduckdb/duckdb.dll
     steps:
@@ -1065,7 +1065,7 @@ jobs:
           mkdir libduckdb
           pushd libduckdb
           curl --no-progress-meter -LO "${DUCKDB_CAPI_LIB_URL}"
-          unzip -q libduckdb-windows-amd64.zip
+          tar xzvf duckdb-shared-libs-windows-amd64.tar.gz 
           ls -laR
           popd
 
@@ -1155,7 +1155,7 @@ jobs:
           mkdir libduckdb
           cd libduckdb
           curl --no-progress-meter -LO ${DUCKDB_CAPI_LIB_URL_LINUX_AMD64}
-          unzip -q libduckdb-linux-amd64.zip
+          tar xzvf duckdb-shared-libs-linux-amd64.tar.gz
           ls -laR
 
       - name: Build

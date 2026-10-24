@@ -10,7 +10,7 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT FAILURE')
+FROM odbc_query(getvariable('conn'), 'SELECT FAILURE')
 ----
 Error:
 

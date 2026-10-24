@@ -5,7 +5,7 @@
 require odbc_scanner
 
 query II
-SELECT * FROM odbc_query('Driver={DuckDB Driver};', 'SELECT 42, ''foo'' UNION ALL SELECT 43, ''bar'' ORDER BY 1')
+FROM odbc_query('Driver={DuckDB Driver};', 'SELECT 42, ''foo'' UNION ALL SELECT 43, ''bar'' ORDER BY 1')
 ----
 42	foo
 43	bar

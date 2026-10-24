@@ -10,89 +10,71 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(1 AS BIT)')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(1 AS BIT)')
 ----
 TRUE
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(0 AS BIT)')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(0 AS BIT)')
 ----
 FALSE
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(1 AS BIT)')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT CAST(1 AS BIT)')
 )
 ----
 BOOLEAN
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS INT), CAST(1 AS BIT)')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(42 AS INT), CAST(1 AS BIT)')
 ----
 42	1
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(1 AS BIT)',
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(''foo'' AS NVARCHAR(max)), CAST(1 AS BIT)',
   enable_columns_binding=TRUE)
 ----
 Invalid Descriptor Index
 
 query II
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(0 AS BIT), CAST(1 AS BIT)',
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(0 AS BIT), CAST(1 AS BIT)',
   enable_columns_binding=TRUE)
 ----
 0	1
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params=row(TRUE))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params=row(TRUE))
 ----
 TRUE
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params=row(FALSE))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params=row(FALSE))
 ----
 FALSE
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params=row(NULL))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params=row(NULL))
 ----
 NULL
 
 statement ok
-SET VARIABLE params1 = odbc_create_params()
-
-statement ok
-PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params_handle=getvariable('params1'))
-
-statement ok
-PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
-
-statement ok
-EXECUTE p1_bind(TRUE)
+PREPARE p1 AS FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS BIT)', params=row(?))
 
 query I
-EXECUTE p1
+EXECUTE p1(TRUE)
 ----
 TRUE
 
-statement ok
-EXECUTE p1_bind(FALSE)
-
 query I
-EXECUTE p1
+EXECUTE p1(FALSE)
 ----
 FALSE
 
-statement ok
-EXECUTE p1_bind(NULL)
-
 query I
-EXECUTE p1
+EXECUTE p1(NULL)
 ----
 NULL
-
-statement ok
-DEALLOCATE p1_bind
 
 statement ok
 DEALLOCATE p1

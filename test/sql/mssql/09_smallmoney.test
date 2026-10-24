@@ -10,70 +10,55 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.1234 AS SMALLMONEY)')
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.1234 AS SMALLMONEY)')
 ----
 42.1234
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(41.1234 AS SMALLMONEY)')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT CAST(41.1234 AS SMALLMONEY)')
 )
 ----
 DECIMAL(10,4)
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.1234 AS SMALLMONEY)',
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(42.1234 AS SMALLMONEY)',
   enable_columns_binding=TRUE)
 ----
 Inconsistent descriptor information
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(42.1234::DECIMAL(10,4)))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(42.1234::DECIMAL(10,4)))
 ----
 42.1234
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(0::DECIMAL(10,4)))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(0::DECIMAL(10,4)))
 ----
 0
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(214748.3647::DECIMAL(10,4)))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(214748.3647::DECIMAL(10,4)))
 ----
 214748.3647
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(-214748.3648::DECIMAL(10,4)))
+FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(-214748.3648::DECIMAL(10,4)))
 ----
 -214748.3648
 
 statement ok
-SET VARIABLE params1 = odbc_create_params()
-
-statement ok
-PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params_handle=getvariable('params1'))
-
-statement ok
-PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
-
-statement ok
-EXECUTE p1_bind(214748.3647::DECIMAL(10,4))
+PREPARE p1 AS FROM odbc_query(getvariable('conn'), 'SELECT CAST(? AS SMALLMONEY)', params=row(?))
 
 query I
-EXECUTE p1
+EXECUTE p1(214748.3647::DECIMAL(10,4))
 ----
 214748.3647
 
-statement ok
-EXECUTE p1_bind(-214748.3648::DECIMAL(10,4))
-
 query I
-EXECUTE p1
+EXECUTE p1(-214748.3648::DECIMAL(10,4))
 ----
 -214748.3648
-
-statement ok
-DEALLOCATE p1_bind
 
 statement ok
 DEALLOCATE p1

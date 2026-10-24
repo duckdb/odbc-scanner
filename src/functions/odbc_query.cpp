@@ -55,13 +55,12 @@ struct BindData {
 
 	std::vector<SQLSMALLINT> param_types;
 	std::vector<ScannerValue> params;
-	int64_t params_handle = 0;
 
 	BindData(int64_t conn_id_in, QueryContext ctx_in, std::vector<ResultColumn> columns_in,
 	         QueryOptions query_options_in, std::vector<SQLSMALLINT> param_types_in,
-	         std::vector<ScannerValue> params_in, int64_t params_handle_in)
+	         std::vector<ScannerValue> params_in)
 	    : conn_id(conn_id_in), ctx(std::move(ctx_in)), columns(std::move(columns_in)), query_options(query_options_in),
-	      param_types(std::move(param_types_in)), params(std::move(params_in)), params_handle(params_handle_in) {
+	      param_types(std::move(param_types_in)), params(std::move(params_in)) {
 	}
 
 	BindData(const BindData &other) = delete;
@@ -69,13 +68,6 @@ struct BindData {
 
 	BindData &operator=(const BindData &other) = delete;
 	BindData &operator=(BindData &&other) = delete;
-
-	~BindData() noexcept {
-		if (params_handle != 0) {
-			auto params_ptr = ParamsRegistry::Remove(params_handle);
-			(void)params_ptr;
-		}
-	}
 
 	static void Destroy(void *bdata_in) noexcept {
 		auto bdata = reinterpret_cast<BindData *>(bdata_in);
@@ -191,28 +183,14 @@ static void Bind(duckdb_bind_info info) {
 		params = Params::Extract(quirks, params_val.get());
 	}
 
-	int64_t params_handle = 0;
-	auto param_handle_val = ValuePtr(duckdb_bind_get_named_parameter(info, "params_handle"), ValueDeleter);
-	if (param_handle_val.get() != nullptr && !duckdb_is_null_value(param_handle_val.get())) {
-		params_handle = duckdb_get_int64(param_handle_val.get());
-		auto params_ptr = ParamsRegistry::Remove(params_handle);
-		if (params_ptr.get() == nullptr) {
-			throw ScannerException("'odbc_query' error: specified parameters handle not found, ID: " +
-			                       std::to_string(params_handle));
-		}
-		ParamsRegistry::Add(std::move(params_ptr));
-	}
-
 	std::vector<ResultColumn> columns = Columns::Collect(ctx);
 
 	// This must go after the Columns::Collect to prevent the crash in MSSQL ODBC driver
 	// https://web.archive.org/web/20251225082810/https://developercommunity.visualstudio.com/t/SQL-Server-ODBC-driver-186-crash-with-S/11021276
 	std::vector<SQLSMALLINT> param_types;
-	if (params_val.get() != nullptr || param_handle_val.get() != nullptr) {
+	if (params_val.get() != nullptr) {
 		param_types = Params::CollectTypes(ctx);
-		if (params_val.get() != nullptr) {
-			Params::SetExpectedTypes(ctx, param_types, params);
-		}
+		Params::SetExpectedTypes(ctx, param_types, params);
 	}
 
 	if (columns.size() == 0) {
@@ -226,9 +204,8 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 
-	auto bdata_ptr =
-	    std::unique_ptr<BindData>(new BindData(extracted_conn.id, std::move(ctx), std::move(columns), query_options,
-	                                           std::move(param_types), std::move(params), params_handle));
+	auto bdata_ptr = std::unique_ptr<BindData>(new BindData(extracted_conn.id, std::move(ctx), std::move(columns),
+	                                                        query_options, std::move(param_types), std::move(params)));
 	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
 }
 
@@ -252,15 +229,6 @@ static SqlExecStatus BindParamsAndExecute(BindData &bdata) {
 
 	if (bdata.params.size() > 0) {
 		Params::BindToOdbc(ctx, bdata.params);
-	} else if (bdata.params_handle != 0) {
-		auto params_ptr = ParamsRegistry::Remove(bdata.params_handle);
-		if (params_ptr.get() == nullptr) {
-			throw ScannerException("'odbc_query' error: specified parameters handle not found, ID: " +
-			                       std::to_string(bdata.params_handle));
-		}
-		auto deferred = Defer([&params_ptr] { ParamsRegistry::Add(std::move(params_ptr)); });
-		Params::SetExpectedTypes(bdata.ctx, bdata.param_types, *params_ptr);
-		Params::BindToOdbc(ctx, *params_ptr);
 	}
 
 	if (ctx.quirks.reset_stmt_before_execute) {
@@ -397,7 +365,6 @@ void OdbcQueryFunction::Register(duckdb_connection conn) {
 	duckdb_table_function_set_name(fun.get(), "odbc_query");
 
 	// parameters
-	auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
 	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
 	auto any_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_ANY), LogicalTypeDeleter);
 	auto bool_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN), LogicalTypeDeleter);
@@ -410,7 +377,6 @@ void OdbcQueryFunction::Register(duckdb_connection conn) {
 	duckdb_table_function_add_named_parameter(fun.get(), "close_connection", bool_type.get());
 	// query params
 	duckdb_table_function_add_named_parameter(fun.get(), "params", any_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "params_handle", bigint_type.get());
 	// quirks
 	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_as_chars", bool_type.get());
 	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_precision_through_ard", bool_type.get());

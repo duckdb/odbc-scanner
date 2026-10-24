@@ -10,7 +10,7 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), '
+FROM odbc_query(getvariable('conn'), '
   SELECT ''foo'' AS col1, 42 AS col2
   FROM (VALUES (1)) AS tab1(dummy)
   FOR XML AUTO;
@@ -20,7 +20,7 @@ SELECT * FROM odbc_query(getvariable('conn'), '
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), '
+  DESCRIBE FROM odbc_query(getvariable('conn'), '
     SELECT ''foo'' AS col1, 42 AS col2
     FROM (VALUES (1)) AS tab1(dummy)
     FOR XML AUTO;
@@ -30,7 +30,7 @@ SELECT column_type from (
 VARCHAR
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), '
+FROM odbc_query(getvariable('conn'), '
   SELECT ? AS col1, ? AS col2
   FROM (VALUES (1)) AS tab1(dummy)
   FOR XML AUTO;

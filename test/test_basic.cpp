@@ -7,7 +7,7 @@ TEST_CASE("Basic query with a single value", group_name) {
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               (R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
 	getvariable('conn'), 
 	'
 		SELECT )" + CastAsBigintSQL("42") +
@@ -27,7 +27,7 @@ TEST_CASE("Basic query with multiple rows and columns", group_name) {
 	Result res;
 	duckdb_state st = duckdb_query(sc.conn,
 	                               (R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
 	getvariable('conn'),
 	'
 		SELECT a.col1, a.col2 FROM (
@@ -57,7 +57,7 @@ TEST_CASE("Basic query with a prepared statement", group_name) {
 	duckdb_prepared_statement ps_ptr = nullptr;
 	duckdb_state st_prepare = duckdb_prepare(sc.conn,
 	                                         (R"(
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   '
 		SELECT )" + CastAsBigintSQL("42") + R"(
@@ -100,7 +100,7 @@ TEST_CASE("Update query with zero rows changed", group_name) {
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn,
 		                               (R"(
-	SELECT * FROM odbc_query(
+	FROM odbc_query(
 		getvariable('conn'), 
 		'
 			DROP TABLE )" + IfExistsSQL() +
@@ -117,7 +117,7 @@ TEST_CASE("Update query with zero rows changed", group_name) {
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn,
 		                               R"(
-	SELECT * FROM odbc_query(
+	FROM odbc_query(
 		getvariable('conn'), 
 		'
 			CREATE TABLE duckdb_test_update_zero_rows (col1 INTEGER)
@@ -131,7 +131,7 @@ TEST_CASE("Update query with zero rows changed", group_name) {
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn,
 		                               R"(
-	SELECT * FROM odbc_query(
+	FROM odbc_query(
 		getvariable('conn'), 
 		'
 			INSERT INTO duckdb_test_update_zero_rows VALUES(42)
@@ -145,7 +145,7 @@ TEST_CASE("Update query with zero rows changed", group_name) {
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn,
 		                               R"(
-	SELECT * FROM odbc_query(
+	FROM odbc_query(
 		getvariable('conn'), 
 		'
 			UPDATE duckdb_test_update_zero_rows SET col1 = 42 WHERE 1 < 0
@@ -159,7 +159,7 @@ TEST_CASE("Update query with zero rows changed", group_name) {
 		Result res;
 		duckdb_state st = duckdb_query(sc.conn,
 		                               R"(
-	SELECT * FROM odbc_query(
+	FROM odbc_query(
 		getvariable('conn'), 
 		'
 			DROP TABLE duckdb_test_update_zero_rows

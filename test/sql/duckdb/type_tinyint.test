@@ -10,56 +10,44 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::TINYINT')
+FROM odbc_query(getvariable('conn'), 'SELECT 42::TINYINT')
 ----
 42
 
 query I
 SELECT column_type from (
-  DESCRIBE SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 42::TINYINT')
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT 42::TINYINT')
 )
 ----
 TINYINT
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(42::TINYINT))
+FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(42::TINYINT))
 ----
 42
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(0::TINYINT))
+FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(0::TINYINT))
 ----
 0
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(127::TINYINT))
+FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(127::TINYINT))
 ----
 127
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(-127::TINYINT))
+FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(-127::TINYINT))
 ----
 -127
 
 statement ok
-SET VARIABLE params1 = odbc_create_params()
-
-statement ok
-PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params_handle=getvariable('params1'))
-
-statement ok
-PREPARE p1_bind AS SELECT odbc_bind_params(getvariable('conn'), getvariable('params1'), row(?))
-
-statement ok
-EXECUTE p1_bind(127::TINYINT)
+PREPARE p1 AS FROM odbc_query(getvariable('conn'), 'SELECT ?::TINYINT', params=row(?))
 
 query I
-EXECUTE p1
+EXECUTE p1(127::TINYINT)
 ----
 127
-
-statement ok
-DEALLOCATE p1_bind
 
 statement ok
 DEALLOCATE p1

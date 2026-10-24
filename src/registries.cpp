@@ -34,25 +34,9 @@ static std::shared_ptr<std::set<int64_t>> SharedConnectionsRegistry() {
 	return registry;
 }
 
-static void SharedParamsRegistryDeleter(std::set<int64_t> *reg_ptr) {
-	auto &reg = *reg_ptr;
-	for (int64_t params_id : reg) {
-		std::vector<ScannerValue> *params_ptr = reinterpret_cast<std::vector<ScannerValue> *>(params_id);
-		delete params_ptr;
-	}
-	reg.clear();
-	delete reg_ptr;
-}
-
 // initialized from DUCKDB_EXTENSION_ENTRYPOINT
 static std::shared_ptr<std::unordered_map<int64_t, SQLHANDLE>> SharedCancellationRegistry() {
 	static auto registry = std::make_shared<std::unordered_map<int64_t, SQLHANDLE>>();
-	return registry;
-}
-
-// initialized from DUCKDB_EXTENSION_ENTRYPOINT
-static std::shared_ptr<std::set<int64_t>> SharedParamsRegistry() {
-	static auto registry = std::shared_ptr<std::set<int64_t>>(new std::set<int64_t>, SharedParamsRegistryDeleter);
 	return registry;
 }
 
@@ -96,46 +80,6 @@ std::unique_ptr<OdbcConnection> ConnectionsRegistry::Remove(int64_t conn_id) {
 	return std::unique_ptr<OdbcConnection>(conn_ptr);
 }
 
-int64_t ParamsRegistry::Add(std::unique_ptr<std::vector<ScannerValue>> params) {
-	if (params.get() == nullptr) {
-		throw ScannerException("Cannot register invalid empty params");
-	}
-
-	auto mtx = SharedMutex();
-	std::lock_guard<std::mutex> guard(*mtx);
-
-	auto shared_reg_ptr = SharedParamsRegistry();
-	auto &shared_reg = *shared_reg_ptr;
-
-	int64_t params_id = reinterpret_cast<int64_t>(params.get());
-	auto res = shared_reg.insert(params_id);
-	bool inserted = res.second;
-
-	if (!inserted) {
-		throw ScannerException("Parameters are already registered, ID: " + std::to_string(params_id));
-	}
-
-	params.release();
-
-	return params_id;
-}
-
-std::unique_ptr<std::vector<ScannerValue>> ParamsRegistry::Remove(int64_t params_id) {
-	auto mtx = SharedMutex();
-	std::lock_guard<std::mutex> guard(*mtx);
-
-	auto shared_reg_ptr = SharedParamsRegistry();
-	auto &shared_reg = *shared_reg_ptr;
-
-	auto removed_count = shared_reg.erase(params_id);
-	if (removed_count == 0) {
-		return std::unique_ptr<std::vector<ScannerValue>>(nullptr);
-	}
-
-	std::vector<ScannerValue> *params_ptr = reinterpret_cast<std::vector<ScannerValue> *>(params_id);
-	return std::unique_ptr<std::vector<ScannerValue>>(params_ptr);
-}
-
 void CancellationRegistry::Add(int64_t conn_id, HSTMT stmt) {
 	auto mtx = SharedMutex();
 	std::lock_guard<std::mutex> guard(*mtx);
@@ -173,7 +117,6 @@ void CancellationRegistry::Remove(int64_t conn_id) {
 void Registries::Initialize() {
 	SharedMutex();
 	SharedConnectionsRegistry();
-	SharedParamsRegistry();
 }
 
 } // namespace odbcscanner

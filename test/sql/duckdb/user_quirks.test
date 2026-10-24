@@ -10,7 +10,7 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 statement ok
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   'SELECT 42',
 	decimal_columns_as_chars=TRUE,
@@ -31,7 +31,7 @@ SELECT * FROM odbc_query(
 )
 
 statement error
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   'SELECT 42',
 	timestamp_max_fraction_precision=10
@@ -40,7 +40,7 @@ SELECT * FROM odbc_query(
 Invalid value for user option 'timestamp_max_fraction_precision'
 
 statement error
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   'SELECT 42',
 	foobar=42
@@ -49,13 +49,13 @@ SELECT * FROM odbc_query(
 Invalid named parameter "foobar"
 
 statement error
-SELECT * FROM odbc_query(
+FROM odbc_query(
   getvariable('conn'),
   'SELECT 42',
 	timestamp_max_fraction_precision="foo"
 )
 ----
-Failed to cast value: Could not convert string 'foo' to UINT8
+Could not convert string 'foo' to UINT8
 
 statement ok
 SELECT odbc_close(getvariable('conn'))

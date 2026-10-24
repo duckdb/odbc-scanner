@@ -10,37 +10,37 @@ statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=NULL)
+FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=NULL)
 ----
 Binder Error: Cannot extract parameters from STRUCT: specified STRUCT is NULL
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=42)
+FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=42)
 ----
 Binder Error: Cannot extract parameters from STRUCT: specified value is not STRUCT
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=row(42))
+FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=row(42))
 ----
 42
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=row('foo'))
+FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=row('foo'))
 ----
 Invalid Input Error: 'SQLExecute' failed, query: 'SELECT ?::INTEGER'
 
 statement error
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=row(41, 42))
+FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=row(41, 42))
 ----
 Binder Error: Incorrect number of parameters specified, query: 'SELECT ?::INTEGER', expected: 1, actual: 2
 
 query I
-SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=row(NULL))
+FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=row(NULL))
 ----
 NULL
 
 statement ok
-PREPARE p1 AS SELECT * FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=row(?))
+PREPARE p1 AS FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER', params=row(?))
 
 query I
 EXECUTE p1(42)
@@ -54,6 +54,22 @@ EXECUTE p1(43)
 
 statement ok
 DEALLOCATE p1
+
+statement ok
+PREPARE p2 AS FROM odbc_query(getvariable('conn'), 'SELECT ?::INTEGER, ?::VARCHAR', params=row(?, ?))
+
+query II
+EXECUTE p2(42, 'foo')
+----
+42	foo
+
+query II
+EXECUTE p2(43, 'bar')
+----
+43	bar
+
+statement ok
+DEALLOCATE p2
 
 statement ok
 SELECT odbc_close(getvariable('conn'))
