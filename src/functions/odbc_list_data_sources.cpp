@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "diagnostics.hpp"
 #include "driver_manager.hpp"
 #include "make_unique.hpp"
@@ -12,12 +12,10 @@
 #include "strings.hpp"
 #include "widechar.hpp"
 
-DUCKDB_EXTENSION_EXTERN
-
-static void odbc_list_data_sources_bind(duckdb_bind_info info) noexcept;
-static void odbc_list_data_sources_init(duckdb_init_info info) noexcept;
-static void odbc_list_data_sources_local_init(duckdb_init_info info) noexcept;
-static void odbc_list_data_sources_function(duckdb_function_info info, duckdb_data_chunk output) noexcept;
+static void odbc_list_data_sources_bind(duckdb::cxx::TableFunction::BindInput &input);
+static void odbc_list_data_sources_init(duckdb::cxx::TableFunction::InitGlobalInput &input);
+static void odbc_list_data_sources_local_init(duckdb::cxx::TableFunction::InitLocalInput &input);
+static void odbc_list_data_sources_function(duckdb::cxx::TableFunction::ExecInput &input);
 
 namespace odbcscanner {
 
@@ -46,31 +44,26 @@ struct LocalInitData {
 	ExecState state = ExecState::UNINITIALIZED;
 	std::vector<DataSource> data_sources;
 	size_t ds_idx = 0;
-
-	static void Destroy(void *ldata_in) noexcept {
-		auto ldata = reinterpret_cast<LocalInitData *>(ldata_in);
-		delete ldata;
-	}
 };
 
 } // namespace
 
-static void Bind(duckdb_bind_info info) {
-	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
+static void Bind(TableFunction::BindInput &input) {
+	Factory &factory = input.GetContext().GetFactory();
+	auto varchar_type = factory.CreateType(LogicalTypeId::VARCHAR);
 
-	duckdb_bind_add_result_column(info, "name", varchar_type.get());
-	duckdb_bind_add_result_column(info, "description", varchar_type.get());
-	duckdb_bind_add_result_column(info, "type", varchar_type.get());
+	input.AddResultColumn("name", varchar_type);
+	input.AddResultColumn("description", varchar_type);
+	input.AddResultColumn("type", varchar_type);
 }
 
-static void GlobalInit(duckdb_init_info info) {
-	(void)info;
+static void GlobalInit(TableFunction::InitGlobalInput &input) {
+	(void)input;
 	// no-op
 }
 
-static void LocalInit(duckdb_init_info info) {
-	auto ldata_ptr = std_make_unique<LocalInitData>();
-	duckdb_init_set_init_data(info, ldata_ptr.release(), LocalInitData::Destroy);
+static void LocalInit(TableFunction::InitLocalInput &input) {
+	input.SetLocalState<LocalInitData>();
 }
 
 static std::vector<DataSourceLength> ReadDataSourceLengths(SQLHANDLE env, SQLSMALLINT first_dir) {
@@ -200,11 +193,11 @@ static std::vector<DataSource> ReadDataSources() {
 	return res;
 }
 
-static void ListDataSources(duckdb_function_info info, duckdb_data_chunk output) {
-	LocalInitData &ldata = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
+static void ListDataSources(TableFunction::ExecInput &input, DataChunk &output) {
+	LocalInitData &ldata = input.GetLocalState<LocalInitData>();
 
 	if (ldata.state == ExecState::EXHAUSTED) {
-		duckdb_data_chunk_set_size(output, 0);
+		output.GetVector(0).SetSize(0);
 		return;
 	}
 
@@ -213,78 +206,69 @@ static void ListDataSources(duckdb_function_info info, duckdb_data_chunk output)
 		ldata.state = ExecState::EXECUTED;
 	}
 
-	duckdb_vector name_vector = duckdb_data_chunk_get_vector(output, 0);
-	duckdb_vector description_vector = duckdb_data_chunk_get_vector(output, 1);
-	duckdb_vector kind_vector = duckdb_data_chunk_get_vector(output, 2);
+	Vector name_vector = output.GetVector(0);
+	Vector description_vector = output.GetVector(1);
+	Vector kind_vector = output.GetVector(2);
 
-	if (name_vector == nullptr || description_vector == nullptr || kind_vector == nullptr) {
+	if (!name_vector || !description_vector || !kind_vector) {
 		throw ScannerException("'odbc_list_data_sources' error: invalid null output vector");
 	}
 
+	idx_t vector_size = output.GetCapacity();
 	idx_t row_idx = 0;
-	for (; row_idx < duckdb_vector_size(); row_idx++) {
+	for (; row_idx < vector_size; row_idx++) {
 		if (ldata.ds_idx >= ldata.data_sources.size()) {
 			ldata.state = ExecState::EXHAUSTED;
 			break;
 		}
 		const DataSource &ds = ldata.data_sources.at(ldata.ds_idx++);
-		duckdb_vector_assign_string_element_len(name_vector, row_idx, ds.name.c_str(), ds.name.length());
-		duckdb_vector_assign_string_element_len(description_vector, row_idx, ds.description.c_str(),
-		                                        ds.description.length());
+		name_vector.AssignStringUnsafe(row_idx, std::string_view(ds.name.c_str(), ds.name.length()));
+		description_vector.AssignStringUnsafe(row_idx,
+		                                      std::string_view(ds.description.c_str(), ds.description.length()));
 		std::string kind = ds.kind == DataSourceKind::USER ? "USER" : "SYSTEM";
-		duckdb_vector_assign_string_element_len(kind_vector, row_idx, kind.c_str(), kind.length());
+		kind_vector.AssignStringUnsafe(row_idx, std::string_view(kind.c_str(), kind.length()));
 	}
-	duckdb_data_chunk_set_size(output, row_idx);
+	output.GetVector(0).SetSize(row_idx);
 }
 
-void OdbcListDataSourcesFunction::Register(duckdb_connection conn) {
-	auto fun = TableFunctionPtr(duckdb_create_table_function(), TableFunctionDeleter);
-	duckdb_table_function_set_name(fun.get(), "odbc_list_data_sources");
+void OdbcListDataSourcesFunction::Register(Extension &extension, Factory &factory) {
+	auto fun = TableFunction::Create(factory);
+	fun.SetName("odbc_list_data_sources");
 
 	// callbacks
-	duckdb_table_function_set_bind(fun.get(), odbc_list_data_sources_bind);
-	duckdb_table_function_set_init(fun.get(), odbc_list_data_sources_init);
-	duckdb_table_function_set_local_init(fun.get(), odbc_list_data_sources_local_init);
-	duckdb_table_function_set_function(fun.get(), odbc_list_data_sources_function);
+	fun.SetBindCallback(odbc_list_data_sources_bind);
+	fun.SetInitGlobalCallback(odbc_list_data_sources_init);
+	fun.SetInitLocalCallback(odbc_list_data_sources_local_init);
+	fun.SetExecCallback(odbc_list_data_sources_function);
 
 	// register and cleanup
-	duckdb_state state = duckdb_register_table_function(conn, fun.get());
-
-	if (state != DuckDBSuccess) {
-		throw ScannerException("'odbc_list_data_sources' function registration failed");
+	try {
+		extension.Register(fun);
+	} catch (std::exception &e) {
+		throw ScannerException(std::string("\'") + "odbc_list_data_sources" +
+		                       "\' function registration failed: " + e.what());
 	}
 }
 
 } // namespace odbcscanner
 
-static void odbc_list_data_sources_bind(duckdb_bind_info info) noexcept {
+static void odbc_list_data_sources_bind(duckdb::cxx::TableFunction::BindInput &input) {
 	try {
-		odbcscanner::Bind(info);
+		odbcscanner::Bind(input);
 	} catch (std::exception &e) {
-		duckdb_bind_set_error(info, e.what());
+		throw odbcscanner::FunctionArgs::BinderError(e.what());
 	}
 }
 
-static void odbc_list_data_sources_init(duckdb_init_info info) noexcept {
-	try {
-		odbcscanner::GlobalInit(info);
-	} catch (std::exception &e) {
-		duckdb_init_set_error(info, e.what());
-	}
+static void odbc_list_data_sources_init(duckdb::cxx::TableFunction::InitGlobalInput &input) {
+	odbcscanner::GlobalInit(input);
 }
 
-static void odbc_list_data_sources_local_init(duckdb_init_info info) noexcept {
-	try {
-		odbcscanner::LocalInit(info);
-	} catch (std::exception &e) {
-		duckdb_init_set_error(info, e.what());
-	}
+static void odbc_list_data_sources_local_init(duckdb::cxx::TableFunction::InitLocalInput &input) {
+	odbcscanner::LocalInit(input);
 }
 
-static void odbc_list_data_sources_function(duckdb_function_info info, duckdb_data_chunk output) noexcept {
-	try {
-		odbcscanner::ListDataSources(info, output);
-	} catch (std::exception &e) {
-		duckdb_function_set_error(info, e.what());
-	}
+static void odbc_list_data_sources_function(duckdb::cxx::TableFunction::ExecInput &input) {
+	duckdb::cxx::DataChunk output = input.GetOutputChunk();
+	odbcscanner::ListDataSources(input, output);
 }

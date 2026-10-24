@@ -41,9 +41,9 @@ TEST_CASE("Long string query", group_name) {
 		cast = "CAST(? AS LVARCHAR(32739))";
 	}
 	ScannerConn sc;
-	duckdb_prepared_statement ps_ptr = nullptr;
-	duckdb_state st_prepare = duckdb_prepare(sc.conn,
-	                                         std::string(R"(
+	PreparedStatement ps;
+	bool st_prepare = Prepare(sc.conn,
+	                          std::string(R"(
 FROM odbc_query(
   getvariable('conn'),
   '
@@ -51,10 +51,9 @@ FROM odbc_query(
   ', 
   params=row(?::VARCHAR))
 )")
-	                                             .c_str(),
-	                                         &ps_ptr);
-	REQUIRE(PreparedSuccess(ps_ptr, st_prepare));
-	auto ps = PreparedStatementPtr(ps_ptr, PreparedStatementDeleter);
+	                              .c_str(),
+	                          ps);
+	REQUIRE(PreparedSuccess(ps, st_prepare));
 
 	std::vector<std::string> vec;
 	for (size_t i = (1 << 10) - 4; i < (1 << 10) + 4; i++) {
@@ -80,13 +79,13 @@ FROM odbc_query(
 	REQUIRE(vec.size() == 40);
 
 	for (std::string &str : vec) {
-		auto param_val = ValuePtr(duckdb_create_varchar_length(str.c_str(), str.length()), ValueDeleter);
-		duckdb_state st_bind = duckdb_bind_value(ps.get(), 1, param_val.get());
-		REQUIRE(PreparedSuccess(ps_ptr, st_bind));
+		auto param_val = CreateVarchar(sc, str);
+		bool st_bind = ps.Bind(1, param_val.get());
+		REQUIRE(PreparedSuccess(ps, st_bind));
 
 		Result res;
-		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st_exec));
+		bool st_exec = ps.Execute(res);
+		REQUIRE(QuerySuccess(res, st_exec));
 		REQUIRE(res.NextChunk());
 		REQUIRE(res.Value<std::string>(0, 0) == str);
 	}
@@ -97,9 +96,9 @@ TEST_CASE("Long string query Oracle", group_name) {
 		return;
 	}
 	ScannerConn sc;
-	duckdb_prepared_statement ps_ptr = nullptr;
-	duckdb_state st_prepare = duckdb_prepare(sc.conn,
-	                                         R"(
+	PreparedStatement ps;
+	bool st_prepare = Prepare(sc.conn,
+	                          R"(
 FROM odbc_query(
   getvariable('conn'),
   '
@@ -124,9 +123,8 @@ FROM odbc_query(
 		?::VARCHAR
 	))
 )",
-	                                         &ps_ptr);
-	REQUIRE(PreparedSuccess(ps_ptr, st_prepare));
-	auto ps = PreparedStatementPtr(ps_ptr, PreparedStatementDeleter);
+	                          ps);
+	REQUIRE(PreparedSuccess(ps, st_prepare));
 
 	std::vector<std::string> vec;
 	for (size_t i = (1 << 10) - 4; i < (1 << 10) + 4; i++) {
@@ -139,15 +137,15 @@ FROM odbc_query(
 	}
 
 	for (std::string &str : vec) {
-		auto param_val = ValuePtr(duckdb_create_varchar_length(str.c_str(), str.length()), ValueDeleter);
+		auto param_val = CreateVarchar(sc, str);
 		for (idx_t i = 1; i <= 8; i++) {
-			duckdb_state st_bind = duckdb_bind_value(ps.get(), i, param_val.get());
-			REQUIRE(PreparedSuccess(ps_ptr, st_bind));
+			bool st_bind = ps.Bind(i, param_val.get());
+			REQUIRE(PreparedSuccess(ps, st_bind));
 		}
 
 		Result res;
-		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st_exec));
+		bool st_exec = ps.Execute(res);
+		REQUIRE(QuerySuccess(res, st_exec));
 		REQUIRE(res.NextChunk());
 		REQUIRE(res.Value<std::string>(0, 0) == (str + str + str + str + str + str + str + str));
 	}
@@ -161,19 +159,19 @@ TEST_CASE("Long string query FlightSQL", group_name) {
 
 	for (size_t i = (1 << 10) - 4; i < (1 << 10) + 4; i++) {
 		Result res;
-		duckdb_state st = duckdb_query(sc.conn,
-		                               (R"(
+		bool st = Query(sc.conn,
+		                (R"(
 	FROM odbc_query(
 		getvariable('conn'), 
 		'
 			SELECT repeat(''0123456789'', )" +
-		                                std::to_string(i) + R"()
+		                 std::to_string(i) + R"()
 		'
 		)
 	)")
-		                                   .c_str(),
-		                               res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st));
+		                    .c_str(),
+		                res);
+		REQUIRE(QuerySuccess(res, st));
 		REQUIRE(res.NextChunk());
 		REQUIRE(res.Value<std::string>(0, 0).length() == i * 10);
 	}
@@ -193,9 +191,9 @@ TEST_CASE("Long binary query", group_name) {
 		return;
 	}
 	ScannerConn sc;
-	duckdb_prepared_statement ps_ptr = nullptr;
-	duckdb_state st_prepare = duckdb_prepare(sc.conn,
-	                                         std::string(R"(
+	PreparedStatement ps;
+	bool st_prepare = Prepare(sc.conn,
+	                          std::string(R"(
 FROM odbc_query(
   getvariable('conn'),
   '
@@ -203,10 +201,9 @@ FROM odbc_query(
   ', 
   params=row(?::BLOB))
 )")
-	                                             .c_str(),
-	                                         &ps_ptr);
-	REQUIRE(PreparedSuccess(ps_ptr, st_prepare));
-	auto ps = PreparedStatementPtr(ps_ptr, PreparedStatementDeleter);
+	                              .c_str(),
+	                          ps);
+	REQUIRE(PreparedSuccess(ps, st_prepare));
 
 	std::vector<std::string> vec;
 	for (size_t i = (1 << 10) - 4; i < (1 << 10) + 4; i++) {
@@ -232,13 +229,13 @@ FROM odbc_query(
 	REQUIRE(vec.size() == 40);
 
 	for (std::string &str : vec) {
-		auto param_val = ValuePtr(duckdb_create_varchar_length(str.c_str(), str.length()), ValueDeleter);
-		duckdb_state st_bind = duckdb_bind_value(ps.get(), 1, param_val.get());
-		REQUIRE(PreparedSuccess(ps_ptr, st_bind));
+		auto param_val = CreateVarchar(sc, str);
+		bool st_bind = ps.Bind(1, param_val.get());
+		REQUIRE(PreparedSuccess(ps, st_bind));
 
 		Result res;
-		duckdb_state st_exec = duckdb_execute_prepared(ps.get(), res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st_exec));
+		bool st_exec = ps.Execute(res);
+		REQUIRE(QuerySuccess(res, st_exec));
 		REQUIRE(res.NextChunk());
 		REQUIRE(res.BinaryValue(0, 0) == str);
 	}

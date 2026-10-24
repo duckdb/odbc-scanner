@@ -33,9 +33,9 @@ struct OdbcType {
 	OdbcType &operator=(OdbcType &other) = delete;
 	OdbcType &operator=(OdbcType &&other) = default;
 
-	std::string ToString();
+	std::string ToString() const;
 
-	bool Equals(OdbcType &other);
+	bool Equals(const OdbcType &other) const;
 };
 
 struct Types {
@@ -65,57 +65,60 @@ struct Types {
 
 	// Type-dispatched functions
 
-	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_type type_id, duckdb_vector vec, idx_t row_idx,
+	static ScannerValue ExtractNotNullParam(const DbmsQuirks &quirks, LogicalTypeId type_id, Vector &vec, idx_t row_idx,
 	                                        idx_t param_idx);
 
-	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value, idx_t param_idx);
+	static ScannerValue ExtractNotNullParam(const DbmsQuirks &quirks, const Value *value, idx_t param_idx);
 
-	static void BindOdbcParam(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx);
+	static void BindOdbcParam(const QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx);
 
-	static void BindColumn(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx);
+	static void BindColumn(const QueryContext &ctx, const OdbcType &odbc_type, SQLSMALLINT col_idx);
 
-	static void FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
+	static void FetchAndSetResult(const QueryContext &ctx, const OdbcType &odbc_type, SQLSMALLINT col_idx, Vector &vec,
 	                              idx_t row_idx);
 
-	static void CoalesceParameterType(QueryContext &ctx, ScannerValue &param);
+	static void CoalesceParameterType(const QueryContext &ctx, ScannerValue &param);
 
-	static void CoalesceColumnType(QueryContext &ctx, ResultColumn &column);
+	static void CoalesceColumnType(const QueryContext &ctx, ResultColumn &column);
 
-	static duckdb_type ResolveColumnType(QueryContext &ctx, ResultColumn &column);
+	static LogicalTypeId ResolveColumnType(const QueryContext &ctx, ResultColumn &column);
 
 	// Other functions
 
 	template <typename T>
-	static std::pair<T, bool> ExtractFunctionArg(duckdb_data_chunk chunk, idx_t col_idx);
+	static std::pair<T, bool> ExtractFunctionArg(ScalarFunction::ExecInput &input, idx_t col_idx);
 
-	static void SetNullValueToResult(duckdb_vector vec, idx_t row_idx);
+	static void SetNullValueToResult(Vector &vec, idx_t row_idx);
 
-	static std::string ToString(duckdb_type type_id);
+	// TUPLE is an unnamed STRUCT, it was reported as STRUCT in C API V1
+	static LogicalTypeId TypeIdOf(const LogicalType &ltype);
 
-	static duckdb_type FromString(const std::string &type_name);
+	static std::string ToString(LogicalTypeId type_id);
+
+	static LogicalTypeId FromString(const std::string &type_name);
 };
 
 class TypeSpecific {
 	friend struct Types;
 
 	template <typename T>
-	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_vector vec, idx_t row_idx);
+	static ScannerValue ExtractNotNullParam(const DbmsQuirks &quirks, Vector &vec, idx_t row_idx);
 
 	template <typename T>
-	static ScannerValue ExtractNotNullParam(DbmsQuirks &quirks, duckdb_value value);
+	static ScannerValue ExtractNotNullParam(const DbmsQuirks &quirks, const Value *value);
 
 	template <typename T>
-	static void BindOdbcParam(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx);
+	static void BindOdbcParam(const QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx);
 
 	template <typename T>
-	static void BindColumn(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx);
+	static void BindColumn(const QueryContext &ctx, const OdbcType &odbc_type, SQLSMALLINT col_idx);
 
 	template <typename T>
-	static void FetchAndSetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec,
+	static void FetchAndSetResult(const QueryContext &ctx, const OdbcType &odbc_type, SQLSMALLINT col_idx, Vector &vec,
 	                              idx_t row_idx);
 
 	template <typename T>
-	static duckdb_type ResolveColumnType(QueryContext &ctx, ResultColumn &column);
+	static LogicalTypeId ResolveColumnType(const QueryContext &ctx, ResultColumn &column);
 };
 
 } // namespace odbcscanner

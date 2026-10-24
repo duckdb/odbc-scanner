@@ -3,37 +3,33 @@
 #include <stdexcept>
 #include <string>
 
-#include "capi_pointers.hpp"
 #include "capi_entry_point.hpp"
 #include "registries.hpp"
 #include "scanner_exception.hpp"
 
 namespace odbcscanner {
 
-static void Initialize(duckdb_connection connection, duckdb_extension_info, duckdb_extension_access *) {
+static void Initialize(Extension &extension, Context &context) {
+	Factory &factory = context.GetFactory();
 	Registries::Initialize();
-	OdbcBeginTransactionFunction::Register(connection);
-	OdbcCancelQueryFunction::Register(connection);
-	OdbcCloseFunction::Register(connection);
-	OdbcCommitFunction::Register(connection);
-	OdbcConnectFunction::Register(connection);
-	OdbcCopyFunction::Register(connection);
-	OdbcListDataSourcesFunction::Register(connection);
-	OdbcListDriversFunction::Register(connection);
-	OdbcQueryFunction::Register(connection);
-	OdbcRollbackFunction::Register(connection);
+	OdbcBeginTransactionFunction::Register(extension, factory);
+	OdbcCancelQueryFunction::Register(extension, factory);
+	OdbcCloseFunction::Register(extension, factory);
+	OdbcCommitFunction::Register(extension, factory);
+	OdbcConnectFunction::Register(extension, factory);
+	OdbcCopyFunction::Register(extension, factory);
+	OdbcListDataSourcesFunction::Register(extension, factory);
+	OdbcListDriversFunction::Register(extension, factory);
+	OdbcQueryFunction::Register(extension, factory);
+	OdbcRollbackFunction::Register(extension, factory);
 }
 
 } // namespace odbcscanner
 
-bool initiaize_odbc_scanner(duckdb_connection connection, duckdb_extension_info info,
-                            duckdb_extension_access *access) noexcept {
+void initiaize_odbc_scanner(duckdb::cxx::Extension &extension, duckdb::cxx::Context &context) {
 	try {
-		odbcscanner::Initialize(connection, info, access);
-		return true;
+		odbcscanner::Initialize(extension, context);
 	} catch (std::exception &e) {
-		std::string msg = "ODBC Scanner initialization failed: " + std::string(e.what());
-		access->set_error(info, msg.c_str());
-		return false;
+		throw duckdb::cxx::InvalidInputException("ODBC Scanner initialization failed: " + std::string(e.what()));
 	}
 }

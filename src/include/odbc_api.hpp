@@ -2,6 +2,10 @@
 
 #include <memory>
 
+// Must be included before windows.h, that defines macros (like DELETE and IGNORE)
+// conflicting with the names used in C++ API
+#include "duckdb_extension_api.hpp"
+
 extern "C" {
 
 #ifdef _MSC_VER

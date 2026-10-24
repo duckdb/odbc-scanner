@@ -3,34 +3,29 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <vector>
+
+// Must be included before catch.hpp, that includes windows.h, that defines macros
+// (like DELETE and IGNORE) conflicting with the names used in C++ API
+#include "duckdb_cpp.hpp"
 
 #include "catch.hpp"
 
-extern "C" {
-#include "duckdb.h"
-}
+using idx_t = duckdb::cxx::idx_t;
+using int128_t = duckdb::cxx::int128_t;
 
-using LogicalTypePtr = std::unique_ptr<_duckdb_logical_type, void (*)(duckdb_logical_type)>;
+using ValuePtr = std::unique_ptr<duckdb::cxx::Value>;
 
-inline void LogicalTypeDeleter(duckdb_logical_type lt) {
-	duckdb_destroy_logical_type(&lt);
-}
-
-using PreparedStatementPtr = std::unique_ptr<_duckdb_prepared_statement, void (*)(duckdb_prepared_statement)>;
-
-inline void PreparedStatementDeleter(duckdb_prepared_statement ps) {
-	duckdb_destroy_prepare(&ps);
-}
-
-using ValuePtr = std::unique_ptr<_duckdb_value, void (*)(duckdb_value)>;
-
-inline void ValueDeleter(duckdb_value val) {
-	duckdb_destroy_value(&val);
-}
+// Replaces 'duckdb_date_struct' from C API V1
+struct DateStruct {
+	int32_t year;
+	int8_t month;
+	int8_t day;
+};
 
 struct ScannerConn {
-	duckdb_database db = nullptr;
-	duckdb_connection conn = nullptr;
+	duckdb::cxx::Instance db;
+	duckdb::cxx::Connection conn;
 	bool odbc_connection_established = false;
 
 	ScannerConn(bool establish_odbc_connection = true);
@@ -38,14 +33,18 @@ struct ScannerConn {
 	~ScannerConn() noexcept;
 };
 
+// Query result, all chunks are fetched when the query is executed
 struct Result {
-	duckdb_result res;
-	duckdb_data_chunk chunk = nullptr;
+	std::string error;
+	std::vector<duckdb::cxx::LogicalTypeId> column_types;
+	std::vector<duckdb::cxx::DataChunk> chunks;
+	duckdb::cxx::DataChunk *chunk = nullptr;
+	idx_t next_chunk_idx = 0;
 	idx_t cur_row_idx = 0;
 
-	~Result() noexcept;
+	void Fill(duckdb::cxx::QueryResult res);
 
-	duckdb_result *Get();
+	const std::string &Error();
 
 	bool NextChunk();
 
@@ -60,11 +59,36 @@ struct Result {
 	T DecimalValue(idx_t col_idx, idx_t row_idx);
 };
 
+// Parameters are bound to prepared statement on execution in C API V2,
+// bound values are borrowed and must be alive when the statement is executed
+struct PreparedStatement {
+	std::unique_ptr<duckdb::cxx::PreparedStatement> ps;
+	duckdb::cxx::Factory *factory = nullptr;
+	std::string error;
+	std::vector<const duckdb::cxx::Value *> params;
+
+	bool Bind(idx_t param_idx, const duckdb::cxx::Value *value);
+
+	bool Execute(Result &res);
+};
+
+bool Query(duckdb::cxx::Connection &conn, const std::string &sql, Result &res);
+
+bool Prepare(duckdb::cxx::Connection &conn, const std::string &sql, PreparedStatement &ps);
+
+ValuePtr CreateInt32(ScannerConn &sc, int32_t value);
+
+ValuePtr CreateVarchar(ScannerConn &sc, const std::string &value);
+
+ValuePtr CreateDate(ScannerConn &sc, DateStruct value);
+
+ValuePtr CreateDecimal(ScannerConn &sc, int128_t value, uint8_t width, uint8_t scale);
+
 bool DBMSConfigured(const std::string dbms_name);
 
-bool QuerySuccess(duckdb_result *res, duckdb_state st);
+bool QuerySuccess(Result &res, bool st);
 
-bool PreparedSuccess(duckdb_prepared_statement ps, duckdb_state st);
+bool PreparedSuccess(PreparedStatement &ps, bool st);
 
 std::string CastAsBigintSQL(const std::string& value, const std::string &alias = "");
 

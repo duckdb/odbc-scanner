@@ -8,6 +8,13 @@
 
 namespace odbcscanner {
 
+// Replaces 'duckdb_decimal' from C API V1
+struct DecimalValue {
+	uint8_t width = 0;
+	uint8_t scale = 0;
+	int128_t value = {0, 0};
+};
+
 struct DecimalChars {
 	std::vector<char> characters;
 	// Optional wide buffer populated by BindOdbcParam<DecimalChars> when the
@@ -18,7 +25,7 @@ struct DecimalChars {
 
 	DecimalChars();
 
-	explicit DecimalChars(duckdb_decimal decimal);
+	explicit DecimalChars(DecimalValue decimal);
 
 	DecimalChars(DecimalChars &other) = delete;
 	DecimalChars(DecimalChars &&other) = default;
@@ -64,7 +71,7 @@ struct ScannerUuid {
 
 	ScannerUuid();
 
-	explicit ScannerUuid(duckdb_uhugeint uuid);
+	explicit ScannerUuid(uint128_t uuid);
 
 	ScannerUuid(ScannerUuid &other) = delete;
 	ScannerUuid(ScannerUuid &&other) = default;

@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "connection.hpp"
 #include "diagnostics.hpp"
 #include "odbc_api.hpp"
@@ -11,14 +11,10 @@
 #include "scanner_exception.hpp"
 #include "types.hpp"
 
-DUCKDB_EXTENSION_EXTERN
-
-static void odbc_close_function(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) noexcept;
-
 namespace odbcscanner {
 
-static void Close(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-	(void)info;
+static void Close(ScalarFunction::ExecInput &input) {
+	Vector output = input.GetResult();
 
 	auto arg = Types::ExtractFunctionArg<int64_t>(input, 0);
 	if (arg.second) {
@@ -29,42 +25,33 @@ static void Close(duckdb_function_info info, duckdb_data_chunk input, duckdb_vec
 		// connection may or may not be already closed - we won't throw from this function either way
 	}
 
-	duckdb_vector_ensure_validity_writable(output);
-	uint64_t *result_validity = duckdb_vector_get_validity(output);
-	duckdb_validity_set_row_invalid(result_validity, 0);
+	Types::SetNullValueToResult(output, 0);
 }
 
-void OdbcCloseFunction::Register(duckdb_connection conn) {
-	auto fun = ScalarFunctionPtr(duckdb_create_scalar_function(), ScalarFunctionDeleter);
-	duckdb_scalar_function_set_name(fun.get(), "odbc_close");
+void OdbcCloseFunction::Register(Extension &extension, Factory &factory) {
+	auto fun = ScalarFunction::Create(factory);
+	fun.SetName("odbc_close");
+	FunctionSignature sig = fun.GetSignature();
 
 	// parameters and return
-	auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
-	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
-	duckdb_scalar_function_add_parameter(fun.get(), bigint_type.get());
-	duckdb_scalar_function_set_return_type(fun.get(), varchar_type.get());
+	auto bigint_type = factory.CreateType(LogicalTypeId::BIGINT);
+	auto varchar_type = factory.CreateType(LogicalTypeId::VARCHAR);
+	sig.AddParameter("connection", bigint_type, FunctionParameterKind::POSITIONAL_ONLY);
+	sig.SetReturnType(varchar_type);
 
 	// callbacks
-	duckdb_scalar_function_set_function(fun.get(), odbc_close_function);
+	fun.SetExecCallback(Close);
 
 	// options
-	duckdb_scalar_function_set_special_handling(fun.get());
-	duckdb_scalar_function_set_volatile(fun.get());
+	fun.SetNullHandling(duckdb::cxx::FunctionNullHandling::SPECIAL);
+	fun.SetStability(duckdb::cxx::FunctionStability::VOLATILE);
 
 	// register and cleanup
-	duckdb_state state = duckdb_register_scalar_function(conn, fun.get());
-
-	if (state != DuckDBSuccess) {
-		throw ScannerException("'odbc_close' function registration failed");
+	try {
+		extension.Register(fun);
+	} catch (std::exception &e) {
+		throw ScannerException(std::string("\'") + "odbc_close" + "\' function registration failed: " + e.what());
 	}
 }
 
 } // namespace odbcscanner
-
-static void odbc_close_function(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) noexcept {
-	try {
-		odbcscanner::Close(info, input, output);
-	} catch (std::exception &e) {
-		duckdb_scalar_function_set_error(info, e.what());
-	}
-}

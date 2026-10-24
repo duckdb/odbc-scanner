@@ -104,7 +104,7 @@ static OdbcType GetTypeAttributes(const std::string &query, SQLSMALLINT cols_cou
 	                decimal_scale);
 }
 
-std::vector<ResultColumn> Columns::Collect(QueryContext &ctx) {
+std::vector<ResultColumn> Columns::Collect(const QueryContext &ctx) {
 
 	SQLSMALLINT cols_count = -1;
 	{
@@ -143,7 +143,8 @@ std::vector<ResultColumn> Columns::Collect(QueryContext &ctx) {
 	return vec;
 }
 
-void Columns::CheckSame(QueryContext &ctx, std::vector<ResultColumn> &expected, std::vector<ResultColumn> &actual) {
+void Columns::CheckSame(const QueryContext &ctx, const std::vector<ResultColumn> &expected,
+                        const std::vector<ResultColumn> &actual) {
 	if (expected.size() != actual.size()) {
 		throw ScannerException("Resulting columns from 'SQLPrepare' and 'SQLExecute' do not match, query: '" +
 		                       ctx.query + "',  expected count: " + std::to_string(expected.size()) +
@@ -172,15 +173,15 @@ void Columns::CheckSame(QueryContext &ctx, std::vector<ResultColumn> &expected, 
 	}
 }
 
-void Columns::AddToResults(duckdb_bind_info info, duckdb_type type_id, ResultColumn &col) {
-	if (type_id == DUCKDB_TYPE_DECIMAL) {
-		auto ltype =
-		    LogicalTypePtr(duckdb_create_decimal_type(col.odbc_type.decimal_precision, col.odbc_type.decimal_scale),
-		                   LogicalTypeDeleter);
-		duckdb_bind_add_result_column(info, col.name.c_str(), ltype.get());
+void Columns::AddToResults(TableFunction::BindInput &input, Factory &factory, LogicalTypeId type_id,
+                           ResultColumn &col) {
+	if (type_id == LogicalTypeId::DECIMAL) {
+		auto ltype = factory.ParseType("DECIMAL(" + std::to_string(col.odbc_type.decimal_precision) + ", " +
+		                               std::to_string(col.odbc_type.decimal_scale) + ")");
+		input.AddResultColumn(col.name, ltype);
 	} else {
-		auto ltype = LogicalTypePtr(duckdb_create_logical_type(type_id), LogicalTypeDeleter);
-		duckdb_bind_add_result_column(info, col.name.c_str(), ltype.get());
+		auto ltype = factory.CreateType(type_id);
+		input.AddResultColumn(col.name, ltype);
 	}
 }
 

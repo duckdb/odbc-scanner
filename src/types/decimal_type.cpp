@@ -5,69 +5,120 @@
 #include <algorithm>
 #include <limits>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "connection.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
 #include "widechar.hpp"
 
-DUCKDB_EXTENSION_EXTERN
-
 namespace odbcscanner {
 
-template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_decimal>(DbmsQuirks &quirks, duckdb_vector vec, idx_t row_idx) {
-	auto ltype = LogicalTypePtr(duckdb_vector_get_column_type(vec), LogicalTypeDeleter);
+// Storage tier of DECIMAL values is defined by the width
+static LogicalTypeId DecimalInternalType(uint8_t width) {
+	if (width <= 4) {
+		return LogicalTypeId::SMALLINT;
+	} else if (width <= 9) {
+		return LogicalTypeId::INTEGER;
+	} else if (width <= 18) {
+		return LogicalTypeId::BIGINT;
+	} else if (width <= 38) {
+		return LogicalTypeId::HUGEINT;
+	}
+	return LogicalTypeId::INVALID;
+}
 
-	duckdb_decimal dec;
-	dec.width = duckdb_decimal_width(ltype.get());
-	dec.scale = duckdb_decimal_scale(ltype.get());
+template <>
+ScannerValue TypeSpecific::ExtractNotNullParam<DecimalValue>(const DbmsQuirks &quirks, Vector &vec, idx_t row_idx) {
+	auto ltype = vec.GetLogicalType();
+
+	DecimalValue dec;
+	dec.width = ltype.GetDecimalWidth();
+	dec.scale = ltype.GetDecimalScale();
 	dec.value.lower = 0;
 	dec.value.upper = 0;
 
-	duckdb_type type_id = duckdb_decimal_internal_type(ltype.get());
+	LogicalTypeId type_id = DecimalInternalType(dec.width);
 	switch (type_id) {
-	case DUCKDB_TYPE_SMALLINT: {
-		int16_t *data = reinterpret_cast<int16_t *>(duckdb_vector_get_data(vec));
+	case LogicalTypeId::SMALLINT: {
+		int16_t *data = vec.GetDataMutable<int16_t>();
 		int16_t val = data[row_idx];
 		dec.value.lower = static_cast<uint64_t>(val);
 		dec.value.upper = val >= 0 ? 0 : -1;
 		break;
 	}
-	case DUCKDB_TYPE_INTEGER: {
-		int32_t *data = reinterpret_cast<int32_t *>(duckdb_vector_get_data(vec));
+	case LogicalTypeId::INTEGER: {
+		int32_t *data = vec.GetDataMutable<int32_t>();
 		int32_t val = data[row_idx];
 		dec.value.lower = static_cast<uint64_t>(val);
 		dec.value.upper = val >= 0 ? 0 : -1;
 		break;
 	}
-	case DUCKDB_TYPE_BIGINT: {
-		int64_t *data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
+	case LogicalTypeId::BIGINT: {
+		int64_t *data = vec.GetDataMutable<int64_t>();
 		int64_t val = data[row_idx];
 		dec.value.lower = static_cast<uint64_t>(val);
 		dec.value.upper = val >= 0 ? 0 : -1;
 		break;
 	}
-	case DUCKDB_TYPE_HUGEINT: {
-		duckdb_hugeint *data = reinterpret_cast<duckdb_hugeint *>(duckdb_vector_get_data(vec));
+	case LogicalTypeId::HUGEINT: {
+		int128_t *data = vec.GetDataMutable<int128_t>();
 		dec.value = data[row_idx];
 		break;
 	}
 	default:
-		throw ScannerException("Invalid unsupported DECIMAL internal type, ID: " + std::to_string(type_id));
+		throw ScannerException("Invalid unsupported DECIMAL internal type, ID: " +
+		                       std::to_string(static_cast<uint32_t>(type_id)));
 	}
 
 	return ScannerValue(dec, quirks.decimal_params_as_chars);
 }
 
+// Parses DECIMAL value text, as rendered by DuckDB, into its backing integer
+static int128_t DecimalStorageFromText(const std::string &text) {
+	uint64_t upper = 0;
+	uint64_t lower = 0;
+	bool negative = false;
+	for (char ch : text) {
+		if (ch == '-') {
+			negative = true;
+			continue;
+		}
+		if (ch < '0' || ch > '9') {
+			continue;
+		}
+		// multiply 128-bit unsigned number by 10 and add digit using 32-bit parts of the lower half
+		uint64_t lower_lo = (lower & 0xffffffff) * 10 + static_cast<uint64_t>(ch - '0');
+		uint64_t lower_hi = (lower >> 32) * 10 + (lower_lo >> 32);
+		lower = (lower_hi << 32) | (lower_lo & 0xffffffff);
+		upper = upper * 10 + (lower_hi >> 32);
+	}
+	if (negative) {
+		lower = ~lower + 1;
+		upper = ~upper;
+		if (lower == 0) {
+			upper += 1; // carry from low to high
+		}
+	}
+	int128_t res;
+	res.lower = lower;
+	res.upper = static_cast<int64_t>(upper);
+	return res;
+}
+
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_decimal>(DbmsQuirks &quirks, duckdb_value value) {
-	duckdb_decimal val = duckdb_get_decimal(value);
+ScannerValue TypeSpecific::ExtractNotNullParam<DecimalValue>(const DbmsQuirks &quirks, const Value *value) {
+	// C++ API reads DECIMAL backing integers only for the width and scale known at compile time
+	LogicalType ltype = value->GetLogicalType();
+	DecimalValue val;
+	val.width = ltype.GetDecimalWidth();
+	val.scale = ltype.GetDecimalScale();
+	val.value = DecimalStorageFromText(value->ToText());
 	return ScannerValue(val, quirks.decimal_params_as_chars);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<SQL_NUMERIC_STRUCT>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<SQL_NUMERIC_STRUCT>(const QueryContext &ctx, ScannerValue &param,
+                                                     SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_NUMERIC;
 	SQL_NUMERIC_STRUCT &ns = param.Value<SQL_NUMERIC_STRUCT>();
 	SQLRETURN ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_NUMERIC, sqltype,
@@ -82,7 +133,7 @@ void TypeSpecific::BindOdbcParam<SQL_NUMERIC_STRUCT>(QueryContext &ctx, ScannerV
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<DecimalChars>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<DecimalChars>(const QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT expected = param.ExpectedType();
 	// Preserve the driver's column type when it is a CHAR/VARCHAR/WCHAR family:
 	// binding → the actual expected type avoids an extra driver-side coercion.
@@ -123,7 +174,7 @@ void TypeSpecific::BindOdbcParam<DecimalChars>(QueryContext &ctx, ScannerValue &
 	}
 }
 
-static void SetDescriptorFields(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+static void SetDescriptorFields(const QueryContext &ctx, const OdbcType &odbc_type, SQLSMALLINT col_idx) {
 	SQLHDESC hdesc = nullptr;
 	{
 		SQLRETURN ret = SQLGetStmtAttr(ctx.hstmt(), SQL_ATTR_APP_ROW_DESC, &hdesc, 0, NULL);
@@ -182,7 +233,7 @@ static void ZeroNumericStruct(SQL_NUMERIC_STRUCT &ns) {
 }
 
 template <>
-void TypeSpecific::BindColumn<duckdb_decimal>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+void TypeSpecific::BindColumn<DecimalValue>(const QueryContext &ctx, const OdbcType &odbc_type, SQLSMALLINT col_idx) {
 	if (ctx.quirks.decimal_columns_precision_through_ard) {
 		SetDescriptorFields(ctx, odbc_type, col_idx);
 	}
@@ -214,7 +265,7 @@ void TypeSpecific::BindColumn<duckdb_decimal>(QueryContext &ctx, OdbcType &odbc_
 	}
 }
 
-static void Negate(duckdb_hugeint &hi) {
+static void Negate(int128_t &hi) {
 	hi.lower = ~hi.lower + 1;
 	hi.upper = ~hi.upper;
 	if (hi.lower == 0) {
@@ -222,8 +273,8 @@ static void Negate(duckdb_hugeint &hi) {
 	}
 }
 
-static duckdb_hugeint Zero() {
-	duckdb_hugeint zero;
+static int128_t Zero() {
+	int128_t zero;
 	zero.lower = 0;
 	zero.upper = 0;
 	return zero;
@@ -231,8 +282,8 @@ static duckdb_hugeint Zero() {
 
 // The implementation can be more robust, but we expect the decimal strings from
 // drivers to be well-formed.
-static duckdb_hugeint ParseHugeInt(const std::string &str) {
-	duckdb_hugeint hi;
+static int128_t ParseHugeInt(const std::string &str) {
+	int128_t hi;
 	hi.lower = 0;
 	hi.upper = 0;
 
@@ -258,19 +309,19 @@ static duckdb_hugeint ParseHugeInt(const std::string &str) {
 	return hi;
 }
 
-static void SetResult(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx, duckdb_vector vec, idx_t row_idx,
-                      duckdb_hugeint hi) {
+static void SetResult(const QueryContext &ctx, const OdbcType &odbc_type, SQLSMALLINT col_idx, Vector &vec,
+                      idx_t row_idx, int128_t hi) {
 	if (odbc_type.decimal_precision <= 4) {
-		int16_t *data = reinterpret_cast<int16_t *>(duckdb_vector_get_data(vec));
+		int16_t *data = vec.GetDataMutable<int16_t>();
 		data[row_idx] = static_cast<int16_t>(hi.lower);
 	} else if (odbc_type.decimal_precision <= 9) {
-		int32_t *data = reinterpret_cast<int32_t *>(duckdb_vector_get_data(vec));
+		int32_t *data = vec.GetDataMutable<int32_t>();
 		data[row_idx] = static_cast<int32_t>(hi.lower);
 	} else if (odbc_type.decimal_precision <= 18) {
-		int64_t *data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
+		int64_t *data = vec.GetDataMutable<int64_t>();
 		data[row_idx] = static_cast<int64_t>(hi.lower);
 	} else if (odbc_type.decimal_precision <= 38) {
-		duckdb_hugeint *data = reinterpret_cast<duckdb_hugeint *>(duckdb_vector_get_data(vec));
+		int128_t *data = vec.GetDataMutable<int128_t>();
 		data[row_idx] = hi;
 	} else
 		throw ScannerException("Invalid unsupported DECIMAL precision: " + std::to_string(odbc_type.decimal_precision) +
@@ -297,7 +348,7 @@ static size_t RemoveSeparatorReturnScale(std::string &str) {
 	}
 }
 
-static std::pair<duckdb_hugeint, bool> FetchDecimal(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+static std::pair<int128_t, bool> FetchDecimal(const QueryContext &ctx, const OdbcType &odbc_type, SQLSMALLINT col_idx) {
 	SQL_NUMERIC_STRUCT fetched_data;
 	ZeroNumericStruct(fetched_data);
 	SQL_NUMERIC_STRUCT *fetched_ptr = &fetched_data;
@@ -330,7 +381,7 @@ static std::pair<duckdb_hugeint, bool> FetchDecimal(QueryContext &ctx, OdbcType 
 		return std::make_pair(Zero(), true);
 	}
 
-	duckdb_hugeint hi;
+	int128_t hi;
 	std::memcpy(&hi.lower, fetched.val, sizeof(hi.lower));
 	std::memcpy(&hi.upper, fetched.val + sizeof(hi.lower), sizeof(hi.upper));
 
@@ -341,7 +392,7 @@ static std::pair<duckdb_hugeint, bool> FetchDecimal(QueryContext &ctx, OdbcType 
 	return std::make_pair(hi, false);
 }
 
-static std::pair<duckdb_hugeint, bool> FetchVarchar(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+static std::pair<int128_t, bool> FetchVarchar(const QueryContext &ctx, const OdbcType &odbc_type, SQLSMALLINT col_idx) {
 	std::vector<char> buf;
 	buf.resize(128);
 	SQLLEN len_bytes = 0;
@@ -374,7 +425,7 @@ static std::pair<duckdb_hugeint, bool> FetchVarchar(QueryContext &ctx, OdbcType 
 		return std::make_pair(Zero(), false);
 	}
 
-	duckdb_hugeint parsed = ParseHugeInt(str);
+	int128_t parsed = ParseHugeInt(str);
 	if (negative) {
 		Negate(parsed);
 	}
@@ -383,9 +434,9 @@ static std::pair<duckdb_hugeint, bool> FetchVarchar(QueryContext &ctx, OdbcType 
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<duckdb_decimal>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
-                                                     duckdb_vector vec, idx_t row_idx) {
-	std::pair<duckdb_hugeint, bool> fetched;
+void TypeSpecific::FetchAndSetResult<DecimalValue>(const QueryContext &ctx, const OdbcType &odbc_type,
+                                                   SQLSMALLINT col_idx, Vector &vec, idx_t row_idx) {
+	std::pair<int128_t, bool> fetched;
 	if (ctx.quirks.decimal_columns_as_chars) {
 		fetched = FetchVarchar(ctx, odbc_type, col_idx);
 	} else {
@@ -399,8 +450,8 @@ void TypeSpecific::FetchAndSetResult<duckdb_decimal>(QueryContext &ctx, OdbcType
 }
 
 template <>
-duckdb_type TypeSpecific::ResolveColumnType<duckdb_decimal>(QueryContext &, ResultColumn &) {
-	return DUCKDB_TYPE_DECIMAL;
+LogicalTypeId TypeSpecific::ResolveColumnType<DecimalValue>(const QueryContext &, ResultColumn &) {
+	return LogicalTypeId::DECIMAL;
 }
 
 } // namespace odbcscanner

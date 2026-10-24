@@ -19,20 +19,20 @@ TEST_CASE("Query cancellation", group_name) {
 	int64_t conn_handle = 0;
 	{
 		Result res;
-		duckdb_state st = duckdb_query(sc1.conn,
-		                               R"(
+		bool st = Query(sc1.conn,
+		                R"(
 	SELECT getvariable('conn')
   )",
-		                               res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st));
+		                res);
+		REQUIRE(QuerySuccess(res, st));
 		REQUIRE(res.NextChunk());
 		conn_handle = res.Value<int64_t>(0, 0);
 	}
 
 	Result res1;
-	duckdb_state st1;
+	bool st1;
 	std::thread th([&sc1, &res1, &st1] {
-		st1 = duckdb_query(sc1.conn, R"(
+		st1 = Query(sc1.conn, R"(
   FROM odbc_query(
     getvariable('conn'), 
     '
@@ -40,7 +40,7 @@ TEST_CASE("Query cancellation", group_name) {
     '
     )
   )",
-		                   res1.Get());
+		            res1);
 	});
 
 	auto start = std::chrono::steady_clock::now();
@@ -48,14 +48,14 @@ TEST_CASE("Query cancellation", group_name) {
 	ScannerConn sc2;
 	{
 		Result res;
-		duckdb_state st = duckdb_query(sc2.conn,
-		                               std::string(R"(
+		bool st = Query(sc2.conn,
+		                std::string(R"(
 	SELECT odbc_cancel_query()" + std::to_string(conn_handle) +
-		                                           R"()
+		                            R"()
   )")
-		                                   .c_str(),
-		                               res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st));
+		                    .c_str(),
+		                res);
+		REQUIRE(QuerySuccess(res, st));
 		REQUIRE(res.NextChunk());
 		REQUIRE(res.Value<bool>(0, 0));
 	}
@@ -63,8 +63,8 @@ TEST_CASE("Query cancellation", group_name) {
 	auto end = std::chrono::steady_clock::now();
 	auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-	REQUIRE(st1 == DuckDBError);
-	std::string res1_err = duckdb_result_error(res1.Get());
+	REQUIRE(!st1);
+	std::string res1_err = res1.Error();
 	REQUIRE(EndsWith(res1_err, "]Operation canceled'"));
 	REQUIRE(elapsed_ms < 2000);
 }
@@ -73,32 +73,32 @@ TEST_CASE("Query cancellation failure", group_name) {
 	ScannerConn sc;
 	{
 		Result res;
-		duckdb_state st = duckdb_query(sc.conn,
-		                               R"(
+		bool st = Query(sc.conn,
+		                R"(
     SELECT odbc_cancel_query(NULL)
 	)",
-		                               res.Get());
-		REQUIRE(st == DuckDBError);
+		                res);
+		REQUIRE(!st);
 	}
 	{
 		Result res;
-		duckdb_state st = duckdb_query(sc.conn,
-		                               R"(
+		bool st = Query(sc.conn,
+		                R"(
     SELECT odbc_cancel_query(42)
 	)",
-		                               res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st));
+		                res);
+		REQUIRE(QuerySuccess(res, st));
 		REQUIRE(res.NextChunk());
 		REQUIRE(!res.Value<bool>(0, 0));
 	}
 	{
 		Result res;
-		duckdb_state st = duckdb_query(sc.conn,
-		                               R"(
+		bool st = Query(sc.conn,
+		                R"(
     SELECT odbc_cancel_query(getvariable('conn'))
 	)",
-		                               res.Get());
-		REQUIRE(QuerySuccess(res.Get(), st));
+		                res);
+		REQUIRE(QuerySuccess(res, st));
 		REQUIRE(res.NextChunk());
 		REQUIRE(!res.Value<bool>(0, 0));
 	}

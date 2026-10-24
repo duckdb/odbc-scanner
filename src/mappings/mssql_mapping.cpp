@@ -2,28 +2,28 @@
 
 namespace odbcscanner {
 
-std::unordered_map<duckdb_type, std::string> Mappings::MSSQL(const DbmsQuirks &) {
-	return {{DUCKDB_TYPE_BOOLEAN, "BIT"},
+std::unordered_map<LogicalTypeId, std::string> Mappings::MSSQL(const DbmsQuirks &) {
+	return {{LogicalTypeId::BOOLEAN, "BIT"},
 
-	        {DUCKDB_TYPE_TINYINT, "SMALLINT"},
-	        {DUCKDB_TYPE_UTINYINT, "SMALLINT"},
-	        {DUCKDB_TYPE_SMALLINT, "SMALLINT"},
-	        {DUCKDB_TYPE_USMALLINT, "INTEGER"},
-	        {DUCKDB_TYPE_INTEGER, "INTEGER"},
-	        {DUCKDB_TYPE_UINTEGER, "BIGINT"},
-	        {DUCKDB_TYPE_BIGINT, "BIGINT"},
+	        {LogicalTypeId::TINYINT, "SMALLINT"},
+	        {LogicalTypeId::UTINYINT, "SMALLINT"},
+	        {LogicalTypeId::SMALLINT, "SMALLINT"},
+	        {LogicalTypeId::USMALLINT, "INTEGER"},
+	        {LogicalTypeId::INTEGER, "INTEGER"},
+	        {LogicalTypeId::UINTEGER, "BIGINT"},
+	        {LogicalTypeId::BIGINT, "BIGINT"},
 
-	        {DUCKDB_TYPE_FLOAT, "REAL"},
-	        {DUCKDB_TYPE_DOUBLE, "FLOAT"},
+	        {LogicalTypeId::FLOAT, "REAL"},
+	        {LogicalTypeId::DOUBLE, "FLOAT"},
 
-	        {DUCKDB_TYPE_DECIMAL, "DECIMAL({typmod1},{typmod2})"},
+	        {LogicalTypeId::DECIMAL, "DECIMAL({typmod1},{typmod2})"},
 
-	        {DUCKDB_TYPE_DATE, "DATE"},
-	        {DUCKDB_TYPE_TIMESTAMP, "DATETIME2(6)"},
-	        {DUCKDB_TYPE_TIMESTAMP_NS, "DATETIME2(7)"},
+	        {LogicalTypeId::DATE, "DATE"},
+	        {LogicalTypeId::TIMESTAMP, "DATETIME2(6)"},
+	        {LogicalTypeId::TIMESTAMP_NS, "DATETIME2(7)"},
 
-	        {DUCKDB_TYPE_VARCHAR, "NVARCHAR(MAX)"},
-	        {DUCKDB_TYPE_BLOB, "VARBINARY(MAX)"}};
+	        {LogicalTypeId::VARCHAR, "NVARCHAR(MAX)"},
+	        {LogicalTypeId::BLOB, "VARBINARY(MAX)"}};
 }
 
 } // namespace odbcscanner

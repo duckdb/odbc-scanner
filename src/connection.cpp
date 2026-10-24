@@ -5,8 +5,9 @@
 #include <regex>
 #include <vector>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "diagnostics.hpp"
+#include "types.hpp"
 #include "driver_manager.hpp"
 #include "make_unique.hpp"
 #include "registries.hpp"
@@ -186,30 +187,25 @@ OdbcConnection::~OdbcConnection() noexcept {
 	SQLFreeHandle(SQL_HANDLE_ENV, env);
 }
 
-ExtractedConnection OdbcConnection::ExtractOrOpen(const std::string &function_name, duckdb_value conn_id_or_str_val) {
-	if (duckdb_is_null_value(conn_id_or_str_val)) {
+ExtractedConnection OdbcConnection::ExtractOrOpen(const std::string &function_name, const Value *conn_id_or_str_val) {
+	if (conn_id_or_str_val->IsNull()) {
 		throw ScannerException("'" + function_name + "' error: specified ODBC connection must be not NULL");
 	}
 
-	duckdb_logical_type ltype = duckdb_get_value_type(conn_id_or_str_val);
-	duckdb_type type_id = duckdb_get_type_id(ltype);
+	LogicalTypeId type_id = Types::TypeIdOf(conn_id_or_str_val->GetLogicalType());
 
 	int64_t conn_id = -1;
 	bool must_be_closed = false;
-	if (type_id == DUCKDB_TYPE_VARCHAR) {
-		auto conn_cstr = VarcharPtr(duckdb_get_varchar(conn_id_or_str_val), VarcharDeleter);
-		if (conn_cstr == nullptr) {
-			throw ScannerException("'" + function_name + "' error: extracted ODBC connection must be not NULL");
-		}
-		std::string conn_str(conn_cstr.get());
+	if (type_id == LogicalTypeId::VARCHAR) {
+		std::string conn_str = std::string(conn_id_or_str_val->Get<varchar_t>().view());
 		auto oc_ptr = std_make_unique<OdbcConnection>(conn_str);
 		conn_id = ConnectionsRegistry::Add(std::move(oc_ptr));
 		must_be_closed = true;
-	} else if (type_id == DUCKDB_TYPE_BIGINT) {
-		conn_id = duckdb_get_int64(conn_id_or_str_val);
+	} else if (type_id == LogicalTypeId::BIGINT) {
+		conn_id = conn_id_or_str_val->Get<int64_t>();
 	} else {
-		throw ScannerException("'" + function_name +
-		                       "' error: invalid first argument specified, type ID: " + std::to_string(type_id) +
+		throw ScannerException("'" + function_name + "' error: invalid first argument specified, type ID: " +
+		                       std::to_string(static_cast<uint32_t>(type_id)) +
 		                       ", must be either 'BIGINT' as an output of 'odbc_connect()' (example: 'FROM "
 		                       "odbc_query(getvariable(\'conn\'), ...)')" +
 		                       " or an ODBC connection string (for one-off queries)");

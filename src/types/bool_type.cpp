@@ -2,29 +2,27 @@
 
 #include <cstdint>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
-
-DUCKDB_EXTENSION_EXTERN
 
 namespace odbcscanner {
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<bool>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
-	bool *data = reinterpret_cast<bool *>(duckdb_vector_get_data(vec));
+ScannerValue TypeSpecific::ExtractNotNullParam<bool>(const DbmsQuirks &, Vector &vec, idx_t row_idx) {
+	bool *data = vec.GetDataMutable<bool>();
 	bool val = data[row_idx];
 	return ScannerValue(val);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<bool>(DbmsQuirks &, duckdb_value value) {
-	bool val = duckdb_get_bool(value);
+ScannerValue TypeSpecific::ExtractNotNullParam<bool>(const DbmsQuirks &, const Value *value) {
+	bool val = value->Get<bool>();
 	return ScannerValue(val);
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<bool>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<bool>(const QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = param.ExpectedType() != SQL_PARAM_TYPE_UNKNOWN ? param.ExpectedType() : SQL_BIT;
 	bool &val = param.Value<bool>();
 	SQLRETURN ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_BIT, sqltype, 0, 0,
@@ -39,7 +37,7 @@ void TypeSpecific::BindOdbcParam<bool>(QueryContext &ctx, ScannerValue &param, S
 }
 
 template <>
-void TypeSpecific::BindColumn<bool>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx) {
+void TypeSpecific::BindColumn<bool>(const QueryContext &ctx, const OdbcType &odbc_type, SQLSMALLINT col_idx) {
 	if (!ctx.quirks.enable_columns_binding) {
 		return;
 	}
@@ -61,8 +59,8 @@ void TypeSpecific::BindColumn<bool>(QueryContext &ctx, OdbcType &odbc_type, SQLS
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<bool>(QueryContext &ctx, OdbcType &odbc_type, SQLSMALLINT col_idx,
-                                           duckdb_vector vec, idx_t row_idx) {
+void TypeSpecific::FetchAndSetResult<bool>(const QueryContext &ctx, const OdbcType &odbc_type, SQLSMALLINT col_idx,
+                                           Vector &vec, idx_t row_idx) {
 	SqlBit fetched_data;
 	SqlBit *fetched_ptr = &fetched_data;
 	SQLLEN ind = 0;
@@ -89,13 +87,13 @@ void TypeSpecific::FetchAndSetResult<bool>(QueryContext &ctx, OdbcType &odbc_typ
 		return;
 	}
 
-	bool *data = reinterpret_cast<bool *>(duckdb_vector_get_data(vec));
+	bool *data = vec.GetDataMutable<bool>();
 	data[row_idx] = fetched.val == 1;
 }
 
 template <>
-duckdb_type TypeSpecific::ResolveColumnType<bool>(QueryContext &, ResultColumn &) {
-	return DUCKDB_TYPE_BOOLEAN;
+LogicalTypeId TypeSpecific::ResolveColumnType<bool>(const QueryContext &, ResultColumn &) {
+	return LogicalTypeId::BOOLEAN;
 }
 
 } // namespace odbcscanner

@@ -26,11 +26,13 @@ struct ResultColumn {
 };
 
 struct Columns {
-	static std::vector<ResultColumn> Collect(QueryContext &ctx);
+	static std::vector<ResultColumn> Collect(const QueryContext &ctx);
 
-	static void CheckSame(QueryContext &ctx, std::vector<ResultColumn> &expected, std::vector<ResultColumn> &actual);
+	static void CheckSame(const QueryContext &ctx, const std::vector<ResultColumn> &expected,
+	                      const std::vector<ResultColumn> &actual);
 
-	static void AddToResults(duckdb_bind_info info, duckdb_type type_id, ResultColumn &col);
+	static void AddToResults(TableFunction::BindInput &input, Factory &factory, LogicalTypeId type_id,
+	                         ResultColumn &col);
 };
 
 } // namespace odbcscanner

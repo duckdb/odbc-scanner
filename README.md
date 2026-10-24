@@ -4,6 +4,29 @@
 
 [ODBC functions API reference](https://duckdb.org/docs/current/core_extensions/odbc/functions).
 
+The extension is no longer compatible with older versions of DuckDB. To install the latest published versiobn that is still binary compatible with DuckDB v1.2.0+ use the following command:
+
+```sql
+FORCE INSTALL 'http://nightly-extensions.duckdb.org/odbc_scanner/02132ae/v1.2.0/<platform>/odbc_scanner.duckdb_extension.gz'
+```
+
+Where the `<platform>` is one of:
+
+ - `linux_amd64`
+ - `linux_arm64`
+ - `linux_amd64_musl`
+ - `linux_arm64_musl`
+ - `osx_amd64`
+ - `osx_arm64`
+ - `windows_amd64`
+ - `windows_arm64`
+
+To install the latest available version on DuckDB v2.0+ use:
+
+```
+FORCE INSTALL odbc FROM core_nightly;
+```
+
 ## Building
 
 Dependencies: 

@@ -64,7 +64,7 @@ SET VARIABLE conn = odbc_connect('Driver=fail;', 'foo', 'bar')
 statement error
 SET VARIABLE conn = odbc_connect('Driver=fail', MAP {0 : 0}, MAP {0 : 0})
 ----
-Invalid Input Error: Cannot extract VARCHAR function argument: invalid column type: 26, expected: 17, column: 1, columns count: 3
+Invalid Input Error: Cannot extract VARCHAR function argument: invalid column type: 102, expected: 25, column: 1, columns count: 3
 
 statement error
 SET VARIABLE conn = odbc_connect('Driver=fail', MAP {0 : NULL::BIGINT })

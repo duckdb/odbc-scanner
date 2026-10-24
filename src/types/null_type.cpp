@@ -3,12 +3,10 @@
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
 
-DUCKDB_EXTENSION_EXTERN
-
 namespace odbcscanner {
 
 template <>
-void TypeSpecific::BindOdbcParam<std::nullptr_t>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<std::nullptr_t>(const QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLRETURN ret = SQLBindParameter(ctx.hstmt(), param_idx, SQL_PARAM_INPUT, SQL_C_DEFAULT, param.ExpectedType(), 1, 0,
 	                                 nullptr, 0, &param.LengthBytes());
 	if (!SQL_SUCCEEDED(ret)) {
@@ -20,10 +18,20 @@ void TypeSpecific::BindOdbcParam<std::nullptr_t>(QueryContext &ctx, ScannerValue
 	}
 }
 
-void Types::SetNullValueToResult(duckdb_vector vec, idx_t row_idx) {
-	duckdb_vector_ensure_validity_writable(vec);
-	uint64_t *validity = duckdb_vector_get_validity(vec);
-	duckdb_validity_set_row_invalid(validity, row_idx);
+void Types::SetNullValueToResult(Vector &vec, idx_t row_idx) {
+	if (vec.GetVectorType() == duckdb::cxx::VectorType::CONSTANT) {
+		vec.SetConstantValid(false);
+		return;
+	}
+	vec.GetValidityMutable().SetInvalid(row_idx);
+}
+
+LogicalTypeId Types::TypeIdOf(const LogicalType &ltype) {
+	LogicalTypeId type_id = ltype.GetTypeId();
+	if (type_id == LogicalTypeId::TUPLE) {
+		return LogicalTypeId::STRUCT;
+	}
+	return type_id;
 }
 
 } // namespace odbcscanner

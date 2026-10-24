@@ -4,7 +4,7 @@
 
 namespace odbcscanner {
 
-DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePtr> &user_quirks) {
+DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, std::unique_ptr<Value>> &user_quirks) {
 
 	// Quirks assigned based on DBMS name reported by the driver
 
@@ -73,46 +73,46 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePt
 	// Quirks explicitly requested by user
 
 	for (auto &en : user_quirks) {
-		const ValuePtr &val = en.second;
-		if (!val || duckdb_is_null_value(val.get())) {
+		const std::unique_ptr<Value> &val = en.second;
+		if (!val || val->IsNull()) {
 			continue;
 		}
 		if (en.first == "decimal_columns_as_chars") {
-			this->decimal_columns_as_chars = duckdb_get_bool(val.get());
+			this->decimal_columns_as_chars = val->Get<bool>();
 		} else if (en.first == "decimal_columns_precision_through_ard") {
-			this->decimal_columns_precision_through_ard = duckdb_get_bool(val.get());
+			this->decimal_columns_precision_through_ard = val->Get<bool>();
 		} else if (en.first == "decimal_columns_as_ard_type") {
-			this->decimal_columns_as_ard_type = duckdb_get_bool(val.get());
+			this->decimal_columns_as_ard_type = val->Get<bool>();
 		} else if (en.first == "decimal_params_as_chars") {
-			this->decimal_params_as_chars = duckdb_get_bool(val.get());
+			this->decimal_params_as_chars = val->Get<bool>();
 		} else if (en.first == "integral_params_as_decimals") {
-			this->integral_params_as_decimals = duckdb_get_bool(val.get());
+			this->integral_params_as_decimals = val->Get<bool>();
 		} else if (en.first == "reset_stmt_before_execute") {
-			this->reset_stmt_before_execute = duckdb_get_bool(val.get());
+			this->reset_stmt_before_execute = val->Get<bool>();
 		} else if (en.first == "time_params_as_ss_time2") {
-			this->time_params_as_ss_time2 = duckdb_get_bool(val.get());
+			this->time_params_as_ss_time2 = val->Get<bool>();
 		} else if (en.first == "timestamp_columns_as_timestamp_ns") {
-			this->timestamp_columns_as_timestamp_ns = duckdb_get_bool(val.get());
+			this->timestamp_columns_as_timestamp_ns = val->Get<bool>();
 		} else if (en.first == "timestamp_columns_with_typename_date_as_date") {
-			this->timestamp_columns_with_typename_date_as_date = duckdb_get_bool(val.get());
+			this->timestamp_columns_with_typename_date_as_date = val->Get<bool>();
 		} else if (en.first == "timestamp_max_fraction_precision") {
-			uint8_t num = duckdb_get_uint8(val.get());
+			uint8_t num = val->Get<uint8_t>();
 			if (num > 9) {
 				throw ScannerException("Invalid value for user option 'timestamp_max_fraction_precision': " +
 				                       std::to_string(num) + ", max value: 9");
 			}
 			this->timestamp_max_fraction_precision = num;
 		} else if (en.first == "timestamp_params_as_sf_timestamp_ntz") {
-			this->timestamp_params_as_sf_timestamp_ntz = duckdb_get_bool(val.get());
+			this->timestamp_params_as_sf_timestamp_ntz = val->Get<bool>();
 		} else if (en.first == "timestamptz_params_as_ss_timestampoffset") {
-			this->timestamptz_params_as_ss_timestampoffset = duckdb_get_bool(val.get());
+			this->timestamptz_params_as_ss_timestampoffset = val->Get<bool>();
 		} else if (en.first == "var_len_data_single_part") {
-			this->var_len_data_single_part = duckdb_get_bool(val.get());
+			this->var_len_data_single_part = val->Get<bool>();
 		} else if (en.first == "var_len_params_long_threshold_bytes") {
-			uint32_t num = duckdb_get_uint32(val.get());
+			uint32_t num = val->Get<uint32_t>();
 			this->var_len_params_long_threshold_bytes = num;
 		} else if (en.first == "enable_columns_binding") {
-			this->enable_columns_binding = duckdb_get_bool(val.get());
+			this->enable_columns_binding = val->Get<bool>();
 		} else {
 			throw ScannerException("Unsupported user option: '" + en.first + "'");
 		}
@@ -139,10 +139,10 @@ const std::vector<std::string> DbmsQuirks::AllNames() {
 	return res;
 }
 
-std::map<std::string, ValuePtr> DbmsQuirks::ExtractUserQuirks(duckdb_bind_info info) {
-	std::map<std::string, ValuePtr> res;
+std::map<std::string, std::unique_ptr<Value>> DbmsQuirks::ExtractUserQuirks(FunctionBindInput &input) {
+	std::map<std::string, std::unique_ptr<Value>> res;
 	for (auto &name : DbmsQuirks::AllNames()) {
-		auto val = ValuePtr(duckdb_bind_get_named_parameter(info, name.c_str()), ValueDeleter);
+		auto val = FunctionArgs::GetNamedArg(input, name);
 		res.emplace(name, std::move(val));
 	}
 	return res;

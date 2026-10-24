@@ -6,8 +6,6 @@
 #include "scanner_exception.hpp"
 #include "widechar.hpp"
 
-DUCKDB_EXTENSION_EXTERN
-
 namespace odbcscanner {
 
 struct DiagMsg {

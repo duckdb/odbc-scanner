@@ -6,12 +6,13 @@ PROJ_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 EXTENSION_NAME := odbc_scanner
 
 # Set to 1 to enable Unstable API (binaries will only work on TARGET_DUCKDB_VERSION, forwards compatibility will be broken)
-# WARNING: When set to 1, the duckdb_extension.h from the TARGET_DUCKDB_VERSION must be used, using any other version of
-#          the header is unsafe.
-USE_UNSTABLE_C_API := 0
+# WARNING: When set to 1, the duckdb_extension_v2.h from the TARGET_DUCKDB_VERSION must be used, using any other version
+#          of the header is unsafe.
+# Note: C API V2 has no stable surface yet, so it requires the unstable API.
+USE_UNSTABLE_C_API := 1
 
 # The DuckDB version to target
-TARGET_DUCKDB_VERSION := v1.2.0
+TARGET_DUCKDB_VERSION := v2.0.0
 
 ENABLE_C_API_TESTS := TRUE
 
@@ -21,6 +22,9 @@ ifeq ("$(DUCKDB_CAPI_LIB_PATH)","")
 endif
 
 CMAKE_EXTRA_BUILD_FLAGS := -DENABLE_C_API_TESTS=$(ENABLE_C_API_TESTS)
+
+# extension-ci-tools only parses V1 versions, V2 version is passed explicitly
+CMAKE_EXTRA_BUILD_FLAGS += -DTARGET_DUCKDB_VERSION_MAJOR=2 -DTARGET_DUCKDB_VERSION_MINOR=0 -DTARGET_DUCKDB_VERSION_PATCH=0
 
 CAPI_RUN_MSG := "Running C API tests using shared lib at $(DUCKDB_CAPI_LIB_PATH)"
 CAPI_ERROR_MSG := "C API test suite is disabled, to enable it specify DuckDB shared library in 'DUCKDB_CAPI_LIB_PATH' environment variable."

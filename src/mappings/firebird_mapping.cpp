@@ -2,28 +2,28 @@
 
 namespace odbcscanner {
 
-std::unordered_map<duckdb_type, std::string> Mappings::FIREBIRD(const DbmsQuirks &) {
-	return {{DUCKDB_TYPE_BOOLEAN, "BOOLEAN"},
+std::unordered_map<LogicalTypeId, std::string> Mappings::FIREBIRD(const DbmsQuirks &) {
+	return {{LogicalTypeId::BOOLEAN, "BOOLEAN"},
 
-	        {DUCKDB_TYPE_TINYINT, "SMALLINT"},
-	        {DUCKDB_TYPE_UTINYINT, "SMALLINT"},
-	        {DUCKDB_TYPE_SMALLINT, "SMALLINT"},
-	        {DUCKDB_TYPE_USMALLINT, "INTEGER"},
-	        {DUCKDB_TYPE_INTEGER, "INTEGER"},
-	        {DUCKDB_TYPE_UINTEGER, "BIGINT"},
-	        {DUCKDB_TYPE_BIGINT, "BIGINT"},
-	        {DUCKDB_TYPE_UBIGINT, "INT128"},
+	        {LogicalTypeId::TINYINT, "SMALLINT"},
+	        {LogicalTypeId::UTINYINT, "SMALLINT"},
+	        {LogicalTypeId::SMALLINT, "SMALLINT"},
+	        {LogicalTypeId::USMALLINT, "INTEGER"},
+	        {LogicalTypeId::INTEGER, "INTEGER"},
+	        {LogicalTypeId::UINTEGER, "BIGINT"},
+	        {LogicalTypeId::BIGINT, "BIGINT"},
+	        {LogicalTypeId::UBIGINT, "INT128"},
 
-	        {DUCKDB_TYPE_FLOAT, "REAL"},
-	        {DUCKDB_TYPE_DOUBLE, "DOUBLE PRECISION"},
+	        {LogicalTypeId::FLOAT, "REAL"},
+	        {LogicalTypeId::DOUBLE, "DOUBLE PRECISION"},
 
-	        {DUCKDB_TYPE_DECIMAL, "DECIMAL({typmod1},{typmod2})"},
+	        {LogicalTypeId::DECIMAL, "DECIMAL({typmod1},{typmod2})"},
 
-	        {DUCKDB_TYPE_DATE, "DATE"},
-	        {DUCKDB_TYPE_TIMESTAMP, "TIMESTAMP"},
+	        {LogicalTypeId::DATE, "DATE"},
+	        {LogicalTypeId::TIMESTAMP, "TIMESTAMP"},
 
-	        {DUCKDB_TYPE_VARCHAR, "BLOB SUB_TYPE TEXT"},
-	        {DUCKDB_TYPE_BLOB, "BLOB"}};
+	        {LogicalTypeId::VARCHAR, "BLOB SUB_TYPE TEXT"},
+	        {LogicalTypeId::BLOB, "BLOB"}};
 }
 
 } // namespace odbcscanner
