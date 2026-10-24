@@ -9,6 +9,8 @@ Catalog Error: Scalar Function
 
 require odbc_scanner
 
+require-env ODBC_CONN_STRING
+
 statement error
 SELECT odbc_close()
 ----
@@ -23,7 +25,7 @@ statement ok
 SELECT odbc_close(42)
 
 statement ok
-SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 statement ok
 SELECT odbc_close(getvariable('conn'))

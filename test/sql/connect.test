@@ -9,6 +9,8 @@ Catalog Error: Scalar Function
 
 require odbc_scanner
 
+require-env ODBC_CONN_STRING
+
 statement error
 SET VARIABLE conn = odbc_connect()
 ----
@@ -75,7 +77,7 @@ SET VARIABLE conn = odbc_connect('Driver=fail', MAP {0 : 'foo' })
 Invalid Input Error: 'odbc_connect' error: specified connection attribute map values must be INTEGER or BIGINT
 
 statement ok
-SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 statement ok
 SELECT odbc_close(getvariable('conn'))
@@ -86,13 +88,13 @@ SELECT odbc_close(getvariable('conn'))
 # SQL_AUTOCOMMIT_ON 1UL
 
 statement ok
-SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING', MAP {113 : 10, 102: 1})
+SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}', MAP {113 : 10, 102: 1})
 
 statement ok
 SELECT odbc_close(getvariable('conn'))
 
 statement ok
-SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING', MAP {113 : 10::BIGINT, 102: 1::BIGINT})
+SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}', MAP {113 : 10::BIGINT, 102: 1::BIGINT})
 
 statement ok
 SELECT odbc_close(getvariable('conn'))

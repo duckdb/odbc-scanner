@@ -4,8 +4,10 @@
 
 require odbc_scanner
 
+require-env ODBC_CONN_STRING
+
 statement ok
-SET VARIABLE conn = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
 
 query I
 SELECT * FROM odbc_query(getvariable('conn'), 'SELECT CAST(''1.234'' AS DECIMAL(4,3))')
