@@ -17,8 +17,6 @@
 
 DUCKDB_EXTENSION_EXTERN
 
-static const std::string ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR = "ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR";
-
 static void odbc_connect_function(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) noexcept;
 
 namespace odbcscanner {
@@ -173,17 +171,6 @@ static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 	} else if (varchar_args_count == 3) {
 		// Signature: (conn_string, username, password)
 		AppendUsernameAndPassword(input, conn_str);
-	}
-
-	// Env var fetch is not thread-safe, should be used only for debugging,
-	// ideally this logic should be moved into SQLLogic test runner.
-	if (conn_str.rfind(ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR, 0) == 0 && conn_str.find(";") == std::string::npos) {
-		std::vector<std::string> parts = Strings::Split(conn_str, '=');
-		if (parts.size() == 2 && ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR == parts.at(0)) {
-			std::string &var_name = parts.at(1);
-			char *var = std::getenv(var_name.c_str());
-			conn_str = var != nullptr ? std::string(var) : "Driver={DuckDB Driver};";
-		}
 	}
 
 	auto oc_ptr = std_make_unique<OdbcConnection>(conn_str, access_token, attrs.first);

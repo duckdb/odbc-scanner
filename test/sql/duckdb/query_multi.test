@@ -4,8 +4,10 @@
 
 require odbc_scanner
 
+require-env ODBC_CONN_STRING
+
 statement ok
-SET VARIABLE conn1 = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+SET VARIABLE conn1 = odbc_connect('${ODBC_CONN_STRING}')
 
 statement error
 SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 42, ''foo''')
@@ -18,7 +20,7 @@ ORDER BY 1
 'odbc_query' error: ODBC connection not found on global init
 
 statement ok
-SET VARIABLE conn2 = odbc_connect('ODBCSCANNER_DEBUG_CONN_STRING_ENV_VAR=ODBC_CONN_STRING')
+SET VARIABLE conn2 = odbc_connect('${ODBC_CONN_STRING}')
 
 query II
 SELECT * FROM odbc_query(getvariable('conn1'), 'SELECT 42, ''foo''')
