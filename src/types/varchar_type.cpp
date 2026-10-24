@@ -2,82 +2,82 @@
 
 #include <cstring>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
-
-DUCKDB_EXTENSION_EXTERN
 
 namespace odbcscanner {
 
 static const std::string trunc_diag_code("01004");
 
 template <>
-std::pair<std::string, bool> Types::ExtractFunctionArg<std::string>(duckdb_data_chunk chunk, idx_t col_idx) {
-	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
+std::pair<std::string, bool> Types::ExtractFunctionArg<std::string>(ScalarFunction::ExecInput &input, idx_t col_idx) {
+	idx_t col_count = input.GetArgCount();
 	if (col_idx >= col_count) {
 		throw ScannerException("Cannot extract VARCHAR function argument: column not found, column: " +
 		                       std::to_string(col_idx) + ", columns count: " + std::to_string(col_count));
 	}
 
-	duckdb_vector vec = duckdb_data_chunk_get_vector(chunk, col_idx);
-	if (vec == nullptr) {
+	Vector vec = input.GetArg(col_idx);
+	if (!vec) {
 		throw ScannerException("Cannot extract VARCHAR function argument: vector is NULL, column: " +
 		                       std::to_string(col_idx) + ", columns count: " + std::to_string(col_count));
 	}
 
-	idx_t rows_count = duckdb_data_chunk_get_size(chunk);
+	idx_t rows_count = input.GetRowCount();
 	if (rows_count == 0) {
 		throw ScannerException("Cannot extract VARCHAR function argument: vector contains no rows, column: " +
 		                       std::to_string(col_idx) + ", columns count: " + std::to_string(col_count));
 	}
 
-	uint64_t *validity = duckdb_vector_get_validity(vec);
-	if (validity != nullptr && !duckdb_validity_row_is_valid(validity, 0)) {
+	VectorView view = vec.GetView();
+	idx_t row_idx = view.SelAt(0);
+	if (!view.RowIsValid(row_idx)) {
 		return std::make_pair("", true);
 	}
 
-	auto vec_type = LogicalTypePtr(duckdb_vector_get_column_type(vec), LogicalTypeDeleter);
+	auto vec_type = vec.GetLogicalType();
 	if (!vec_type) {
 		throw ScannerException("Cannot extract VARCHAR function argument: column type is NULL, column: " +
 		                       std::to_string(col_idx) + ", columns count: " + std::to_string(col_count));
 	}
 
-	duckdb_type vec_type_id = duckdb_get_type_id(vec_type.get());
-	if (vec_type_id != DUCKDB_TYPE_VARCHAR) {
-		throw ScannerException(
-		    "Cannot extract VARCHAR function argument: invalid column type: " + std::to_string(vec_type_id) +
-		    ", expected: " + std::to_string(DUCKDB_TYPE_VARCHAR) + ", column: " + std::to_string(col_idx) +
-		    ", columns count: " + std::to_string(col_count));
+	LogicalTypeId vec_type_id = Types::TypeIdOf(vec_type);
+	if (vec_type_id != LogicalTypeId::VARCHAR) {
+		throw ScannerException("Cannot extract VARCHAR function argument: invalid column type: " +
+		                       std::to_string(static_cast<uint32_t>(vec_type_id)) +
+		                       ", expected: " + std::to_string(static_cast<uint32_t>(LogicalTypeId::VARCHAR)) +
+		                       ", column: " + std::to_string(col_idx) +
+		                       ", columns count: " + std::to_string(col_count));
 	}
 
-	duckdb_string_t *str_data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(vec));
-	duckdb_string_t str_t = str_data[0];
+	const varchar_t *str_data = reinterpret_cast<const varchar_t *>(view.data);
+	const varchar_t &str_t = str_data[row_idx];
 
-	const char *cstr = duckdb_string_t_data(&str_t);
-	uint32_t len = duckdb_string_t_length(str_t);
+	const char *cstr = str_t.data();
+	uint32_t len = str_t.size();
 	std::string res(cstr, len);
 
 	return std::make_pair(std::move(res), false);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<std::string>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
-	duckdb_string_t *data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(vec));
-	duckdb_string_t dstr = data[row_idx];
-	const char *cstr = duckdb_string_t_data(&dstr);
-	uint32_t len = duckdb_string_t_length(dstr);
+ScannerValue TypeSpecific::ExtractNotNullParam<std::string>(const DbmsQuirks &, Vector &vec, idx_t row_idx) {
+	varchar_t *data = vec.GetDataMutable<varchar_t>();
+	varchar_t &dstr = data[row_idx];
+	const char *cstr = dstr.data();
+	uint32_t len = dstr.size();
 	return ScannerValue(cstr, len);
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<std::string>(DbmsQuirks &, duckdb_value value) {
-	auto str_ptr = VarcharPtr(duckdb_get_varchar(value), VarcharDeleter);
-	return ScannerValue(str_ptr.get());
+ScannerValue TypeSpecific::ExtractNotNullParam<std::string>(const DbmsQuirks &, const Value *value) {
+	std::string str = std::string(value->Get<varchar_t>().view());
+	return ScannerValue(str.c_str());
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<std::string>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<std::string>(const QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_WVARCHAR;
 	WideString &wstring = param.Value<WideString>();
 	size_t len_bytes = wstring.length<size_t>() * sizeof(SQLWCHAR);
@@ -96,7 +96,7 @@ void TypeSpecific::BindOdbcParam<std::string>(QueryContext &ctx, ScannerValue &p
 	}
 }
 
-static std::pair<std::string, bool> FetchTail(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLWCHAR> &buf,
+static std::pair<std::string, bool> FetchTail(const QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLWCHAR> &buf,
                                               SQLLEN len_bytes) {
 	if (len_bytes % sizeof(SQLWCHAR) != 0) {
 		len_bytes -= 1;
@@ -136,7 +136,7 @@ static std::pair<std::string, bool> FetchTail(QueryContext &ctx, SQLSMALLINT col
 	return std::make_pair(std::move(str), false);
 }
 
-static std::pair<std::string, bool> FetchMultiReads(QueryContext &ctx, SQLSMALLINT col_idx,
+static std::pair<std::string, bool> FetchMultiReads(const QueryContext &ctx, SQLSMALLINT col_idx,
                                                     std::vector<SQLWCHAR> &buf) {
 	for (size_t i = 1; true; i++) {
 		size_t prev_len = buf.size();
@@ -174,8 +174,8 @@ static std::pair<std::string, bool> FetchMultiReads(QueryContext &ctx, SQLSMALLI
 	}
 }
 
-static std::pair<std::string, bool> FetchSinglePart(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLWCHAR> &buf,
-                                                    SQLLEN len_bytes) {
+static std::pair<std::string, bool> FetchSinglePart(const QueryContext &ctx, SQLSMALLINT col_idx,
+                                                    std::vector<SQLWCHAR> &buf, SQLLEN len_bytes) {
 	if (len_bytes % sizeof(SQLWCHAR) != 0) {
 		len_bytes -= 1;
 	}
@@ -208,7 +208,7 @@ static std::pair<std::string, bool> FetchSinglePart(QueryContext &ctx, SQLSMALLI
 	return std::make_pair(std::move(str), false);
 }
 
-static std::pair<std::string, bool> FetchInternal(QueryContext &ctx, SQLSMALLINT col_idx) {
+static std::pair<std::string, bool> FetchInternal(const QueryContext &ctx, SQLSMALLINT col_idx) {
 	std::vector<SQLWCHAR> buf;
 	buf.resize(4096);
 	SQLLEN len_bytes = 0;
@@ -257,8 +257,8 @@ static std::pair<std::string, bool> FetchInternal(QueryContext &ctx, SQLSMALLINT
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<std::string>(QueryContext &ctx, OdbcType &, SQLSMALLINT col_idx, duckdb_vector vec,
-                                                  idx_t row_idx) {
+void TypeSpecific::FetchAndSetResult<std::string>(const QueryContext &ctx, const OdbcType &, SQLSMALLINT col_idx,
+                                                  Vector &vec, idx_t row_idx) {
 	auto fetched = FetchInternal(ctx, col_idx);
 
 	if (fetched.second) {
@@ -266,12 +266,12 @@ void TypeSpecific::FetchAndSetResult<std::string>(QueryContext &ctx, OdbcType &,
 		return;
 	}
 
-	duckdb_vector_assign_string_element_len(vec, row_idx, fetched.first.c_str(), fetched.first.length());
+	vec.AssignStringUnsafe(row_idx, std::string_view(fetched.first.c_str(), fetched.first.length()));
 }
 
 template <>
-duckdb_type TypeSpecific::ResolveColumnType<std::string>(QueryContext &, ResultColumn &) {
-	return DUCKDB_TYPE_VARCHAR;
+LogicalTypeId TypeSpecific::ResolveColumnType<std::string>(const QueryContext &, ResultColumn &) {
+	return LogicalTypeId::VARCHAR;
 }
 
 } // namespace odbcscanner

@@ -10,9 +10,10 @@ if(DEFINED DUCKDB_MODULE_BASE_DIR)
     set(EXTENSION_NAME odbc_scanner)
     set(${EXTENSION_NAME}_CMAKE_ONLY_BUILD TRUE)
 
-    set(TARGET_DUCKDB_VERSION_MAJOR 1)
-    set(TARGET_DUCKDB_VERSION_MINOR 2)
+    set(TARGET_DUCKDB_VERSION_MAJOR 2)
+    set(TARGET_DUCKDB_VERSION_MINOR 0)
     set(TARGET_DUCKDB_VERSION_PATCH 0)
+    set(DUCKDB_EXTENSION_API_VERSION_UNSTABLE v2.0.0)
 
     find_package(Git)
     if(Git_FOUND)
@@ -70,7 +71,9 @@ else()
     endif()
 endif()
 
-set(CMAKE_CXX_STANDARD "11" CACHE STRING "C++ standard to enforce")
+# C++ API requires C++17
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 if(MSVC) 
@@ -81,6 +84,7 @@ endif()
 
 # Create Extension library
 set(EXTENSION_SOURCES
+    duckdb_capi_v2/cpp/duckdb_cpp.cpp
     src/binary.cpp
     src/capi_entry_point.cpp
     src/columns.cpp
@@ -88,11 +92,13 @@ set(EXTENSION_SOURCES
     src/dbms_quirks.cpp
     src/diagnostics.cpp
     src/driver_manager.cpp
+    src/function_args.cpp
     src/odbc_scanner.cpp
     src/params.cpp
     src/registries.cpp
     src/scanner_value.cpp
     src/strings.cpp
+    src/temporal.cpp
     src/widechar.cpp
     src/functions/odbc_begin_transaction.cpp
     src/functions/odbc_cancel_query.cpp
@@ -124,6 +130,19 @@ set(EXTENSION_SOURCES
 
 add_library(${EXTENSION_NAME} SHARED ${EXTENSION_SOURCES})
 
+# C++ API calls are routed through the extension API struct
+target_compile_definitions(${EXTENSION_NAME} PRIVATE DUCKDB_CPP_API_LOADABLE)
+
+if(MSVC)
+    # C++ API sources: integer conversions and local variables shadowing class members
+    set_source_files_properties(duckdb_capi_v2/cpp/duckdb_cpp.cpp PROPERTIES COMPILE_OPTIONS "/wd4244;/wd4458")
+    # DUCKDB_EXTENSION_ENTRYPOINT declares the entrypoint with 'dllexport' twice
+    set_source_files_properties(src/capi_entry_point.cpp PROPERTIES COMPILE_OPTIONS /wd4141)
+else()
+    # Extension API struct is zero-initialized in DUCKDB_EXTENSION_ENTRYPOINT
+    set_source_files_properties(src/capi_entry_point.cpp PROPERTIES COMPILE_OPTIONS -Wno-missing-field-initializers)
+endif()
+
 if(DEFINED ${EXTENSION_NAME}_CMAKE_ONLY_BUILD)
     add_dependencies(${EXTENSION_NAME} duckdb_platform)
     add_dependencies(duckdb_local_extension_repo ${EXTENSION_NAME})
@@ -134,7 +153,7 @@ if(DEFINED ${EXTENSION_NAME}_CMAKE_ONLY_BUILD)
             $<TARGET_FILE:${EXTENSION_NAME}>
             ${CMAKE_CURRENT_BINARY_DIR}/${EXTENSION_NAME}.duckdb_extension
         COMMAND ${CMAKE_COMMAND}
-            -DABI_TYPE=C_STRUCT
+            -DABI_TYPE=C_STRUCT_UNSTABLE
             -DEXTENSION=${CMAKE_CURRENT_BINARY_DIR}/odbc_scanner.duckdb_extension
             -DPLATFORM_FILE=${DuckDB_BINARY_DIR}/duckdb_platform_out
             -DVERSION_FIELD=v${TARGET_DUCKDB_VERSION_MAJOR}.${TARGET_DUCKDB_VERSION_MINOR}.${TARGET_DUCKDB_VERSION_PATCH}
@@ -156,7 +175,8 @@ endif()
 
 target_include_directories(${EXTENSION_NAME} PRIVATE
     third_party/utf8cpp
-    duckdb_capi
+    duckdb_capi_v2
+    duckdb_capi_v2/cpp
     ${ODBC_INCLUDE_DIRS}
     src/include
 )

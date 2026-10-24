@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "connection.hpp"
 #include "diagnostics.hpp"
 #include "make_unique.hpp"
@@ -15,13 +15,9 @@
 #include "strings.hpp"
 #include "types.hpp"
 
-DUCKDB_EXTENSION_EXTERN
-
-static void odbc_connect_function(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) noexcept;
-
 namespace odbcscanner {
 
-static void AppendUsernameAndPassword(duckdb_data_chunk input, std::string &conn_str) {
+static void AppendUsernameAndPassword(ScalarFunction::ExecInput &input, std::string &conn_str) {
 	auto username_pair = Types::ExtractFunctionArg<std::string>(input, 1);
 	if (username_pair.second) {
 		throw ScannerException("'odbc_connect' error: specified username argument must be not NULL");
@@ -58,7 +54,7 @@ static void AppendUsernameAndPassword(duckdb_data_chunk input, std::string &conn
 
 // Extract an optional access_token string from the given argument index.
 // Returns an empty string when the argument is absent or NULL.
-static std::string ExtractAccessToken(duckdb_data_chunk input, idx_t arg_idx) {
+static std::string ExtractAccessToken(ScalarFunction::ExecInput &input, idx_t arg_idx) {
 	auto pair = Types::ExtractFunctionArg<std::string>(input, arg_idx);
 	if (pair.second) {
 		// NULL value - treat as "no token"
@@ -67,71 +63,75 @@ static std::string ExtractAccessToken(duckdb_data_chunk input, idx_t arg_idx) {
 	return pair.first;
 }
 
-static bool HasNulls(uint64_t *validity, idx_t attrs_count) {
-	if (validity == nullptr) {
-		return false;
-	}
-	for (idx_t i = 0; i < attrs_count; i++) {
-		if (!duckdb_validity_row_is_valid(validity, i)) {
+static bool HasNulls(const VectorView &view, idx_t attrs_offset, idx_t attrs_count) {
+	for (idx_t i = attrs_offset; i < attrs_offset + attrs_count; i++) {
+		if (!view.IsValid(i)) {
 			return true;
 		}
 	}
 	return false;
 }
 
-static std::pair<std::vector<OdbcConnectionAttribute>, bool> ExtractAttrs(duckdb_data_chunk input, idx_t args_count) {
+static std::pair<std::vector<OdbcConnectionAttribute>, bool> ExtractAttrs(ScalarFunction::ExecInput &input,
+                                                                          idx_t args_count) {
 	if (args_count <= 1) {
 		return std::make_pair(std::vector<OdbcConnectionAttribute>(), false);
 	}
-	duckdb_vector vec = duckdb_data_chunk_get_vector(input, args_count - 1);
+	Vector vec = input.GetArg(args_count - 1);
 	if (!vec) {
 		return std::make_pair(std::vector<OdbcConnectionAttribute>(), false);
 	}
-	auto vec_type = LogicalTypePtr(duckdb_vector_get_column_type(vec), LogicalTypeDeleter);
-	duckdb_type type_id = duckdb_get_type_id(vec_type.get());
-	if (type_id != DUCKDB_TYPE_MAP) {
+	auto vec_type = vec.GetLogicalType();
+	LogicalTypeId type_id = Types::TypeIdOf(vec_type);
+	if (type_id != LogicalTypeId::MAP) {
 		return std::make_pair(std::vector<OdbcConnectionAttribute>(), false);
 	}
 
 	{
-		auto key_type = LogicalTypePtr(duckdb_map_type_key_type(vec_type.get()), LogicalTypeDeleter);
-		duckdb_type key_type_id = duckdb_get_type_id(key_type.get());
-		if (key_type_id != DUCKDB_TYPE_INTEGER) {
+		auto key_type = vec_type.GetMapKeyType();
+		LogicalTypeId key_type_id = Types::TypeIdOf(key_type);
+		if (key_type_id != LogicalTypeId::INTEGER) {
 			throw ScannerException("'odbc_connect' error: specified connection attribute map keys must be INTEGER");
 		}
 	}
 
-	auto value_type = LogicalTypePtr(duckdb_map_type_value_type(vec_type.get()), LogicalTypeDeleter);
-	duckdb_type value_type_id = duckdb_get_type_id(value_type.get());
-	if (value_type_id != DUCKDB_TYPE_INTEGER && value_type_id != DUCKDB_TYPE_BIGINT) {
+	auto value_type = vec_type.GetMapValueType();
+	LogicalTypeId value_type_id = Types::TypeIdOf(value_type);
+	if (value_type_id != LogicalTypeId::INTEGER && value_type_id != LogicalTypeId::BIGINT) {
 		throw ScannerException(
 		    "'odbc_connect' error: specified connection attribute map values must be INTEGER or BIGINT");
 	}
 
-	duckdb_vector struct_vec = duckdb_list_vector_get_child(vec);
-	uint64_t *struct_validity = duckdb_vector_get_validity(struct_vec);
-	duckdb_vector key_vec = duckdb_struct_vector_get_child(struct_vec, 0);
-	uint64_t *keys_validity = duckdb_vector_get_validity(key_vec);
-	duckdb_vector value_vec = duckdb_struct_vector_get_child(struct_vec, 1);
-	uint64_t *values_validity = duckdb_vector_get_validity(value_vec);
-	idx_t attrs_count = duckdb_list_vector_get_size(vec);
+	// map entries of the first row
+	VectorView map_view = vec.GetView();
+	const list_entry_t *map_entries = map_view.Data<list_entry_t>();
+	const list_entry_t &map_entry = map_entries[map_view.SelAt(0)];
+	idx_t attrs_offset = map_entry.offset;
+	idx_t attrs_count = map_entry.length;
 
-	if (HasNulls(struct_validity, attrs_count) || HasNulls(keys_validity, attrs_count) ||
-	    HasNulls(values_validity, attrs_count)) {
+	Vector struct_vec = vec.GetChild(0);
+	VectorView struct_view = struct_vec.GetView();
+	Vector key_vec = struct_vec.GetChild(0);
+	VectorView keys_view = key_vec.GetView();
+	Vector value_vec = struct_vec.GetChild(1);
+	VectorView values_view = value_vec.GetView();
+
+	if (HasNulls(struct_view, attrs_offset, attrs_count) || HasNulls(keys_view, attrs_offset, attrs_count) ||
+	    HasNulls(values_view, attrs_offset, attrs_count)) {
 		throw ScannerException("'odbc_connect' error: specified connection attribute map entries must not be NULL");
 	}
 
 	std::vector<OdbcConnectionAttribute> attrs;
 	attrs.reserve(attrs_count);
-	int32_t *keys = reinterpret_cast<int32_t *>(duckdb_vector_get_data(key_vec));
-	for (idx_t i = 0; i < attrs_count; i++) {
+	int32_t *keys = key_vec.GetDataMutable<int32_t>();
+	for (idx_t i = attrs_offset; i < attrs_offset + attrs_count; i++) {
 		int32_t key = keys[i];
 		int64_t val = 0;
-		if (value_type_id == DUCKDB_TYPE_INTEGER) {
-			int32_t *values = reinterpret_cast<int32_t *>(duckdb_vector_get_data(value_vec));
+		if (value_type_id == LogicalTypeId::INTEGER) {
+			int32_t *values = value_vec.GetDataMutable<int32_t>();
 			val = static_cast<int64_t>(values[i]);
-		} else if (value_type_id == DUCKDB_TYPE_BIGINT) {
-			int64_t *values = reinterpret_cast<int64_t *>(duckdb_vector_get_data(value_vec));
+		} else if (value_type_id == LogicalTypeId::BIGINT) {
+			int64_t *values = value_vec.GetDataMutable<int64_t>();
 			val = values[i];
 		}
 		attrs.emplace_back(OdbcConnectionAttribute(key, val));
@@ -140,10 +140,10 @@ static std::pair<std::vector<OdbcConnectionAttribute>, bool> ExtractAttrs(duckdb
 	return std::make_pair(std::move(attrs), true);
 }
 
-static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) {
-	(void)info;
+static void Connect(ScalarFunction::ExecInput &input) {
+	Vector output = input.GetResult();
 
-	idx_t args_count = duckdb_data_chunk_get_column_count(input);
+	idx_t args_count = input.GetArgCount();
 	auto attrs = ExtractAttrs(input, args_count);
 	idx_t varchar_args_count = attrs.second ? args_count - 1 : args_count;
 
@@ -175,41 +175,34 @@ static void Connect(duckdb_function_info info, duckdb_data_chunk input, duckdb_v
 
 	auto oc_ptr = std_make_unique<OdbcConnection>(conn_str, access_token, attrs.first);
 
-	int64_t *result_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(output));
+	int64_t *result_data = output.GetDataMutable<int64_t>();
 	result_data[0] = ConnectionsRegistry::Add(std::move(oc_ptr));
 }
 
-void OdbcConnectFunction::Register(duckdb_connection conn) {
-	auto fun = ScalarFunctionPtr(duckdb_create_scalar_function(), ScalarFunctionDeleter);
-	duckdb_scalar_function_set_name(fun.get(), "odbc_connect");
+void OdbcConnectFunction::Register(Extension &extension, Factory &factory) {
+	auto fun = ScalarFunction::Create(factory);
+	fun.SetName("odbc_connect");
+	FunctionSignature sig = fun.GetSignature();
 
 	// parameters and return
-	auto any_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_ANY), LogicalTypeDeleter);
-	auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
-	duckdb_scalar_function_set_varargs(fun.get(), any_type.get());
-	duckdb_scalar_function_set_return_type(fun.get(), bigint_type.get());
+	auto any_type = factory.CreateType(LogicalTypeId::ANY);
+	auto bigint_type = factory.CreateType(LogicalTypeId::BIGINT);
+	sig.AddArgs("args", any_type);
+	sig.SetReturnType(bigint_type);
 
 	// callbacks
-	duckdb_scalar_function_set_function(fun.get(), odbc_connect_function);
+	fun.SetExecCallback(Connect);
 
 	// options
-	duckdb_scalar_function_set_volatile(fun.get());
-	duckdb_scalar_function_set_special_handling(fun.get());
+	fun.SetStability(duckdb::cxx::FunctionStability::VOLATILE);
+	fun.SetNullHandling(duckdb::cxx::FunctionNullHandling::SPECIAL);
 
 	// register and cleanup
-	duckdb_state state = duckdb_register_scalar_function(conn, fun.get());
-
-	if (state != DuckDBSuccess) {
-		throw ScannerException("'odbc_connect' function registration failed");
+	try {
+		extension.Register(fun);
+	} catch (std::exception &e) {
+		throw ScannerException(std::string("\'") + "odbc_connect" + "\' function registration failed: " + e.what());
 	}
 }
 
 } // namespace odbcscanner
-
-static void odbc_connect_function(duckdb_function_info info, duckdb_data_chunk input, duckdb_vector output) noexcept {
-	try {
-		odbcscanner::Connect(info, input, output);
-	} catch (std::exception &e) {
-		duckdb_scalar_function_set_error(info, e.what());
-	}
-}

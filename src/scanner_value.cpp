@@ -6,86 +6,84 @@
 #include <string>
 #include <vector>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "connection.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
 #include "types.hpp"
 #include "widechar.hpp"
 
-DUCKDB_EXTENSION_EXTERN
-
 namespace odbcscanner {
 
 template <>
 bool &ScannerValue::Value<bool>() {
-	CheckType(DUCKDB_TYPE_BOOLEAN);
+	CheckType(ToParamType(LogicalTypeId::BOOLEAN));
 	return val.bool_val;
 }
 
 template <>
 int8_t &ScannerValue::Value<int8_t>() {
-	CheckType(DUCKDB_TYPE_TINYINT);
+	CheckType(ToParamType(LogicalTypeId::TINYINT));
 	return val.int8;
 }
 
 template <>
 uint8_t &ScannerValue::Value<uint8_t>() {
-	CheckType(DUCKDB_TYPE_UTINYINT);
+	CheckType(ToParamType(LogicalTypeId::UTINYINT));
 	return val.uint8;
 }
 
 template <>
 int16_t &ScannerValue::Value<int16_t>() {
-	CheckType(DUCKDB_TYPE_SMALLINT);
+	CheckType(ToParamType(LogicalTypeId::SMALLINT));
 	return val.int16;
 }
 
 template <>
 uint16_t &ScannerValue::Value<uint16_t>() {
-	CheckType(DUCKDB_TYPE_USMALLINT);
+	CheckType(ToParamType(LogicalTypeId::USMALLINT));
 	return val.uint16;
 }
 
 template <>
 int32_t &ScannerValue::Value<int32_t>() {
-	CheckType(DUCKDB_TYPE_INTEGER);
+	CheckType(ToParamType(LogicalTypeId::INTEGER));
 	return val.int32;
 }
 
 template <>
 uint32_t &ScannerValue::Value<uint32_t>() {
-	CheckType(DUCKDB_TYPE_UINTEGER);
+	CheckType(ToParamType(LogicalTypeId::UINTEGER));
 	return val.uint32;
 }
 
 template <>
 int64_t &ScannerValue::Value<int64_t>() {
-	CheckType(DUCKDB_TYPE_BIGINT);
+	CheckType(ToParamType(LogicalTypeId::BIGINT));
 	return val.int64;
 }
 
 template <>
 uint64_t &ScannerValue::Value<uint64_t>() {
-	CheckType(DUCKDB_TYPE_UBIGINT);
+	CheckType(ToParamType(LogicalTypeId::UBIGINT));
 	return val.uint64;
 }
 
 template <>
 float &ScannerValue::Value<float>() {
-	CheckType(DUCKDB_TYPE_FLOAT);
+	CheckType(ToParamType(LogicalTypeId::FLOAT));
 	return val.float_val;
 }
 
 template <>
 double &ScannerValue::Value<double>() {
-	CheckType(DUCKDB_TYPE_DOUBLE);
+	CheckType(ToParamType(LogicalTypeId::DOUBLE));
 	return val.double_val;
 }
 
 template <>
 SQL_NUMERIC_STRUCT &ScannerValue::Value<SQL_NUMERIC_STRUCT>() {
-	CheckType(DUCKDB_TYPE_DECIMAL);
+	CheckType(ToParamType(LogicalTypeId::DECIMAL));
 	return val.decimal;
 }
 
@@ -97,31 +95,31 @@ DecimalChars &ScannerValue::Value<DecimalChars>() {
 
 template <>
 WideString &ScannerValue::Value<WideString>() {
-	CheckType(DUCKDB_TYPE_VARCHAR);
+	CheckType(ToParamType(LogicalTypeId::VARCHAR));
 	return val.wstr;
 }
 
 template <>
 ScannerBlob &ScannerValue::Value<ScannerBlob>() {
-	CheckType(DUCKDB_TYPE_BLOB);
+	CheckType(ToParamType(LogicalTypeId::BLOB));
 	return val.blob;
 }
 
 template <>
 ScannerUuid &ScannerValue::Value<ScannerUuid>() {
-	CheckType(DUCKDB_TYPE_UUID);
+	CheckType(ToParamType(LogicalTypeId::UUID));
 	return val.uuid;
 }
 
 template <>
 SQL_DATE_STRUCT &ScannerValue::Value<SQL_DATE_STRUCT>() {
-	CheckType(DUCKDB_TYPE_DATE);
+	CheckType(ToParamType(LogicalTypeId::DATE));
 	return val.date;
 }
 
 template <>
 SQL_TIME_STRUCT &ScannerValue::Value<SQL_TIME_STRUCT>() {
-	CheckType(DUCKDB_TYPE_TIME);
+	CheckType(ToParamType(LogicalTypeId::TIME));
 	return val.time;
 }
 
@@ -133,7 +131,7 @@ SQL_SS_TIME2_STRUCT &ScannerValue::Value<SQL_SS_TIME2_STRUCT>() {
 
 template <>
 SQL_TIMESTAMP_STRUCT &ScannerValue::Value<SQL_TIMESTAMP_STRUCT>() {
-	CheckType(DUCKDB_TYPE_TIMESTAMP);
+	CheckType(ToParamType(LogicalTypeId::TIMESTAMP));
 	return val.timestamp;
 }
 
@@ -155,50 +153,61 @@ SQLGUID &ScannerValue::Value<SQLGUID>() {
 	return val.sql_guid;
 }
 
-ScannerValue::ScannerValue() : type_id(DUCKDB_TYPE_SQLNULL), len_bytes(SQL_NULL_DATA) {
+ScannerValue::ScannerValue() : type_id(ToParamType(LogicalTypeId::SQLNULL)), len_bytes(SQL_NULL_DATA) {
 }
 
-ScannerValue::ScannerValue(bool value) : type_id(DUCKDB_TYPE_BOOLEAN), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(bool value)
+    : type_id(ToParamType(LogicalTypeId::BOOLEAN)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(int8_t value) : type_id(DUCKDB_TYPE_TINYINT), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(int8_t value)
+    : type_id(ToParamType(LogicalTypeId::TINYINT)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(uint8_t value) : type_id(DUCKDB_TYPE_UTINYINT), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(uint8_t value)
+    : type_id(ToParamType(LogicalTypeId::UTINYINT)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(int16_t value) : type_id(DUCKDB_TYPE_SMALLINT), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(int16_t value)
+    : type_id(ToParamType(LogicalTypeId::SMALLINT)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(uint16_t value) : type_id(DUCKDB_TYPE_USMALLINT), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(uint16_t value)
+    : type_id(ToParamType(LogicalTypeId::USMALLINT)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(int32_t value) : type_id(DUCKDB_TYPE_INTEGER), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(int32_t value)
+    : type_id(ToParamType(LogicalTypeId::INTEGER)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(uint32_t value) : type_id(DUCKDB_TYPE_UINTEGER), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(uint32_t value)
+    : type_id(ToParamType(LogicalTypeId::UINTEGER)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(int64_t value) : type_id(DUCKDB_TYPE_BIGINT), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(int64_t value)
+    : type_id(ToParamType(LogicalTypeId::BIGINT)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(uint64_t value) : type_id(DUCKDB_TYPE_UBIGINT), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(uint64_t value)
+    : type_id(ToParamType(LogicalTypeId::UBIGINT)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(float value) : type_id(DUCKDB_TYPE_FLOAT), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(float value)
+    : type_id(ToParamType(LogicalTypeId::FLOAT)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(double value) : type_id(DUCKDB_TYPE_DOUBLE), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(double value)
+    : type_id(ToParamType(LogicalTypeId::DOUBLE)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(duckdb_decimal value, bool decimal_as_chars) {
+ScannerValue::ScannerValue(DecimalValue value, bool decimal_as_chars) {
 	if (decimal_as_chars) {
 		this->type_id = Params::TYPE_DECIMAL_AS_CHARS;
 		new (&this->val.decimal_chars) DecimalChars;
 		this->val.decimal_chars = DecimalChars(value);
 		this->len_bytes = val.decimal_chars.size<SQLLEN>();
 	} else {
-		this->type_id = DUCKDB_TYPE_DECIMAL;
+		this->type_id = ToParamType(LogicalTypeId::DECIMAL);
 		SQL_NUMERIC_STRUCT ns;
 		std::memset(&ns, '\0', sizeof(ns));
 		ns.precision = value.width;
@@ -220,23 +229,23 @@ ScannerValue::ScannerValue(duckdb_decimal value, bool decimal_as_chars) {
 }
 
 ScannerValue::ScannerValue(SQL_NUMERIC_STRUCT value)
-    : type_id(DUCKDB_TYPE_DECIMAL), len_bytes(sizeof(value)), val(value) {
+    : type_id(ToParamType(LogicalTypeId::DECIMAL)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(const char *cstr, size_t len) : type_id(DUCKDB_TYPE_VARCHAR) {
+ScannerValue::ScannerValue(const char *cstr, size_t len) : type_id(ToParamType(LogicalTypeId::VARCHAR)) {
 	WideString wstr = WideChar::Widen(cstr, len);
 	new (&this->val.wstr) WideString;
 	this->val.wstr = std::move(wstr);
 	this->len_bytes = val.wstr.length<SQLLEN>() * sizeof(SQLWCHAR);
 }
 
-ScannerValue::ScannerValue(ScannerBlob blob) : type_id(DUCKDB_TYPE_BLOB) {
+ScannerValue::ScannerValue(ScannerBlob blob) : type_id(ToParamType(LogicalTypeId::BLOB)) {
 	new (&this->val.blob) ScannerBlob;
 	this->val.blob = std::move(blob);
 	this->len_bytes = val.blob.size<SQLLEN>();
 }
 
-ScannerValue::ScannerValue(ScannerUuid uuid) : type_id(DUCKDB_TYPE_UUID) {
+ScannerValue::ScannerValue(ScannerUuid uuid) : type_id(ToParamType(LogicalTypeId::UUID)) {
 	new (&this->val.uuid) ScannerUuid;
 	this->val.uuid = std::move(uuid);
 	this->len_bytes = val.uuid.size<SQLLEN>();
@@ -245,7 +254,7 @@ ScannerValue::ScannerValue(ScannerUuid uuid) : type_id(DUCKDB_TYPE_UUID) {
 ScannerValue::ScannerValue(const char *cstr) : ScannerValue(cstr, std::strlen(cstr)) {
 }
 
-ScannerValue::ScannerValue(duckdb_date_struct value) : type_id(DUCKDB_TYPE_DATE) {
+ScannerValue::ScannerValue(DateStruct value) : type_id(ToParamType(LogicalTypeId::DATE)) {
 	SQL_DATE_STRUCT dt;
 	std::memset(&dt, '\0', sizeof(dt));
 	dt.day = static_cast<SQLUSMALLINT>(value.day);
@@ -255,10 +264,11 @@ ScannerValue::ScannerValue(duckdb_date_struct value) : type_id(DUCKDB_TYPE_DATE)
 	this->len_bytes = sizeof(dt);
 }
 
-ScannerValue::ScannerValue(SQL_DATE_STRUCT value) : type_id(DUCKDB_TYPE_DATE), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(SQL_DATE_STRUCT value)
+    : type_id(ToParamType(LogicalTypeId::DATE)), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(duckdb_time_struct value, bool use_time_with_nanos) {
+ScannerValue::ScannerValue(TimeStruct value, bool use_time_with_nanos) {
 	if (use_time_with_nanos) {
 		this->type_id = Params::TYPE_TIME_WITH_NANOS;
 		SQL_SS_TIME2_STRUCT tm;
@@ -270,7 +280,7 @@ ScannerValue::ScannerValue(duckdb_time_struct value, bool use_time_with_nanos) {
 		this->val.time_with_nanos = tm;
 		this->len_bytes = sizeof(tm);
 	} else {
-		this->type_id = DUCKDB_TYPE_TIME;
+		this->type_id = ToParamType(LogicalTypeId::TIME);
 		SQL_TIME_STRUCT tm;
 		std::memset(&tm, '\0', sizeof(tm));
 		tm.hour = static_cast<SQLUSMALLINT>(value.hour);
@@ -281,14 +291,15 @@ ScannerValue::ScannerValue(duckdb_time_struct value, bool use_time_with_nanos) {
 	}
 }
 
-ScannerValue::ScannerValue(SQL_TIME_STRUCT value) : type_id(DUCKDB_TYPE_TIME), len_bytes(sizeof(value)), val(value) {
+ScannerValue::ScannerValue(SQL_TIME_STRUCT value)
+    : type_id(ToParamType(LogicalTypeId::TIME)), len_bytes(sizeof(value)), val(value) {
 }
 
 ScannerValue::ScannerValue(SQL_SS_TIME2_STRUCT value)
     : type_id(Params::TYPE_TIME_WITH_NANOS), len_bytes(sizeof(value)), val(value) {
 }
 
-ScannerValue::ScannerValue(TimestampNsStruct value) : type_id(DUCKDB_TYPE_TIMESTAMP) {
+ScannerValue::ScannerValue(TimestampNsStruct value) : type_id(ToParamType(LogicalTypeId::TIMESTAMP)) {
 	SQL_TIMESTAMP_STRUCT ts;
 	std::memset(&ts, '\0', sizeof(ts));
 	ts.day = static_cast<SQLUSMALLINT>(value.tss_no_micros.date.day);
@@ -303,7 +314,7 @@ ScannerValue::ScannerValue(TimestampNsStruct value) : type_id(DUCKDB_TYPE_TIMEST
 }
 
 ScannerValue::ScannerValue(SQL_TIMESTAMP_STRUCT value)
-    : type_id(DUCKDB_TYPE_TIMESTAMP), len_bytes(sizeof(value)), val(value) {
+    : type_id(ToParamType(LogicalTypeId::TIMESTAMP)), len_bytes(sizeof(value)), val(value) {
 }
 
 ScannerValue::ScannerValue(SQL_SS_TIMESTAMPOFFSET_STRUCT value)
@@ -318,70 +329,70 @@ ScannerValue::ScannerValue(SQLGUID value) : type_id(Params::TYPE_SQL_GUID), len_
 
 void ScannerValue::AssignByType(param_type type_id, InternalValue &val, ScannerValue &other) {
 	switch (type_id) {
-	case DUCKDB_TYPE_SQLNULL:
+	case ToParamType(LogicalTypeId::SQLNULL):
 		break;
-	case DUCKDB_TYPE_BOOLEAN:
+	case ToParamType(LogicalTypeId::BOOLEAN):
 		val.bool_val = other.Value<bool>();
 		break;
-	case DUCKDB_TYPE_TINYINT:
+	case ToParamType(LogicalTypeId::TINYINT):
 		val.int8 = other.Value<int8_t>();
 		break;
-	case DUCKDB_TYPE_UTINYINT:
+	case ToParamType(LogicalTypeId::UTINYINT):
 		val.uint8 = other.Value<uint8_t>();
 		break;
-	case DUCKDB_TYPE_SMALLINT:
+	case ToParamType(LogicalTypeId::SMALLINT):
 		val.int16 = other.Value<int16_t>();
 		break;
-	case DUCKDB_TYPE_USMALLINT:
+	case ToParamType(LogicalTypeId::USMALLINT):
 		val.uint16 = other.Value<uint16_t>();
 		break;
-	case DUCKDB_TYPE_INTEGER:
+	case ToParamType(LogicalTypeId::INTEGER):
 		val.int32 = other.Value<int32_t>();
 		break;
-	case DUCKDB_TYPE_UINTEGER:
+	case ToParamType(LogicalTypeId::UINTEGER):
 		val.uint32 = other.Value<uint32_t>();
 		break;
-	case DUCKDB_TYPE_BIGINT:
+	case ToParamType(LogicalTypeId::BIGINT):
 		val.int64 = other.Value<int64_t>();
 		break;
-	case DUCKDB_TYPE_UBIGINT:
+	case ToParamType(LogicalTypeId::UBIGINT):
 		val.uint64 = other.Value<uint64_t>();
 		break;
-	case DUCKDB_TYPE_FLOAT:
+	case ToParamType(LogicalTypeId::FLOAT):
 		val.float_val = other.Value<float>();
 		break;
-	case DUCKDB_TYPE_DOUBLE:
+	case ToParamType(LogicalTypeId::DOUBLE):
 		val.double_val = other.Value<double>();
 		break;
-	case DUCKDB_TYPE_DECIMAL:
+	case ToParamType(LogicalTypeId::DECIMAL):
 		val.decimal = other.Value<SQL_NUMERIC_STRUCT>();
 		break;
 	case Params::TYPE_DECIMAL_AS_CHARS:
 		new (&val.decimal_chars) DecimalChars;
 		val.decimal_chars = std::move(other.Value<DecimalChars>());
 		break;
-	case DUCKDB_TYPE_VARCHAR:
+	case ToParamType(LogicalTypeId::VARCHAR):
 		new (&val.wstr) WideString;
 		val.wstr = std::move(other.Value<WideString>());
 		break;
-	case DUCKDB_TYPE_BLOB:
+	case ToParamType(LogicalTypeId::BLOB):
 		new (&val.blob) ScannerBlob;
 		val.blob = std::move(other.Value<ScannerBlob>());
 		break;
-	case DUCKDB_TYPE_UUID:
+	case ToParamType(LogicalTypeId::UUID):
 		new (&val.uuid) ScannerUuid;
 		val.uuid = std::move(other.Value<ScannerUuid>());
 		break;
-	case DUCKDB_TYPE_DATE:
+	case ToParamType(LogicalTypeId::DATE):
 		val.date = other.Value<SQL_DATE_STRUCT>();
 		break;
-	case DUCKDB_TYPE_TIME:
+	case ToParamType(LogicalTypeId::TIME):
 		val.time = other.Value<SQL_TIME_STRUCT>();
 		break;
 	case Params::TYPE_TIME_WITH_NANOS:
 		val.time_with_nanos = other.Value<SQL_SS_TIME2_STRUCT>();
 		break;
-	case DUCKDB_TYPE_TIMESTAMP:
+	case ToParamType(LogicalTypeId::TIMESTAMP):
 		val.timestamp = other.Value<SQL_TIMESTAMP_STRUCT>();
 		break;
 	case Params::TYPE_SS_TIMESTAMPOFFSET:
@@ -400,16 +411,16 @@ void ScannerValue::AssignByType(param_type type_id, InternalValue &val, ScannerV
 
 void ScannerValue::Destroy() {
 	switch (type_id) {
-	case DUCKDB_TYPE_VARCHAR:
+	case ToParamType(LogicalTypeId::VARCHAR):
 		this->val.wstr.~WideString();
 		break;
 	case Params::TYPE_DECIMAL_AS_CHARS:
 		this->val.decimal_chars.~DecimalChars();
 		break;
-	case DUCKDB_TYPE_BLOB:
+	case ToParamType(LogicalTypeId::BLOB):
 		this->val.blob.~ScannerBlob();
 		break;
-	case DUCKDB_TYPE_UUID:
+	case ToParamType(LogicalTypeId::UUID):
 		this->val.uuid.~ScannerUuid();
 		break;
 	default: {
@@ -446,11 +457,11 @@ param_type ScannerValue::ParamType() {
 	return type_id;
 }
 
-duckdb_type ScannerValue::DuckType() {
+LogicalTypeId ScannerValue::DuckType() {
 	if (Params::TYPE_DECIMAL_AS_CHARS == type_id) {
-		return DUCKDB_TYPE_DECIMAL;
+		return LogicalTypeId::DECIMAL;
 	}
-	return static_cast<duckdb_type>(type_id);
+	return static_cast<LogicalTypeId>(type_id);
 }
 
 SQLLEN &ScannerValue::LengthBytes() {
@@ -480,48 +491,49 @@ void ScannerValue::CheckType(param_type expected) {
 }
 
 void ScannerValue::TransformIntegralToDecimal() {
-	if (!(type_id == DUCKDB_TYPE_TINYINT || type_id == DUCKDB_TYPE_UTINYINT || type_id == DUCKDB_TYPE_SMALLINT ||
-	      type_id == DUCKDB_TYPE_USMALLINT || type_id == DUCKDB_TYPE_INTEGER || type_id == DUCKDB_TYPE_UINTEGER ||
-	      type_id == DUCKDB_TYPE_BIGINT || type_id == DUCKDB_TYPE_UBIGINT)) {
+	if (!(type_id == ToParamType(LogicalTypeId::TINYINT) || type_id == ToParamType(LogicalTypeId::UTINYINT) ||
+	      type_id == ToParamType(LogicalTypeId::SMALLINT) || type_id == ToParamType(LogicalTypeId::USMALLINT) ||
+	      type_id == ToParamType(LogicalTypeId::INTEGER) || type_id == ToParamType(LogicalTypeId::UINTEGER) ||
+	      type_id == ToParamType(LogicalTypeId::BIGINT) || type_id == ToParamType(LogicalTypeId::UBIGINT))) {
 		return;
 	}
 
-	duckdb_decimal dec;
+	DecimalValue dec;
 	dec.width = 0;
 	dec.scale = 0;
 	dec.value.lower = 0;
 	dec.value.upper = 0;
 
 	switch (type_id) {
-	case DUCKDB_TYPE_TINYINT:
+	case ToParamType(LogicalTypeId::TINYINT):
 		dec.width = 4;
 		dec.value.lower = static_cast<uint64_t>(Value<int8_t>());
 		break;
-	case DUCKDB_TYPE_UTINYINT:
+	case ToParamType(LogicalTypeId::UTINYINT):
 		dec.width = 4;
 		dec.value.lower = static_cast<uint64_t>(Value<uint8_t>());
 		break;
-	case DUCKDB_TYPE_SMALLINT:
+	case ToParamType(LogicalTypeId::SMALLINT):
 		dec.width = 9;
 		dec.value.lower = static_cast<uint64_t>(Value<int16_t>());
 		break;
-	case DUCKDB_TYPE_USMALLINT:
+	case ToParamType(LogicalTypeId::USMALLINT):
 		dec.width = 9;
 		dec.value.lower = static_cast<uint64_t>(Value<uint16_t>());
 		break;
-	case DUCKDB_TYPE_INTEGER:
+	case ToParamType(LogicalTypeId::INTEGER):
 		dec.width = 18;
 		dec.value.lower = static_cast<uint64_t>(Value<int32_t>());
 		break;
-	case DUCKDB_TYPE_UINTEGER:
+	case ToParamType(LogicalTypeId::UINTEGER):
 		dec.width = 18;
 		dec.value.lower = static_cast<uint64_t>(Value<uint32_t>());
 		break;
-	case DUCKDB_TYPE_BIGINT:
+	case ToParamType(LogicalTypeId::BIGINT):
 		dec.width = 38;
 		dec.value.lower = static_cast<uint64_t>(Value<int64_t>());
 		break;
-	case DUCKDB_TYPE_UBIGINT:
+	case ToParamType(LogicalTypeId::UBIGINT):
 		dec.width = 38;
 		dec.value.lower = static_cast<uint64_t>(Value<uint64_t>());
 		break;
@@ -535,28 +547,28 @@ void ScannerValue::TransformIntegralToDecimal() {
 
 std::string ScannerValue::NumericToString() {
 	switch (type_id) {
-	case DUCKDB_TYPE_TINYINT:
+	case ToParamType(LogicalTypeId::TINYINT):
 		return std::to_string(static_cast<int32_t>(Value<int8_t>()));
-	case DUCKDB_TYPE_UTINYINT:
+	case ToParamType(LogicalTypeId::UTINYINT):
 		return std::to_string(static_cast<uint32_t>(Value<uint8_t>()));
-	case DUCKDB_TYPE_SMALLINT:
+	case ToParamType(LogicalTypeId::SMALLINT):
 		return std::to_string(Value<int16_t>());
-	case DUCKDB_TYPE_USMALLINT:
+	case ToParamType(LogicalTypeId::USMALLINT):
 		return std::to_string(Value<uint16_t>());
-	case DUCKDB_TYPE_INTEGER:
+	case ToParamType(LogicalTypeId::INTEGER):
 		return std::to_string(Value<int32_t>());
-	case DUCKDB_TYPE_UINTEGER:
+	case ToParamType(LogicalTypeId::UINTEGER):
 		return std::to_string(Value<uint32_t>());
-	case DUCKDB_TYPE_BIGINT:
+	case ToParamType(LogicalTypeId::BIGINT):
 		return std::to_string(Value<int64_t>());
-	case DUCKDB_TYPE_UBIGINT:
+	case ToParamType(LogicalTypeId::UBIGINT):
 		return std::to_string(Value<uint64_t>());
-	case DUCKDB_TYPE_FLOAT: {
+	case ToParamType(LogicalTypeId::FLOAT): {
 		char buf[32];
 		std::snprintf(buf, sizeof(buf), "%.9g", static_cast<double>(Value<float>()));
 		return std::string(buf);
 	}
-	case DUCKDB_TYPE_DOUBLE: {
+	case ToParamType(LogicalTypeId::DOUBLE): {
 		char buf[32];
 		std::snprintf(buf, sizeof(buf), "%.17g", Value<double>());
 		return std::string(buf);

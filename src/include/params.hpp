@@ -24,7 +24,7 @@ namespace odbcscanner {
 // FirebirdSQL/firebird-odbc-driver#292) into catastrophic row loss, and it is
 // also the least efficient of the three common execute shapes.
 struct BindSlotShape {
-	param_type type_id = DUCKDB_TYPE_INVALID;
+	param_type type_id = ToParamType(LogicalTypeId::INVALID);
 	SQLSMALLINT expected_type = SQL_PARAM_TYPE_UNKNOWN;
 
 	BindSlotShape() = default;
@@ -54,20 +54,20 @@ struct BindCache {
 };
 
 struct Params {
-	static const param_type TYPE_DECIMAL_AS_CHARS = DUCKDB_TYPE_DECIMAL + 1000;
-	static const param_type TYPE_TIME_WITH_NANOS = DUCKDB_TYPE_TIME + 1000;
-	static const param_type TYPE_SQL_BIT = DUCKDB_TYPE_BOOLEAN + 1000;
-	static const param_type TYPE_SQL_GUID = DUCKDB_TYPE_UUID + 1000;
-	static const param_type TYPE_SS_TIMESTAMPOFFSET = DUCKDB_TYPE_TIME_TZ + 1000;
+	static const param_type TYPE_DECIMAL_AS_CHARS = ToParamType(LogicalTypeId::DECIMAL) + 1000;
+	static const param_type TYPE_TIME_WITH_NANOS = ToParamType(LogicalTypeId::TIME) + 1000;
+	static const param_type TYPE_SQL_BIT = ToParamType(LogicalTypeId::BOOLEAN) + 1000;
+	static const param_type TYPE_SQL_GUID = ToParamType(LogicalTypeId::UUID) + 1000;
+	static const param_type TYPE_SS_TIMESTAMPOFFSET = ToParamType(LogicalTypeId::TIME_TZ) + 1000;
 
-	static std::vector<ScannerValue> Extract(DbmsQuirks &quirks, duckdb_value struct_value);
+	static std::vector<ScannerValue> Extract(const DbmsQuirks &quirks, const Value *struct_value);
 
-	static std::vector<SQLSMALLINT> CollectTypes(QueryContext &ctx);
+	static std::vector<SQLSMALLINT> CollectTypes(const QueryContext &ctx);
 
-	static void SetExpectedTypes(QueryContext &ctx, const std::vector<SQLSMALLINT> &expected,
+	static void SetExpectedTypes(const QueryContext &ctx, const std::vector<SQLSMALLINT> &expected,
 	                             std::vector<ScannerValue> &actual);
 
-	static void BindToOdbc(QueryContext &ctx, std::vector<ScannerValue> &params);
+	static void BindToOdbc(const QueryContext &ctx, std::vector<ScannerValue> &params);
 
 	// Per-slot incremental bind. Issues SQLBindParameter only for slots whose
 	// shape changed since the cached bind, or whose backing buffer is variable-
@@ -90,7 +90,7 @@ struct Params {
 	// Caller must Reset(cache) whenever the prepared statement changes or the
 	// params vector's storage may have moved (different `std::vector`
 	// instance, capacity-changing resize, etc.).
-	static void BindToOdbcWithCache(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache);
+	static void BindToOdbcWithCache(const QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache);
 };
 
 } // namespace odbcscanner

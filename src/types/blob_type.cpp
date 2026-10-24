@@ -3,11 +3,9 @@
 #include <cstring>
 
 #include "binary.hpp"
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
-
-DUCKDB_EXTENSION_EXTERN
 
 namespace odbcscanner {
 
@@ -16,11 +14,11 @@ namespace odbcscanner {
 static const std::string trunc_diag_code("01004");
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb_vector vec, idx_t row_idx) {
-	duckdb_string_t *data = reinterpret_cast<duckdb_string_t *>(duckdb_vector_get_data(vec));
-	duckdb_string_t dstr = data[row_idx];
-	const char *buf_ptr = duckdb_string_t_data(&dstr);
-	uint32_t len = duckdb_string_t_length(dstr);
+ScannerValue TypeSpecific::ExtractNotNullParam<ScannerBlob>(const DbmsQuirks &, Vector &vec, idx_t row_idx) {
+	blob_t *data = vec.GetDataMutable<blob_t>();
+	blob_t &dstr = data[row_idx];
+	const char *buf_ptr = dstr.data();
+	uint32_t len = dstr.size();
 	std::vector<char> buf;
 	buf.resize(len);
 	std::memcpy(buf.data(), buf_ptr, len);
@@ -29,17 +27,17 @@ ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb
 }
 
 template <>
-ScannerValue TypeSpecific::ExtractNotNullParam<duckdb_blob>(DbmsQuirks &, duckdb_value value) {
-	duckdb_blob dblob = duckdb_get_blob(value);
+ScannerValue TypeSpecific::ExtractNotNullParam<ScannerBlob>(const DbmsQuirks &, const Value *value) {
+	blob_t dblob = value->Get<blob_t>();
 	std::vector<char> buf;
-	buf.resize(dblob.size);
-	std::memcpy(buf.data(), dblob.data, dblob.size);
+	buf.resize(dblob.size());
+	std::memcpy(buf.data(), dblob.data(), dblob.size());
 	ScannerBlob blob(std::move(buf));
 	return ScannerValue(std::move(blob));
 }
 
 template <>
-void TypeSpecific::BindOdbcParam<duckdb_blob>(QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
+void TypeSpecific::BindOdbcParam<ScannerBlob>(const QueryContext &ctx, ScannerValue &param, SQLSMALLINT param_idx) {
 	SQLSMALLINT sqltype = SQL_VARBINARY;
 	ScannerBlob &blob = param.Value<ScannerBlob>();
 	if (blob.size<uint32_t>() > ctx.quirks.var_len_params_long_threshold_bytes) {
@@ -56,7 +54,7 @@ void TypeSpecific::BindOdbcParam<duckdb_blob>(QueryContext &ctx, ScannerValue &p
 	}
 }
 
-static void FetchTail(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLCHAR> &buf, SQLLEN len_bytes) {
+static void FetchTail(const QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLCHAR> &buf, SQLLEN len_bytes) {
 	size_t head_size = buf.size();
 	buf.resize(len_bytes);
 
@@ -84,7 +82,7 @@ static void FetchTail(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLCHA
 	}
 }
 
-static void FetchMultiReads(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLCHAR> &buf) {
+static void FetchMultiReads(const QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLCHAR> &buf) {
 	for (size_t i = 1; true; i++) {
 		size_t prev_len = buf.size();
 		buf.resize(prev_len * 2);
@@ -116,7 +114,7 @@ static void FetchMultiReads(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<
 	}
 }
 
-static void FetchSinglePart(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLCHAR> &buf, SQLLEN len_bytes) {
+static void FetchSinglePart(const QueryContext &ctx, SQLSMALLINT col_idx, std::vector<SQLCHAR> &buf, SQLLEN len_bytes) {
 	buf.resize(len_bytes);
 	SQLLEN len_read_bytes = 0;
 
@@ -139,7 +137,7 @@ static void FetchSinglePart(QueryContext &ctx, SQLSMALLINT col_idx, std::vector<
 	}
 }
 
-static std::pair<std::vector<SQLCHAR>, bool> FetchInternal(QueryContext &ctx, SQLSMALLINT col_idx) {
+static std::pair<std::vector<SQLCHAR>, bool> FetchInternal(const QueryContext &ctx, SQLSMALLINT col_idx) {
 	std::vector<SQLCHAR> buf;
 	buf.resize(8192);
 	SQLLEN len_bytes = 0;
@@ -186,8 +184,8 @@ static std::pair<std::vector<SQLCHAR>, bool> FetchInternal(QueryContext &ctx, SQ
 }
 
 template <>
-void TypeSpecific::FetchAndSetResult<duckdb_blob>(QueryContext &ctx, OdbcType &, SQLSMALLINT col_idx, duckdb_vector vec,
-                                                  idx_t row_idx) {
+void TypeSpecific::FetchAndSetResult<ScannerBlob>(const QueryContext &ctx, const OdbcType &, SQLSMALLINT col_idx,
+                                                  Vector &vec, idx_t row_idx) {
 	auto fetched = FetchInternal(ctx, col_idx);
 
 	if (fetched.second) {
@@ -195,13 +193,13 @@ void TypeSpecific::FetchAndSetResult<duckdb_blob>(QueryContext &ctx, OdbcType &,
 		return;
 	}
 
-	duckdb_vector_assign_string_element_len(vec, row_idx, reinterpret_cast<char *>(fetched.first.data()),
-	                                        fetched.first.size());
+	vec.AssignStringUnsafe(row_idx,
+	                       std::string_view(reinterpret_cast<char *>(fetched.first.data()), fetched.first.size()));
 }
 
 template <>
-duckdb_type TypeSpecific::ResolveColumnType<duckdb_blob>(QueryContext &, ResultColumn &) {
-	return DUCKDB_TYPE_BLOB;
+LogicalTypeId TypeSpecific::ResolveColumnType<ScannerBlob>(const QueryContext &, ResultColumn &) {
+	return LogicalTypeId::BLOB;
 }
 
 } // namespace odbcscanner

@@ -34,7 +34,7 @@ Binder Error: 'odbc_query' error: ODBC connection not found on bind, id: 42
 statement error
 FROM odbc_query(42::FLOAT, 'SELECT 42')
 ----
-Binder Error: 'odbc_query' error: invalid first argument specified, type ID: 10
+Binder Error: 'odbc_query' error: invalid first argument specified, type ID: 22
 
 statement ok
 SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')

@@ -6,7 +6,7 @@
 #include <string>
 
 #include "binary.hpp"
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "duckdb_extension_api.hpp"
 #include "odbc_api.hpp"
 #include "temporal.hpp"
@@ -14,11 +14,16 @@
 
 namespace odbcscanner {
 
-// duckdb_type with additional values
+// LogicalTypeId with additional values
 using param_type = int;
 
+// param_type value of the specified DuckDB type
+constexpr param_type ToParamType(LogicalTypeId type_id) {
+	return static_cast<param_type>(type_id);
+}
+
 class ScannerValue {
-	param_type type_id = DUCKDB_TYPE_INVALID;
+	param_type type_id = ToParamType(LogicalTypeId::INVALID);
 	SQLLEN len_bytes = 0;
 	SQLSMALLINT expected_type = SQL_PARAM_TYPE_UNKNOWN;
 
@@ -119,15 +124,15 @@ public:
 	explicit ScannerValue(uint64_t value);
 	explicit ScannerValue(float value);
 	explicit ScannerValue(double value);
-	explicit ScannerValue(duckdb_decimal value, bool decimal_as_chars);
+	explicit ScannerValue(DecimalValue value, bool decimal_as_chars);
 	explicit ScannerValue(SQL_NUMERIC_STRUCT value);
 	explicit ScannerValue(const char *cstr, size_t len);
 	explicit ScannerValue(const char *cstr);
 	explicit ScannerValue(ScannerBlob value);
 	explicit ScannerValue(ScannerUuid value);
-	explicit ScannerValue(duckdb_date_struct value);
+	explicit ScannerValue(DateStruct value);
 	explicit ScannerValue(SQL_DATE_STRUCT value);
-	explicit ScannerValue(duckdb_time_struct value, bool use_time_with_nanos);
+	explicit ScannerValue(TimeStruct value, bool use_time_with_nanos);
 	explicit ScannerValue(SQL_TIME_STRUCT value);
 	explicit ScannerValue(SQL_SS_TIME2_STRUCT value);
 	explicit ScannerValue(TimestampNsStruct value);
@@ -150,7 +155,7 @@ public:
 
 	param_type ParamType();
 
-	duckdb_type DuckType();
+	LogicalTypeId DuckType();
 
 	SQLLEN &LengthBytes();
 

@@ -5,43 +5,43 @@
 namespace odbcscanner {
 
 struct OdbcBeginTransactionFunction {
-	static void Register(duckdb_connection connection);
+	static void Register(Extension &extension, Factory &factory);
 };
 
 struct OdbcCancelQueryFunction {
-	static void Register(duckdb_connection connection);
+	static void Register(Extension &extension, Factory &factory);
 };
 
 struct OdbcCloseFunction {
-	static void Register(duckdb_connection connection);
+	static void Register(Extension &extension, Factory &factory);
 };
 
 struct OdbcCommitFunction {
-	static void Register(duckdb_connection connection);
+	static void Register(Extension &extension, Factory &factory);
 };
 
 struct OdbcConnectFunction {
-	static void Register(duckdb_connection connection);
+	static void Register(Extension &extension, Factory &factory);
 };
 
 struct OdbcCopyFunction {
-	static void Register(duckdb_connection connection);
+	static void Register(Extension &extension, Factory &factory);
 };
 
 struct OdbcListDataSourcesFunction {
-	static void Register(duckdb_connection connection);
+	static void Register(Extension &extension, Factory &factory);
 };
 
 struct OdbcListDriversFunction {
-	static void Register(duckdb_connection connection);
+	static void Register(Extension &extension, Factory &factory);
 };
 
 struct OdbcQueryFunction {
-	static void Register(duckdb_connection connection);
+	static void Register(Extension &extension, Factory &factory);
 };
 
 struct OdbcRollbackFunction {
-	static void Register(duckdb_connection connection);
+	static void Register(Extension &extension, Factory &factory);
 };
 
 } // namespace odbcscanner

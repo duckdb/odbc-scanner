@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "columns.hpp"
 #include "connection.hpp"
 #include "dbms_quirks.hpp"
@@ -19,12 +19,10 @@
 #include "types.hpp"
 #include "widechar.hpp"
 
-DUCKDB_EXTENSION_EXTERN
-
-static void odbc_query_bind(duckdb_bind_info info) noexcept;
-static void odbc_query_init(duckdb_init_info info) noexcept;
-static void odbc_query_local_init(duckdb_init_info info) noexcept;
-static void odbc_query_function(duckdb_function_info info, duckdb_data_chunk output) noexcept;
+static void odbc_query_bind(duckdb::cxx::TableFunction::BindInput &input);
+static void odbc_query_init(duckdb::cxx::TableFunction::InitGlobalInput &input);
+static void odbc_query_local_init(duckdb::cxx::TableFunction::InitLocalInput &input);
+static void odbc_query_function(duckdb::cxx::TableFunction::ExecInput &input);
 
 namespace odbcscanner {
 
@@ -54,7 +52,8 @@ struct BindData {
 	QueryOptions query_options;
 
 	std::vector<SQLSMALLINT> param_types;
-	std::vector<ScannerValue> params;
+	// param buffers are bound to the statement during the execution
+	mutable std::vector<ScannerValue> params;
 
 	BindData(int64_t conn_id_in, QueryContext ctx_in, std::vector<ResultColumn> columns_in,
 	         QueryOptions query_options_in, std::vector<SQLSMALLINT> param_types_in,
@@ -68,11 +67,6 @@ struct BindData {
 
 	BindData &operator=(const BindData &other) = delete;
 	BindData &operator=(BindData &&other) = delete;
-
-	static void Destroy(void *bdata_in) noexcept {
-		auto bdata = reinterpret_cast<BindData *>(bdata_in);
-		delete bdata;
-	}
 };
 
 struct GlobalInitData {
@@ -97,11 +91,6 @@ struct GlobalInitData {
 			ConnectionsRegistry::Add(std::move(conn_ptr));
 		}
 	}
-
-	static void Destroy(void *gdata_in) noexcept {
-		auto gdata = reinterpret_cast<GlobalInitData *>(gdata_in);
-		delete gdata;
-	}
 };
 
 struct LocalInitData {
@@ -109,24 +98,19 @@ struct LocalInitData {
 
 	LocalInitData() {
 	}
-
-	static void Destroy(void *ldata_in) noexcept {
-		auto ldata = reinterpret_cast<LocalInitData *>(ldata_in);
-		delete ldata;
-	}
 };
 
 } // namespace
 
-static QueryOptions ExtractQueryOptions(duckdb_value ignore_exec_failure_val, duckdb_value close_connection_val,
+static QueryOptions ExtractQueryOptions(const Value *ignore_exec_failure_val, const Value *close_connection_val,
                                         bool conn_must_be_closed) {
 	bool ignore_exec_failure = false;
-	if (ignore_exec_failure_val != nullptr && !duckdb_is_null_value(ignore_exec_failure_val)) {
-		ignore_exec_failure = duckdb_get_bool(ignore_exec_failure_val);
+	if (ignore_exec_failure_val != nullptr && !ignore_exec_failure_val->IsNull()) {
+		ignore_exec_failure = ignore_exec_failure_val->Get<bool>();
 	}
 	bool close_connection = conn_must_be_closed;
-	if (close_connection_val != nullptr && !duckdb_is_null_value(close_connection_val)) {
-		close_connection = duckdb_get_bool(close_connection_val);
+	if (close_connection_val != nullptr && !close_connection_val->IsNull()) {
+		close_connection = close_connection_val->Get<bool>();
 		if (conn_must_be_closed && !close_connection) {
 			throw ScannerException("'odbc_query' error: 'close_connection=FALSE' option cannot be specified along with "
 			                       "a connection string");
@@ -135,19 +119,19 @@ static QueryOptions ExtractQueryOptions(duckdb_value ignore_exec_failure_val, du
 	return QueryOptions(ignore_exec_failure, close_connection);
 }
 
-static void Bind(duckdb_bind_info info) {
-	auto conn_id_or_str_val = ValuePtr(duckdb_bind_get_parameter(info, 0), ValueDeleter);
+static void Bind(TableFunction::BindInput &input) {
+	Factory &factory = input.GetContext().GetFactory();
+	auto conn_id_or_str_val = FunctionArgs::GetArg(input, 0);
 	auto extracted_conn = OdbcConnection::ExtractOrOpen("odbc_query", conn_id_or_str_val.get());
 	// Return the connection to registry at the end of the block
 	auto deferred = Defer([&extracted_conn] { ConnectionsRegistry::Add(std::move(extracted_conn.ptr)); });
 	OdbcConnection &conn = *extracted_conn.ptr;
 
-	auto query_val = ValuePtr(duckdb_bind_get_parameter(info, 1), ValueDeleter);
-	if (duckdb_is_null_value(query_val.get())) {
+	auto query_val = FunctionArgs::GetArg(input, 1);
+	if (query_val->IsNull()) {
 		throw ScannerException("'odbc_query' error: specified SQL query must be not NULL");
 	}
-	auto query_ptr = VarcharPtr(duckdb_get_varchar(query_val.get()), VarcharDeleter);
-	std::string query(query_ptr.get());
+	std::string query = std::string(query_val->Get<varchar_t>().view());
 
 	StmtHandlePtr hstmt(nullptr, StmtHandleDeleter);
 	{
@@ -168,17 +152,17 @@ static void Bind(duckdb_bind_info info) {
 		}
 	}
 
-	auto ignore_exec_failure_val = ValuePtr(duckdb_bind_get_named_parameter(info, "ignore_exec_failure"), ValueDeleter);
-	auto close_connection_val = ValuePtr(duckdb_bind_get_named_parameter(info, "close_connection"), ValueDeleter);
+	auto ignore_exec_failure_val = FunctionArgs::GetNamedArg(input, "ignore_exec_failure");
+	auto close_connection_val = FunctionArgs::GetNamedArg(input, "close_connection");
 	QueryOptions query_options =
 	    ExtractQueryOptions(ignore_exec_failure_val.get(), close_connection_val.get(), extracted_conn.must_be_closed);
 
-	std::map<std::string, ValuePtr> user_quirks = DbmsQuirks::ExtractUserQuirks(info);
+	std::map<std::string, std::unique_ptr<Value>> user_quirks = DbmsQuirks::ExtractUserQuirks(input);
 	DbmsQuirks quirks(conn, user_quirks);
 	QueryContext ctx(query, std::move(hstmt), quirks);
 
 	std::vector<ScannerValue> params;
-	auto params_val = ValuePtr(duckdb_bind_get_named_parameter(info, "params"), ValueDeleter);
+	auto params_val = FunctionArgs::GetNamedArg(input, "params");
 	if (params_val.get() != nullptr) {
 		params = Params::Extract(quirks, params_val.get());
 	}
@@ -194,38 +178,35 @@ static void Bind(duckdb_bind_info info) {
 	}
 
 	if (columns.size() == 0) {
-		auto bigint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BIGINT), LogicalTypeDeleter);
-		duckdb_bind_add_result_column(info, "rowcount", bigint_type.get());
+		auto bigint_type = factory.CreateType(LogicalTypeId::BIGINT);
+		input.AddResultColumn("rowcount", bigint_type);
 	} else {
 		for (ResultColumn &col : columns) {
 			Types::CoalesceColumnType(ctx, col);
-			duckdb_type type_id = Types::ResolveColumnType(ctx, col);
-			Columns::AddToResults(info, type_id, col);
+			LogicalTypeId type_id = Types::ResolveColumnType(ctx, col);
+			Columns::AddToResults(input, factory, type_id, col);
 		}
 	}
 
-	auto bdata_ptr = std::unique_ptr<BindData>(new BindData(extracted_conn.id, std::move(ctx), std::move(columns),
-	                                                        query_options, std::move(param_types), std::move(params)));
-	duckdb_bind_set_bind_data(info, bdata_ptr.release(), BindData::Destroy);
+	input.SetBindData<BindData>(extracted_conn.id, std::move(ctx), std::move(columns), query_options,
+	                            std::move(param_types), std::move(params));
 }
 
-static void GlobalInit(duckdb_init_info info) {
-	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_init_get_bind_data(info));
+static void GlobalInit(TableFunction::InitGlobalInput &input) {
+	const BindData &bdata = input.GetBindData<BindData>();
 	// Keep the connection in global data while the function is running
 	// to not allow other threads operate on it or close it.
 	auto conn_ptr = ConnectionsRegistry::Remove(bdata.conn_id);
-	auto gdata_ptr = std_make_unique<GlobalInitData>(bdata.conn_id, std::move(conn_ptr),
-	                                                 bdata.query_options.close_connection, bdata.ctx.hstmt());
-	duckdb_init_set_init_data(info, gdata_ptr.release(), GlobalInitData::Destroy);
+	input.SetGlobalState<GlobalInitData>(bdata.conn_id, std::move(conn_ptr), bdata.query_options.close_connection,
+	                                     bdata.ctx.hstmt());
 }
 
-static void LocalInit(duckdb_init_info info) {
-	auto ldata_ptr = std_make_unique<LocalInitData>();
-	duckdb_init_set_init_data(info, ldata_ptr.release(), LocalInitData::Destroy);
+static void LocalInit(TableFunction::InitLocalInput &input) {
+	input.SetLocalState<LocalInitData>();
 }
 
-static SqlExecStatus BindParamsAndExecute(BindData &bdata) {
-	QueryContext &ctx = bdata.ctx;
+static SqlExecStatus BindParamsAndExecute(const BindData &bdata) {
+	const QueryContext &ctx = bdata.ctx;
 
 	if (bdata.params.size() > 0) {
 		Params::BindToOdbc(ctx, bdata.params);
@@ -255,13 +236,13 @@ static SqlExecStatus BindParamsAndExecute(BindData &bdata) {
 	return SqlExecStatus::SUCCESS;
 }
 
-static void Query(duckdb_function_info info, duckdb_data_chunk output) {
-	BindData &bdata = *reinterpret_cast<BindData *>(duckdb_function_get_bind_data(info));
-	LocalInitData &ldata = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
-	QueryContext &ctx = bdata.ctx;
+static void Query(TableFunction::ExecInput &input, DataChunk &output) {
+	const BindData &bdata = input.GetBindData<BindData>();
+	LocalInitData &ldata = input.GetLocalState<LocalInitData>();
+	const QueryContext &ctx = bdata.ctx;
 
 	if (ldata.exec_state == ExecState::EXHAUSTED) {
-		duckdb_data_chunk_set_size(output, 0);
+		output.GetVector(0).SetSize(0);
 		return;
 	}
 
@@ -272,7 +253,7 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 		// if exec error is not thrown then we return empty result set
 		if (exec_status == SqlExecStatus::FAILURE) {
 			ldata.exec_state = ExecState::EXHAUSTED;
-			duckdb_data_chunk_set_size(output, 0);
+			output.GetVector(0).SetSize(0);
 			return;
 		}
 
@@ -292,15 +273,15 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 				                       "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 			}
 
-			duckdb_vector vec = duckdb_data_chunk_get_vector(output, 0);
-			if (vec == nullptr) {
+			Vector vec = output.GetVector(0);
+			if (!vec) {
 				throw ScannerException("Vector is NULL, DDL/DML query: '" + ctx.query +
 				                       "', columns count: " + std::to_string(columns.size()));
 			}
 
-			int64_t *vec_data = reinterpret_cast<int64_t *>(duckdb_vector_get_data(vec));
+			int64_t *vec_data = vec.GetDataMutable<int64_t>();
 			vec_data[0] = static_cast<int64_t>(count);
-			duckdb_data_chunk_set_size(output, 1);
+			output.GetVector(0).SetSize(1);
 			ldata.exec_state = ExecState::EXHAUSTED;
 			return;
 		}
@@ -310,26 +291,27 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 		ctx.col_binds.resize(bdata.columns.size());
 		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(bdata.columns.size()); col_idxz++) {
 			// set column descriptors and bind columns
-			ResultColumn &col = bdata.columns.at(col_idxz);
+			const ResultColumn &col = bdata.columns.at(col_idxz);
 			SQLSMALLINT col_idx = static_cast<SQLSMALLINT>(col_idxz + 1);
 			Types::BindColumn(ctx, col.odbc_type, col_idx);
 		}
 	}
 
 	// collect vectors
-	std::vector<duckdb_vector> col_vectors;
+	std::vector<Vector> col_vectors;
 	for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(bdata.columns.size()); col_idxz++) {
-		duckdb_vector vec = duckdb_data_chunk_get_vector(output, col_idxz);
-		if (vec == nullptr) {
+		Vector vec = output.GetVector(col_idxz);
+		if (!vec) {
 			throw ScannerException("Vector is NULL, query: '" + ctx.query +
 			                       "', columns count: " + std::to_string(bdata.columns.size()) +
 			                       ", column index: " + std::to_string(col_idxz));
 		}
-		col_vectors.push_back(vec);
+		col_vectors.emplace_back(std::move(vec));
 	}
 
+	idx_t vector_size = output.GetCapacity();
 	idx_t row_idx = 0;
-	for (; row_idx < duckdb_vector_size(); row_idx++) {
+	for (; row_idx < vector_size; row_idx++) {
 		{
 			SQLRETURN ret = SQLFetch(ctx.hstmt());
 			if (!SQL_SUCCEEDED(ret)) {
@@ -350,95 +332,84 @@ static void Query(duckdb_function_info info, duckdb_data_chunk output) {
 		}
 
 		for (idx_t col_idxz = 0; col_idxz < static_cast<idx_t>(bdata.columns.size()); col_idxz++) {
-			ResultColumn &col = bdata.columns.at(col_idxz);
-			duckdb_vector vec = col_vectors.at(col_idxz);
+			const ResultColumn &col = bdata.columns.at(col_idxz);
+			Vector &vec = col_vectors.at(col_idxz);
 			SQLSMALLINT col_idx = static_cast<SQLSMALLINT>(col_idxz + 1);
 
 			Types::FetchAndSetResult(ctx, col.odbc_type, col_idx, vec, row_idx);
 		}
 	}
-	duckdb_data_chunk_set_size(output, row_idx);
+	output.GetVector(0).SetSize(row_idx);
 }
 
-void OdbcQueryFunction::Register(duckdb_connection conn) {
-	auto fun = TableFunctionPtr(duckdb_create_table_function(), TableFunctionDeleter);
-	duckdb_table_function_set_name(fun.get(), "odbc_query");
+void OdbcQueryFunction::Register(Extension &extension, Factory &factory) {
+	auto fun = TableFunction::Create(factory);
+	fun.SetName("odbc_query");
+	FunctionSignature sig = fun.GetSignature();
 
 	// parameters
-	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
-	auto any_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_ANY), LogicalTypeDeleter);
-	auto bool_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_BOOLEAN), LogicalTypeDeleter);
-	auto utinyint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_UTINYINT), LogicalTypeDeleter);
-	auto uint_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_UINTEGER), LogicalTypeDeleter);
-	duckdb_table_function_add_parameter(fun.get(), any_type.get());
-	duckdb_table_function_add_parameter(fun.get(), varchar_type.get());
+	auto varchar_type = factory.CreateType(LogicalTypeId::VARCHAR);
+	auto any_type = factory.CreateType(LogicalTypeId::ANY);
+	auto bool_type = factory.CreateType(LogicalTypeId::BOOLEAN);
+	auto utinyint_type = factory.CreateType(LogicalTypeId::UTINYINT);
+	auto uint_type = factory.CreateType(LogicalTypeId::UINTEGER);
+	sig.AddParameter("connection", any_type, FunctionParameterKind::POSITIONAL_ONLY);
+	sig.AddParameter("query", varchar_type, FunctionParameterKind::POSITIONAL_ONLY);
 	// named args
-	duckdb_table_function_add_named_parameter(fun.get(), "ignore_exec_failure", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "close_connection", bool_type.get());
+	FunctionArgs::AddNamedParameter(factory, sig, "ignore_exec_failure", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "close_connection", bool_type);
 	// query params
-	duckdb_table_function_add_named_parameter(fun.get(), "params", any_type.get());
+	FunctionArgs::AddNamedParameter(factory, sig, "params", any_type);
 	// quirks
-	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_as_chars", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_precision_through_ard", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "decimal_columns_as_ard_type", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "decimal_params_as_chars", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "integral_params_as_decimals", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "reset_stmt_before_execute", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "time_params_as_ss_time2", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "timestamp_columns_as_timestamp_ns", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "timestamp_columns_with_typename_date_as_date",
-	                                          bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "timestamp_max_fraction_precision", utinyint_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "timestamp_params_as_sf_timestamp_ntz", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "timestamptz_params_as_ss_timestampoffset", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "var_len_data_single_part", bool_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "var_len_params_long_threshold_bytes", uint_type.get());
-	duckdb_table_function_add_named_parameter(fun.get(), "enable_columns_binding", bool_type.get());
+	FunctionArgs::AddNamedParameter(factory, sig, "decimal_columns_as_chars", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "decimal_columns_precision_through_ard", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "decimal_columns_as_ard_type", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "decimal_params_as_chars", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "integral_params_as_decimals", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "reset_stmt_before_execute", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "time_params_as_ss_time2", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "timestamp_columns_as_timestamp_ns", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "timestamp_columns_with_typename_date_as_date", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "timestamp_max_fraction_precision", utinyint_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "timestamp_params_as_sf_timestamp_ntz", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "timestamptz_params_as_ss_timestampoffset", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "var_len_data_single_part", bool_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "var_len_params_long_threshold_bytes", uint_type);
+	FunctionArgs::AddNamedParameter(factory, sig, "enable_columns_binding", bool_type);
 
 	// callbacks
-	duckdb_table_function_set_bind(fun.get(), odbc_query_bind);
-	duckdb_table_function_set_init(fun.get(), odbc_query_init);
-	duckdb_table_function_set_local_init(fun.get(), odbc_query_local_init);
-	duckdb_table_function_set_function(fun.get(), odbc_query_function);
+	fun.SetBindCallback(odbc_query_bind);
+	fun.SetInitGlobalCallback(odbc_query_init);
+	fun.SetInitLocalCallback(odbc_query_local_init);
+	fun.SetExecCallback(odbc_query_function);
 
 	// register and cleanup
-	duckdb_state state = duckdb_register_table_function(conn, fun.get());
-
-	if (state != DuckDBSuccess) {
-		throw ScannerException("'odbc_query' function registration failed");
+	try {
+		extension.Register(fun);
+	} catch (std::exception &e) {
+		throw ScannerException(std::string("\'") + "odbc_query" + "\' function registration failed: " + e.what());
 	}
 }
 
 } // namespace odbcscanner
 
-static void odbc_query_bind(duckdb_bind_info info) noexcept {
+static void odbc_query_bind(duckdb::cxx::TableFunction::BindInput &input) {
 	try {
-		odbcscanner::Bind(info);
+		odbcscanner::Bind(input);
 	} catch (std::exception &e) {
-		duckdb_bind_set_error(info, e.what());
+		throw odbcscanner::FunctionArgs::BinderError(e.what());
 	}
 }
 
-static void odbc_query_init(duckdb_init_info info) noexcept {
-	try {
-		odbcscanner::GlobalInit(info);
-	} catch (std::exception &e) {
-		duckdb_init_set_error(info, e.what());
-	}
+static void odbc_query_init(duckdb::cxx::TableFunction::InitGlobalInput &input) {
+	odbcscanner::GlobalInit(input);
 }
 
-static void odbc_query_local_init(duckdb_init_info info) noexcept {
-	try {
-		odbcscanner::LocalInit(info);
-	} catch (std::exception &e) {
-		duckdb_init_set_error(info, e.what());
-	}
+static void odbc_query_local_init(duckdb::cxx::TableFunction::InitLocalInput &input) {
+	odbcscanner::LocalInit(input);
 }
 
-static void odbc_query_function(duckdb_function_info info, duckdb_data_chunk output) noexcept {
-	try {
-		odbcscanner::Query(info, output);
-	} catch (std::exception &e) {
-		duckdb_function_set_error(info, e.what());
-	}
+static void odbc_query_function(duckdb::cxx::TableFunction::ExecInput &input) {
+	duckdb::cxx::DataChunk output = input.GetOutputChunk();
+	odbcscanner::Query(input, output);
 }

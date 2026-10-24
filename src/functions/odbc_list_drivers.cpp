@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "diagnostics.hpp"
 #include "driver_manager.hpp"
 #include "make_unique.hpp"
@@ -12,12 +12,10 @@
 #include "strings.hpp"
 #include "widechar.hpp"
 
-DUCKDB_EXTENSION_EXTERN
-
-static void odbc_list_drivers_bind(duckdb_bind_info info) noexcept;
-static void odbc_list_drivers_init(duckdb_init_info info) noexcept;
-static void odbc_list_drivers_local_init(duckdb_init_info info) noexcept;
-static void odbc_list_drivers_function(duckdb_function_info info, duckdb_data_chunk output) noexcept;
+static void odbc_list_drivers_bind(duckdb::cxx::TableFunction::BindInput &input);
+static void odbc_list_drivers_init(duckdb::cxx::TableFunction::InitGlobalInput &input);
+static void odbc_list_drivers_local_init(duckdb::cxx::TableFunction::InitLocalInput &input);
+static void odbc_list_drivers_function(duckdb::cxx::TableFunction::ExecInput &input);
 
 namespace odbcscanner {
 
@@ -52,31 +50,26 @@ struct LocalInitData {
 	ExecState state = ExecState::UNINITIALIZED;
 	std::vector<Driver> drivers;
 	size_t driver_idx = 0;
-
-	static void Destroy(void *ldata_in) noexcept {
-		auto ldata = reinterpret_cast<LocalInitData *>(ldata_in);
-		delete ldata;
-	}
 };
 
 } // namespace
 
-static void Bind(duckdb_bind_info info) {
-	auto varchar_type = LogicalTypePtr(duckdb_create_logical_type(DUCKDB_TYPE_VARCHAR), LogicalTypeDeleter);
-	auto map_type = LogicalTypePtr(duckdb_create_map_type(varchar_type.get(), varchar_type.get()), LogicalTypeDeleter);
+static void Bind(TableFunction::BindInput &input) {
+	Factory &factory = input.GetContext().GetFactory();
+	auto varchar_type = factory.CreateType(LogicalTypeId::VARCHAR);
+	auto map_type = factory.ParseType("MAP(VARCHAR, VARCHAR)");
 
-	duckdb_bind_add_result_column(info, "description", varchar_type.get());
-	duckdb_bind_add_result_column(info, "attributes", map_type.get());
+	input.AddResultColumn("description", varchar_type);
+	input.AddResultColumn("attributes", map_type);
 }
 
-static void GlobalInit(duckdb_init_info info) {
-	(void)info;
+static void GlobalInit(TableFunction::InitGlobalInput &input) {
+	(void)input;
 	// no-op
 }
 
-static void LocalInit(duckdb_init_info info) {
-	auto ldata_ptr = std_make_unique<LocalInitData>();
-	duckdb_init_set_init_data(info, ldata_ptr.release(), LocalInitData::Destroy);
+static void LocalInit(TableFunction::InitLocalInput &input) {
+	input.SetLocalState<LocalInitData>();
 }
 
 static std::vector<DriverAttribute> ParseAttributes(const std::string attrs_str) {
@@ -206,41 +199,34 @@ static std::vector<Driver> ReadDrivers() {
 	    std::to_string(max_attempts));
 }
 
-static void SetAttributesMap(idx_t row_idx, duckdb_vector attributes_vector,
-                             const std::vector<DriverAttribute> &attributes) {
-	duckdb_vector struct_vector = duckdb_list_vector_get_child(attributes_vector);
-	duckdb_list_entry le;
-	le.offset = duckdb_list_vector_get_size(attributes_vector);
+static void SetAttributesMap(idx_t row_idx, Vector &attributes_vector, const std::vector<DriverAttribute> &attributes) {
+	Vector struct_vector = attributes_vector.GetChild(0);
+	list_entry_t le;
+	le.offset = struct_vector.GetSize();
 	le.length = attributes.size();
-	duckdb_list_entry *list_data = reinterpret_cast<duckdb_list_entry *>(duckdb_vector_get_data(attributes_vector));
+	list_entry_t *list_data = attributes_vector.GetDataMutable<list_entry_t>();
 	list_data[row_idx] = le;
 
-	duckdb_state reserve_st = duckdb_list_vector_reserve(attributes_vector, le.offset + le.length);
-	if (reserve_st != DuckDBSuccess) {
-		throw ScannerException("'odbc_list_drivers' error: 'duckdb_list_vector_reserve' failed, offset: " +
-		                       std::to_string(le.offset) + ", length: " + std::to_string(le.length));
-	}
-	duckdb_state set_size_state = duckdb_list_vector_set_size(attributes_vector, le.offset + le.length);
-	if (set_size_state != DuckDBSuccess) {
-		throw ScannerException("'odbc_list_drivers' error: 'duckdb_list_vector_set_size' failed, offset: " +
-		                       std::to_string(le.offset) + ", length: " + std::to_string(le.length));
-	}
+	// reserves the space in the child vector
+	struct_vector.SetSize(le.offset + le.length);
 
-	duckdb_vector names_vector = duckdb_struct_vector_get_child(struct_vector, 0);
-	duckdb_vector values_vector = duckdb_struct_vector_get_child(struct_vector, 1);
+	Vector names_vector = struct_vector.GetChild(0);
+	Vector values_vector = struct_vector.GetChild(1);
+	names_vector.SetSize(le.offset + le.length);
+	values_vector.SetSize(le.offset + le.length);
 	for (size_t i = 0; i < le.length; i++) {
 		idx_t idx = i + le.offset;
 		const DriverAttribute &att = attributes.at(i);
-		duckdb_vector_assign_string_element_len(names_vector, idx, att.name.c_str(), att.name.length());
-		duckdb_vector_assign_string_element_len(values_vector, idx, att.value.c_str(), att.value.length());
+		names_vector.AssignStringUnsafe(idx, std::string_view(att.name.c_str(), att.name.length()));
+		values_vector.AssignStringUnsafe(idx, std::string_view(att.value.c_str(), att.value.length()));
 	}
 }
 
-static void ListDrivers(duckdb_function_info info, duckdb_data_chunk output) {
-	LocalInitData &ldata = *reinterpret_cast<LocalInitData *>(duckdb_function_get_local_init_data(info));
+static void ListDrivers(TableFunction::ExecInput &input, DataChunk &output) {
+	LocalInitData &ldata = input.GetLocalState<LocalInitData>();
 
 	if (ldata.state == ExecState::EXHAUSTED) {
-		duckdb_data_chunk_set_size(output, 0);
+		output.GetVector(0).SetSize(0);
 		return;
 	}
 
@@ -249,75 +235,66 @@ static void ListDrivers(duckdb_function_info info, duckdb_data_chunk output) {
 		ldata.state = ExecState::EXECUTED;
 	}
 
-	duckdb_vector description_vector = duckdb_data_chunk_get_vector(output, 0);
-	duckdb_vector attributes_vector = duckdb_data_chunk_get_vector(output, 1);
+	Vector description_vector = output.GetVector(0);
+	Vector attributes_vector = output.GetVector(1);
 
-	if (description_vector == nullptr || attributes_vector == nullptr) {
+	if (!description_vector || !attributes_vector) {
 		throw ScannerException("'odbc_list_drivers' error: invalid null output vector");
 	}
 
+	idx_t vector_size = output.GetCapacity();
 	idx_t row_idx = 0;
-	for (; row_idx < duckdb_vector_size(); row_idx++) {
+	for (; row_idx < vector_size; row_idx++) {
 		if (ldata.driver_idx >= ldata.drivers.size()) {
 			ldata.state = ExecState::EXHAUSTED;
 			break;
 		}
 		const Driver &driver = ldata.drivers.at(ldata.driver_idx++);
-		duckdb_vector_assign_string_element_len(description_vector, row_idx, driver.description.c_str(),
-		                                        driver.description.length());
+		description_vector.AssignStringUnsafe(
+		    row_idx, std::string_view(driver.description.c_str(), driver.description.length()));
 		SetAttributesMap(row_idx, attributes_vector, driver.attributes);
 	}
-	duckdb_data_chunk_set_size(output, row_idx);
+	output.GetVector(0).SetSize(row_idx);
 }
 
-void OdbcListDriversFunction::Register(duckdb_connection conn) {
-	auto fun = TableFunctionPtr(duckdb_create_table_function(), TableFunctionDeleter);
-	duckdb_table_function_set_name(fun.get(), "odbc_list_drivers");
+void OdbcListDriversFunction::Register(Extension &extension, Factory &factory) {
+	auto fun = TableFunction::Create(factory);
+	fun.SetName("odbc_list_drivers");
 
 	// callbacks
-	duckdb_table_function_set_bind(fun.get(), odbc_list_drivers_bind);
-	duckdb_table_function_set_init(fun.get(), odbc_list_drivers_init);
-	duckdb_table_function_set_local_init(fun.get(), odbc_list_drivers_local_init);
-	duckdb_table_function_set_function(fun.get(), odbc_list_drivers_function);
+	fun.SetBindCallback(odbc_list_drivers_bind);
+	fun.SetInitGlobalCallback(odbc_list_drivers_init);
+	fun.SetInitLocalCallback(odbc_list_drivers_local_init);
+	fun.SetExecCallback(odbc_list_drivers_function);
 
 	// register and cleanup
-	duckdb_state state = duckdb_register_table_function(conn, fun.get());
-
-	if (state != DuckDBSuccess) {
-		throw ScannerException("'odbc_list_drivers' function registration failed");
+	try {
+		extension.Register(fun);
+	} catch (std::exception &e) {
+		throw ScannerException(std::string("\'") + "odbc_list_drivers" +
+		                       "\' function registration failed: " + e.what());
 	}
 }
 
 } // namespace odbcscanner
 
-static void odbc_list_drivers_bind(duckdb_bind_info info) noexcept {
+static void odbc_list_drivers_bind(duckdb::cxx::TableFunction::BindInput &input) {
 	try {
-		odbcscanner::Bind(info);
+		odbcscanner::Bind(input);
 	} catch (std::exception &e) {
-		duckdb_bind_set_error(info, e.what());
+		throw odbcscanner::FunctionArgs::BinderError(e.what());
 	}
 }
 
-static void odbc_list_drivers_init(duckdb_init_info info) noexcept {
-	try {
-		odbcscanner::GlobalInit(info);
-	} catch (std::exception &e) {
-		duckdb_init_set_error(info, e.what());
-	}
+static void odbc_list_drivers_init(duckdb::cxx::TableFunction::InitGlobalInput &input) {
+	odbcscanner::GlobalInit(input);
 }
 
-static void odbc_list_drivers_local_init(duckdb_init_info info) noexcept {
-	try {
-		odbcscanner::LocalInit(info);
-	} catch (std::exception &e) {
-		duckdb_init_set_error(info, e.what());
-	}
+static void odbc_list_drivers_local_init(duckdb::cxx::TableFunction::InitLocalInput &input) {
+	odbcscanner::LocalInit(input);
 }
 
-static void odbc_list_drivers_function(duckdb_function_info info, duckdb_data_chunk output) noexcept {
-	try {
-		odbcscanner::ListDrivers(info, output);
-	} catch (std::exception &e) {
-		duckdb_function_set_error(info, e.what());
-	}
+static void odbc_list_drivers_function(duckdb::cxx::TableFunction::ExecInput &input) {
+	duckdb::cxx::DataChunk output = input.GetOutputChunk();
+	odbcscanner::ListDrivers(input, output);
 }

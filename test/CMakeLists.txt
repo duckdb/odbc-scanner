@@ -7,6 +7,7 @@ if (MSVC)
 endif ()
 
 add_executable(test_${EXTENSION_NAME}
+    ../duckdb_capi_v2/cpp/duckdb_cpp.cpp
     test_basic.cpp
     test_cancel.cpp
     test_common.cpp
@@ -19,10 +20,16 @@ add_executable(test_${EXTENSION_NAME}
     test_version.cpp
 )
 
+if (MSVC)
+    # C++ API sources: integer conversions and local variables shadowing class members
+    set_source_files_properties(../duckdb_capi_v2/cpp/duckdb_cpp.cpp PROPERTIES COMPILE_OPTIONS "/wd4244;/wd4458")
+endif ()
+
 target_include_directories(test_${EXTENSION_NAME} PRIVATE
     ${ODBC_INCLUDE_DIRS}
     ../third_party/catch
-    ../duckdb_capi
+    ../duckdb_capi_v2
+    ../duckdb_capi_v2/cpp
 )
 
 string(TOLOWER ${CMAKE_BUILD_TYPE} CMAKE_BUILD_TYPE_LOWER)

@@ -10,7 +10,7 @@ TEST_CASE("Common version query", group_name) {
 	}
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	bool st = Query(sc.conn, R"(
 FROM odbc_query(
 	getvariable('conn'), 
 	'
@@ -18,8 +18,8 @@ FROM odbc_query(
 	'
 	)
 )",
-	                               res.Get());
-	REQUIRE(QuerySuccess(res.Get(), st));
+	                res);
+	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
 }
@@ -30,7 +30,7 @@ TEST_CASE("MSSQL version query", group_name) {
 	}
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	bool st = Query(sc.conn, R"(
 FROM odbc_query(
 	getvariable('conn'), 
 	'
@@ -38,8 +38,8 @@ FROM odbc_query(
 	'
 	)
 )",
-	                               res.Get());
-	REQUIRE(QuerySuccess(res.Get(), st));
+	                res);
+	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
 }
@@ -50,7 +50,7 @@ TEST_CASE("Oracle version query", group_name) {
 	}
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	bool st = Query(sc.conn, R"(
 FROM odbc_query(
 	getvariable('conn'), 
 	'
@@ -58,8 +58,8 @@ FROM odbc_query(
 	'
 	)
 )",
-	                               res.Get());
-	REQUIRE(QuerySuccess(res.Get(), st));
+	                res);
+	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
 	// std::cout << res.Value<std::string>(1, 0) << std::endl;
@@ -73,7 +73,7 @@ TEST_CASE("DB2 version query", group_name) {
 	}
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	bool st = Query(sc.conn, R"(
 FROM odbc_query(
 	getvariable('conn'), 
 	'
@@ -81,8 +81,8 @@ FROM odbc_query(
 	'
 	)
 )",
-	                               res.Get());
-	REQUIRE(QuerySuccess(res.Get(), st));
+	                res);
+	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
 }
@@ -93,7 +93,7 @@ TEST_CASE("Snowflake version query", group_name) {
 	}
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	bool st = Query(sc.conn, R"(
 FROM odbc_query(
 	getvariable('conn'), 
 	'
@@ -101,8 +101,8 @@ FROM odbc_query(
 	'
 	)
 )",
-	                               res.Get());
-	REQUIRE(QuerySuccess(res.Get(), st));
+	                res);
+	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
 }
@@ -113,7 +113,7 @@ TEST_CASE("Firebird version query", group_name) {
 	}
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	bool st = Query(sc.conn, R"(
 FROM odbc_query(
 	getvariable('conn'), 
 	'
@@ -121,8 +121,8 @@ FROM odbc_query(
 	'
 	)
 )",
-	                               res.Get());
-	REQUIRE(QuerySuccess(res.Get(), st));
+	                res);
+	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
 }
@@ -133,7 +133,7 @@ TEST_CASE("Informix version query", group_name) {
 	}
 	ScannerConn sc;
 	Result res;
-	duckdb_state st = duckdb_query(sc.conn, R"(
+	bool st = Query(sc.conn, R"(
 FROM odbc_query(
 	getvariable('conn'), 
 	'
@@ -141,8 +141,8 @@ FROM odbc_query(
 	'
 	)
 )",
-	                               res.Get());
-	REQUIRE(QuerySuccess(res.Get(), st));
+	                res);
+	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	std::cout << res.Value<std::string>(0, 0) << std::endl;
 }

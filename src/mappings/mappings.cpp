@@ -3,7 +3,7 @@
 
 namespace odbcscanner {
 
-std::unordered_map<duckdb_type, std::string> Mappings::Resolve(DbmsDriver driver, const DbmsQuirks &quirks) {
+std::unordered_map<LogicalTypeId, std::string> Mappings::Resolve(DbmsDriver driver, const DbmsQuirks &quirks) {
 	(void)quirks;
 	switch (driver) {
 	case DbmsDriver::ORACLE:

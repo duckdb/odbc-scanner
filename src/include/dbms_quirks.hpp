@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "connection.hpp"
 #include "duckdb_extension_api.hpp"
 
@@ -28,11 +28,11 @@ struct DbmsQuirks {
 	uint32_t var_len_params_long_threshold_bytes = 4000;
 	bool enable_columns_binding = false;
 
-	explicit DbmsQuirks(OdbcConnection &conn, const std::map<std::string, ValuePtr> &user_quirks);
+	explicit DbmsQuirks(OdbcConnection &conn, const std::map<std::string, std::unique_ptr<Value>> &user_quirks);
 
 	static const std::vector<std::string> AllNames();
 
-	static std::map<std::string, ValuePtr> ExtractUserQuirks(duckdb_bind_info info);
+	static std::map<std::string, std::unique_ptr<Value>> ExtractUserQuirks(FunctionBindInput &input);
 };
 
 } // namespace odbcscanner

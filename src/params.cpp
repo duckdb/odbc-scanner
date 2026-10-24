@@ -4,31 +4,28 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "capi_pointers.hpp"
+#include "function_args.hpp"
 #include "connection.hpp"
 #include "diagnostics.hpp"
 #include "scanner_exception.hpp"
 #include "types.hpp"
 
-DUCKDB_EXTENSION_EXTERN
-
 namespace odbcscanner {
 
-std::vector<ScannerValue> Params::Extract(DbmsQuirks &quirks, duckdb_value struct_value) {
-	if (duckdb_is_null_value(struct_value)) {
+std::vector<ScannerValue> Params::Extract(const DbmsQuirks &quirks, const Value *struct_value) {
+	if (struct_value->IsNull()) {
 		throw ScannerException("Cannot extract parameters from STRUCT: specified STRUCT is NULL");
 	}
-	duckdb_logical_type struct_type = duckdb_get_value_type(struct_value);
-	duckdb_type struct_type_id = duckdb_get_type_id(struct_type);
-	if (struct_type_id != DUCKDB_TYPE_STRUCT) {
+	LogicalTypeId struct_type_id = Types::TypeIdOf(struct_value->GetLogicalType());
+	if (struct_type_id != LogicalTypeId::STRUCT) {
 		throw ScannerException("Cannot extract parameters from STRUCT: specified value is not STRUCT");
 	}
-	idx_t params_count = duckdb_struct_type_child_count(struct_type);
+	idx_t params_count = struct_value->GetChildCount();
 
 	std::vector<ScannerValue> params;
 	for (idx_t i = 0; i < params_count; i++) {
-		auto child_val = ValuePtr(duckdb_get_struct_child(struct_value, i), ValueDeleter);
-		if (duckdb_is_null_value(child_val.get())) {
+		auto child_val = std::unique_ptr<Value>(new Value(struct_value->GetChild(i)));
+		if (child_val->IsNull()) {
 			params.emplace_back(ScannerValue());
 			continue;
 		}
@@ -40,7 +37,7 @@ std::vector<ScannerValue> Params::Extract(DbmsQuirks &quirks, duckdb_value struc
 	return params;
 }
 
-std::vector<SQLSMALLINT> Params::CollectTypes(QueryContext &ctx) {
+std::vector<SQLSMALLINT> Params::CollectTypes(const QueryContext &ctx) {
 	SQLSMALLINT count = -1;
 	{
 		SQLRETURN ret = SQLNumParams(ctx.hstmt(), &count);
@@ -82,16 +79,16 @@ static void CoalesceNumericToCharsIfNeeded(ScannerValue &param) {
 		return;
 	}
 	switch (param.ParamType()) {
-	case DUCKDB_TYPE_TINYINT:
-	case DUCKDB_TYPE_UTINYINT:
-	case DUCKDB_TYPE_SMALLINT:
-	case DUCKDB_TYPE_USMALLINT:
-	case DUCKDB_TYPE_INTEGER:
-	case DUCKDB_TYPE_UINTEGER:
-	case DUCKDB_TYPE_BIGINT:
-	case DUCKDB_TYPE_UBIGINT:
-	case DUCKDB_TYPE_FLOAT:
-	case DUCKDB_TYPE_DOUBLE:
+	case ToParamType(LogicalTypeId::TINYINT):
+	case ToParamType(LogicalTypeId::UTINYINT):
+	case ToParamType(LogicalTypeId::SMALLINT):
+	case ToParamType(LogicalTypeId::USMALLINT):
+	case ToParamType(LogicalTypeId::INTEGER):
+	case ToParamType(LogicalTypeId::UINTEGER):
+	case ToParamType(LogicalTypeId::BIGINT):
+	case ToParamType(LogicalTypeId::UBIGINT):
+	case ToParamType(LogicalTypeId::FLOAT):
+	case ToParamType(LogicalTypeId::DOUBLE):
 		param.TransformNumericToChars();
 		break;
 	default:
@@ -99,7 +96,7 @@ static void CoalesceNumericToCharsIfNeeded(ScannerValue &param) {
 	}
 }
 
-void Params::SetExpectedTypes(QueryContext &ctx, const std::vector<SQLSMALLINT> &expected,
+void Params::SetExpectedTypes(const QueryContext &ctx, const std::vector<SQLSMALLINT> &expected,
                               std::vector<ScannerValue> &actual) {
 	if (expected.size() != actual.size()) {
 		throw ScannerException("Incorrect number of parameters specified, query: '" + ctx.query + "', expected: " +
@@ -114,7 +111,7 @@ void Params::SetExpectedTypes(QueryContext &ctx, const std::vector<SQLSMALLINT> 
 	}
 }
 
-void Params::BindToOdbc(QueryContext &ctx, std::vector<ScannerValue> &params) {
+void Params::BindToOdbc(const QueryContext &ctx, std::vector<ScannerValue> &params) {
 	if (params.size() == 0) {
 		return;
 	}
@@ -138,23 +135,23 @@ void Params::BindToOdbc(QueryContext &ctx, std::vector<ScannerValue> &params) {
 // fixed-width slots are safe to reuse across executes without rebinding.
 static bool IsFixedWidthShape(param_type type_id) {
 	switch (type_id) {
-	case DUCKDB_TYPE_SQLNULL:
-	case DUCKDB_TYPE_BOOLEAN:
-	case DUCKDB_TYPE_TINYINT:
-	case DUCKDB_TYPE_UTINYINT:
-	case DUCKDB_TYPE_SMALLINT:
-	case DUCKDB_TYPE_USMALLINT:
-	case DUCKDB_TYPE_INTEGER:
-	case DUCKDB_TYPE_UINTEGER:
-	case DUCKDB_TYPE_BIGINT:
-	case DUCKDB_TYPE_UBIGINT:
-	case DUCKDB_TYPE_FLOAT:
-	case DUCKDB_TYPE_DOUBLE:
-	case DUCKDB_TYPE_DECIMAL:
-	case DUCKDB_TYPE_DATE:
-	case DUCKDB_TYPE_TIME:
-	case DUCKDB_TYPE_TIMESTAMP:
-	case DUCKDB_TYPE_TIMESTAMP_TZ:
+	case ToParamType(LogicalTypeId::SQLNULL):
+	case ToParamType(LogicalTypeId::BOOLEAN):
+	case ToParamType(LogicalTypeId::TINYINT):
+	case ToParamType(LogicalTypeId::UTINYINT):
+	case ToParamType(LogicalTypeId::SMALLINT):
+	case ToParamType(LogicalTypeId::USMALLINT):
+	case ToParamType(LogicalTypeId::INTEGER):
+	case ToParamType(LogicalTypeId::UINTEGER):
+	case ToParamType(LogicalTypeId::BIGINT):
+	case ToParamType(LogicalTypeId::UBIGINT):
+	case ToParamType(LogicalTypeId::FLOAT):
+	case ToParamType(LogicalTypeId::DOUBLE):
+	case ToParamType(LogicalTypeId::DECIMAL):
+	case ToParamType(LogicalTypeId::DATE):
+	case ToParamType(LogicalTypeId::TIME):
+	case ToParamType(LogicalTypeId::TIMESTAMP):
+	case ToParamType(LogicalTypeId::TIMESTAMP_TZ):
 	case Params::TYPE_TIME_WITH_NANOS:
 	case Params::TYPE_SQL_BIT:
 	case Params::TYPE_SQL_GUID:
@@ -165,7 +162,7 @@ static bool IsFixedWidthShape(param_type type_id) {
 	}
 }
 
-void Params::BindToOdbcWithCache(QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache) {
+void Params::BindToOdbcWithCache(const QueryContext &ctx, std::vector<ScannerValue> &params, BindCache &cache) {
 	if (params.empty()) {
 		return;
 	}

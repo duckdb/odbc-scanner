@@ -11,29 +11,19 @@
 #define SCANNER_STR(value)                   SCANNER_QUOTE(value)
 #define ODBC_SCANNER_EXTENSION_FILE_PATH_STR SCANNER_STR(ODBC_SCANNER_EXTENSION_FILE_PATH)
 
-ScannerConn::ScannerConn(bool establish_odbc_connection) {
-	duckdb_config config = nullptr;
+static duckdb::cxx::StartupOptions ScannerStartupOptions() {
+	duckdb::cxx::StartupOptions options;
+	options.EnableUnsignedExtensions(true);
+	return options;
+}
 
-	duckdb_state state_config_create = duckdb_create_config(&config);
-	REQUIRE(state_config_create == DuckDBSuccess);
-
-	duckdb_state state_config_set_1 = duckdb_set_config(config, "allow_unsigned_extensions", "true");
-	REQUIRE(state_config_set_1 == DuckDBSuccess);
-	duckdb_state state_config_set_2 = duckdb_set_config(config, "threads", "1");
-	REQUIRE(state_config_set_2 == DuckDBSuccess);
-
-	duckdb_state state_db = duckdb_open_ext(nullptr, &db, config, nullptr);
-	REQUIRE(state_db == DuckDBSuccess);
-
-	duckdb_destroy_config(&config);
-
-	duckdb_state state_conn = duckdb_connect(db, &conn);
-	REQUIRE(state_conn == DuckDBSuccess);
+ScannerConn::ScannerConn(bool establish_odbc_connection) : db(":memory:", ScannerStartupOptions()), conn(db.Connect()) {
+	db.GetConfig().SetOption("threads", "1");
 
 	Result res_load;
 	std::string load_query = "LOAD '" + std::string(ODBC_SCANNER_EXTENSION_FILE_PATH_STR) + "'";
-	duckdb_state state_load = duckdb_query(conn, load_query.c_str(), res_load.Get());
-	REQUIRE(QuerySuccess(res_load.Get(), state_load));
+	bool state_load = Query(conn, load_query, res_load);
+	REQUIRE(QuerySuccess(res_load, state_load));
 
 	if (!establish_odbc_connection) {
 		return;
@@ -44,215 +34,315 @@ ScannerConn::ScannerConn(bool establish_odbc_connection) {
 
 	std::string sql = std::string() + "SET VARIABLE conn = odbc_connect('" + conn_str + "')";
 	Result conn_res;
-	duckdb_state state_odbc_conn = duckdb_query(conn, sql.c_str(), conn_res.Get());
-	if (DuckDBError == state_odbc_conn) {
-		std::cerr << duckdb_result_error(conn_res.Get()) << std::endl;
+	bool state_odbc_conn = Query(conn, sql, conn_res);
+	if (!state_odbc_conn) {
+		std::cerr << conn_res.Error() << std::endl;
 	}
-	REQUIRE(state_odbc_conn == DuckDBSuccess);
+	REQUIRE(state_odbc_conn);
 	this->odbc_connection_established = true;
 }
 
 ScannerConn::~ScannerConn() noexcept {
 	if (odbc_connection_established) {
-		duckdb_state state_close = duckdb_query(conn, "SELECT odbc_close(getvariable('conn'))", nullptr);
-		REQUIRE(state_close == DuckDBSuccess);
+		Result res_close;
+		bool state_close = Query(conn, "SELECT odbc_close(getvariable('conn'))", res_close);
+		REQUIRE(state_close);
 	}
-
-	duckdb_disconnect(&conn);
-	duckdb_close(&db);
 }
 
-Result::~Result() noexcept {
-	if (chunk != nullptr) {
-		duckdb_destroy_data_chunk(&chunk);
+void Result::Fill(duckdb::cxx::QueryResult res) {
+	duckdb::cxx::Schema schema = res.GetSchema();
+	for (idx_t i = 0; i < schema.GetFieldCount(); i++) {
+		column_types.push_back(schema.GetFieldType(i).GetTypeId());
 	}
-	duckdb_destroy_result(&res);
+	// fetch all chunks to report execution errors right away
+	for (;;) {
+		duckdb::cxx::DataChunk fetched = res.FetchChunk();
+		if (!fetched) {
+			break;
+		}
+		chunks.emplace_back(std::move(fetched));
+	}
 }
 
-duckdb_result *Result::Get() {
-	return &res;
+const std::string &Result::Error() {
+	return error;
 }
 
 bool Result::NextChunk() {
-	bool first = chunk == nullptr;
-	if (!first) {
-		duckdb_destroy_data_chunk(&chunk);
+	if (chunk != nullptr) {
+		cur_row_idx += chunk->GetRowCount();
 	}
-	this->chunk = duckdb_fetch_chunk(res);
-	if (chunk == nullptr) {
+	if (next_chunk_idx >= chunks.size()) {
+		this->chunk = nullptr;
 		return false;
 	}
-	if (!first) {
-		cur_row_idx += duckdb_vector_size();
-	}
+	this->chunk = &chunks.at(next_chunk_idx);
+	next_chunk_idx += 1;
 	return true;
 }
 
-bool Result::IsNull(idx_t col_idx, idx_t row_idx) {
+static duckdb::cxx::VectorView ChunkVectorView(duckdb::cxx::DataChunk *chunk, idx_t cur_row_idx, idx_t col_idx,
+                                               idx_t row_idx, idx_t &phys_row_idx) {
 	REQUIRE(chunk != nullptr);
 
 	idx_t rel_row_idx = row_idx - cur_row_idx;
-	REQUIRE(rel_row_idx < duckdb_vector_size());
+	REQUIRE(rel_row_idx < chunk->GetRowCount());
 
-	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
-	REQUIRE(col_idx < col_count);
+	REQUIRE(col_idx < chunk->GetVectorCount());
 
-	duckdb_vector vec = duckdb_data_chunk_get_vector(chunk, col_idx);
-	REQUIRE(vec != nullptr);
-
-	uint64_t *validity = duckdb_vector_get_validity(vec);
-	if (validity != nullptr) {
-		return !duckdb_validity_row_is_valid(validity, rel_row_idx);
+	duckdb::cxx::Vector vec = chunk->GetVector(col_idx);
+	REQUIRE(vec);
+	if (vec.GetVectorType() == duckdb::cxx::VectorType::OTHER) {
+		vec.Flatten();
 	}
+	duckdb::cxx::VectorView view = vec.GetView();
 
-	return false;
+	phys_row_idx = view.SelAt(rel_row_idx);
+	return view;
+}
+
+bool Result::IsNull(idx_t col_idx, idx_t row_idx) {
+	idx_t phys_row_idx = 0;
+	duckdb::cxx::VectorView view = ChunkVectorView(chunk, cur_row_idx, col_idx, row_idx, phys_row_idx);
+	return !view.RowIsValid(phys_row_idx);
 }
 
 template <typename CTYPE>
-static CTYPE *NotNullData(duckdb_type expected_type_id, duckdb_data_chunk chunk, idx_t cur_row_idx, idx_t col_idx,
-                          idx_t row_idx) {
-	REQUIRE(chunk != nullptr);
+static const CTYPE &NotNullData(duckdb::cxx::LogicalTypeId expected_type_id, Result &res, idx_t col_idx,
+                                idx_t row_idx) {
+	REQUIRE(col_idx < res.column_types.size());
+	REQUIRE(res.column_types.at(col_idx) == expected_type_id);
 
-	idx_t rel_row_idx = row_idx - cur_row_idx;
-	REQUIRE(rel_row_idx < duckdb_vector_size());
+	idx_t phys_row_idx = 0;
+	duckdb::cxx::VectorView view = ChunkVectorView(res.chunk, res.cur_row_idx, col_idx, row_idx, phys_row_idx);
+	REQUIRE(view.RowIsValid(phys_row_idx));
 
-	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
-	REQUIRE(col_idx < col_count);
-
-	duckdb_vector vec = duckdb_data_chunk_get_vector(chunk, col_idx);
-	REQUIRE(vec != nullptr);
-
-	auto ltype = LogicalTypePtr(duckdb_vector_get_column_type(vec), LogicalTypeDeleter);
-	duckdb_type type_id = duckdb_get_type_id(ltype.get());
-	REQUIRE(type_id == expected_type_id);
-
-	uint64_t *validity = duckdb_vector_get_validity(vec);
-	if (validity != nullptr) {
-		REQUIRE(duckdb_validity_row_is_valid(validity, rel_row_idx));
-	}
-
-	return reinterpret_cast<CTYPE *>(duckdb_vector_get_data(vec));
+	return view.Data<CTYPE>()[phys_row_idx];
 }
 
-static duckdb_type ColumnType(duckdb_data_chunk chunk, idx_t col_idx) {
-	REQUIRE(chunk != nullptr);
-
-	idx_t col_count = duckdb_data_chunk_get_column_count(chunk);
-	REQUIRE(col_idx < col_count);
-
-	duckdb_vector vec = duckdb_data_chunk_get_vector(chunk, col_idx);
-	REQUIRE(vec != nullptr);
-
-	auto ltype = LogicalTypePtr(duckdb_vector_get_column_type(vec), LogicalTypeDeleter);
-	return duckdb_get_type_id(ltype.get());
+static duckdb::cxx::LogicalTypeId ColumnType(Result &res, idx_t col_idx) {
+	REQUIRE(col_idx < res.column_types.size());
+	return res.column_types.at(col_idx);
 }
+
+// Proleptic Gregorian calendar conversions, see:
+// https://howardhinnant.github.io/date_algorithms.html
+
+static DateStruct FromDate(int32_t days) {
+	int64_t z = static_cast<int64_t>(days) + 719468;
+	int64_t era = (z >= 0 ? z : z - 146096) / 146097;
+	int64_t doe = z - era * 146097;
+	int64_t yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+	int64_t y = yoe + era * 400;
+	int64_t doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+	int64_t mp = (5 * doy + 2) / 153;
+	int64_t d = doy - (153 * mp + 2) / 5 + 1;
+	int64_t m = mp < 10 ? mp + 3 : mp - 9;
+
+	DateStruct res;
+	res.year = static_cast<int32_t>(y + (m <= 2 ? 1 : 0));
+	res.month = static_cast<int8_t>(m);
+	res.day = static_cast<int8_t>(d);
+	return res;
+}
+
+static int32_t ToDate(DateStruct date) {
+	int64_t m = static_cast<int64_t>(date.month);
+	int64_t d = static_cast<int64_t>(date.day);
+	int64_t y = static_cast<int64_t>(date.year) - (m <= 2 ? 1 : 0);
+	int64_t era = (y >= 0 ? y : y - 399) / 400;
+	int64_t yoe = y - era * 400;
+	int64_t doy = (153 * (m > 2 ? m - 3 : m + 9) + 2) / 5 + d - 1;
+	int64_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+	return static_cast<int32_t>(era * 146097 + doe - 719468);
+}
+
+using duckdb::cxx::LogicalTypeId;
 
 template <>
 uint8_t Result::Value<uint8_t>(idx_t col_idx, idx_t row_idx) {
-	uint8_t *data = NotNullData<uint8_t>(DUCKDB_TYPE_UTINYINT, chunk, cur_row_idx, col_idx, row_idx);
-	return data[row_idx];
+	return NotNullData<uint8_t>(LogicalTypeId::UTINYINT, *this, col_idx, row_idx);
 }
 
 template <>
 int16_t Result::Value<int16_t>(idx_t col_idx, idx_t row_idx) {
-	int16_t *data = NotNullData<int16_t>(DUCKDB_TYPE_SMALLINT, chunk, cur_row_idx, col_idx, row_idx);
-	return data[row_idx];
+	return NotNullData<int16_t>(LogicalTypeId::SMALLINT, *this, col_idx, row_idx);
 }
 
 template <>
 int32_t Result::Value<int32_t>(idx_t col_idx, idx_t row_idx) {
-	int32_t *data = NotNullData<int32_t>(DUCKDB_TYPE_INTEGER, chunk, cur_row_idx, col_idx, row_idx);
-	return data[row_idx];
+	return NotNullData<int32_t>(LogicalTypeId::INTEGER, *this, col_idx, row_idx);
 }
 
 template <>
 int64_t Result::Value<int64_t>(idx_t col_idx, idx_t row_idx) {
-	if (DBMSConfigured("MariaDB") && DUCKDB_TYPE_INTEGER == ColumnType(chunk, col_idx)) {
-		int32_t *data = NotNullData<int32_t>(DUCKDB_TYPE_INTEGER, chunk, cur_row_idx, col_idx, row_idx);
-		return data[row_idx];
+	if (DBMSConfigured("MariaDB") && LogicalTypeId::INTEGER == ColumnType(*this, col_idx)) {
+		return NotNullData<int32_t>(LogicalTypeId::INTEGER, *this, col_idx, row_idx);
 	}
 	if (DBMSConfigured("Oracle")) {
-		int64_t *data = NotNullData<int64_t>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
-		return data[row_idx];
+		return NotNullData<int64_t>(LogicalTypeId::DECIMAL, *this, col_idx, row_idx);
 	}
 	if (DBMSConfigured("Snowflake")) {
-		duckdb_hugeint *data = NotNullData<duckdb_hugeint>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
-		return static_cast<int64_t>(data[row_idx].lower);
+		const int128_t &data = NotNullData<int128_t>(LogicalTypeId::DECIMAL, *this, col_idx, row_idx);
+		return static_cast<int64_t>(data.lower);
 	}
-	int64_t *data = NotNullData<int64_t>(DUCKDB_TYPE_BIGINT, chunk, cur_row_idx, col_idx, row_idx);
-	return data[row_idx];
+	return NotNullData<int64_t>(LogicalTypeId::BIGINT, *this, col_idx, row_idx);
 }
 
 template <>
 double Result::Value<double>(idx_t col_idx, idx_t row_idx) {
-	double *data = NotNullData<double>(DUCKDB_TYPE_DOUBLE, chunk, cur_row_idx, col_idx, row_idx);
-	return data[row_idx];
+	return NotNullData<double>(LogicalTypeId::DOUBLE, *this, col_idx, row_idx);
 }
 
 template <>
 bool Result::Value<bool>(idx_t col_idx, idx_t row_idx) {
-	bool *data = NotNullData<bool>(DUCKDB_TYPE_BOOLEAN, chunk, cur_row_idx, col_idx, row_idx);
-	return data[row_idx];
+	return NotNullData<bool>(LogicalTypeId::BOOLEAN, *this, col_idx, row_idx);
 }
 
 template <>
 std::string Result::Value<std::string>(idx_t col_idx, idx_t row_idx) {
-	duckdb_string_t *data = NotNullData<duckdb_string_t>(DUCKDB_TYPE_VARCHAR, chunk, cur_row_idx, col_idx, row_idx);
-	duckdb_string_t dstr = data[row_idx];
-	const char *cstr = duckdb_string_t_data(&dstr);
-	uint32_t len = duckdb_string_t_length(dstr);
-	return std::string(cstr, len);
+	return std::string(NotNullData<duckdb::cxx::varchar_t>(LogicalTypeId::VARCHAR, *this, col_idx, row_idx).view());
 }
 
 std::string Result::BinaryValue(idx_t col_idx, idx_t row_idx) {
-	duckdb_string_t *data = NotNullData<duckdb_string_t>(DUCKDB_TYPE_BLOB, chunk, cur_row_idx, col_idx, row_idx);
-	duckdb_string_t dstr = data[row_idx];
-	const char *cstr = duckdb_string_t_data(&dstr);
-	uint32_t len = duckdb_string_t_length(dstr);
-	return std::string(cstr, len);
+	return std::string(NotNullData<duckdb::cxx::blob_t>(LogicalTypeId::BLOB, *this, col_idx, row_idx).view());
 }
 
 template <>
-duckdb_date_struct Result::Value<duckdb_date_struct>(idx_t col_idx, idx_t row_idx) {
-	duckdb_date *data = NotNullData<duckdb_date>(DUCKDB_TYPE_DATE, chunk, cur_row_idx, col_idx, row_idx);
-	duckdb_date dt = data[row_idx];
-	return duckdb_from_date(dt);
+DateStruct Result::Value<DateStruct>(idx_t col_idx, idx_t row_idx) {
+	duckdb::cxx::date_t dt = NotNullData<duckdb::cxx::date_t>(LogicalTypeId::DATE, *this, col_idx, row_idx);
+	return FromDate(dt.days);
 }
 
 template <>
 int16_t Result::DecimalValue<int16_t>(idx_t col_idx, idx_t row_idx) {
 	if (DBMSConfigured("ClickHouse")) {
-		duckdb_hugeint *data = NotNullData<duckdb_hugeint>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
-		return static_cast<int16_t>(data[row_idx].lower);
+		const int128_t &data = NotNullData<int128_t>(LogicalTypeId::DECIMAL, *this, col_idx, row_idx);
+		return static_cast<int16_t>(data.lower);
 	}
-	int16_t *data = NotNullData<int16_t>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
-	return data[row_idx];
+	return NotNullData<int16_t>(LogicalTypeId::DECIMAL, *this, col_idx, row_idx);
 }
 
 template <>
 int32_t Result::DecimalValue<int32_t>(idx_t col_idx, idx_t row_idx) {
 	if (DBMSConfigured("ClickHouse")) {
-		duckdb_hugeint *data = NotNullData<duckdb_hugeint>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
-		return static_cast<int32_t>(data[row_idx].lower);
+		const int128_t &data = NotNullData<int128_t>(LogicalTypeId::DECIMAL, *this, col_idx, row_idx);
+		return static_cast<int32_t>(data.lower);
 	}
-	int32_t *data = NotNullData<int32_t>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
-	return data[row_idx];
+	return NotNullData<int32_t>(LogicalTypeId::DECIMAL, *this, col_idx, row_idx);
 }
 
 template <>
 int64_t Result::DecimalValue<int64_t>(idx_t col_idx, idx_t row_idx) {
 	if (DBMSConfigured("ClickHouse")) {
-		duckdb_hugeint *data = NotNullData<duckdb_hugeint>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
-		return static_cast<int64_t>(data[row_idx].lower);
+		const int128_t &data = NotNullData<int128_t>(LogicalTypeId::DECIMAL, *this, col_idx, row_idx);
+		return static_cast<int64_t>(data.lower);
 	}
-	int64_t *data = NotNullData<int64_t>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
-	return data[row_idx];
+	return NotNullData<int64_t>(LogicalTypeId::DECIMAL, *this, col_idx, row_idx);
 }
 
 template <>
-duckdb_hugeint Result::DecimalValue<duckdb_hugeint>(idx_t col_idx, idx_t row_idx) {
-	duckdb_hugeint *data = NotNullData<duckdb_hugeint>(DUCKDB_TYPE_DECIMAL, chunk, cur_row_idx, col_idx, row_idx);
-	return data[row_idx];
+int128_t Result::DecimalValue<int128_t>(idx_t col_idx, idx_t row_idx) {
+	return NotNullData<int128_t>(LogicalTypeId::DECIMAL, *this, col_idx, row_idx);
+}
+
+bool PreparedStatement::Bind(idx_t param_idx, const duckdb::cxx::Value *value) {
+	if (param_idx == 0 || value == nullptr) {
+		this->error = "Invalid parameter, index: " + std::to_string(param_idx);
+		return false;
+	}
+	if (params.size() < param_idx) {
+		params.resize(param_idx, nullptr);
+	}
+	params[param_idx - 1] = value;
+	return true;
+}
+
+bool PreparedStatement::Execute(Result &res) {
+	try {
+		// values are passed to the statement by value, bound values are copied
+		std::vector<duckdb::cxx::Value> values;
+		for (const duckdb::cxx::Value *val : params) {
+			REQUIRE(val != nullptr);
+			values.emplace_back(val->Cast(*factory, val->GetLogicalType()));
+		}
+		res.Fill(ps->Execute(values));
+		return true;
+	} catch (std::exception &e) {
+		res.error = e.what();
+		return false;
+	}
+}
+
+// Parses the specified SQL, returns the last statement, all previous statements are executed
+static duckdb::cxx::SqlStatement ParseAndExecuteAllButLast(duckdb::cxx::Connection &conn, const std::string &sql) {
+	auto iter = conn.ParseSQL(sql);
+	duckdb::cxx::SqlStatement last = iter.Next();
+	if (!last) {
+		throw std::runtime_error("No statements to execute");
+	}
+	for (;;) {
+		duckdb::cxx::SqlStatement stmt = iter.Next();
+		if (!stmt) {
+			break;
+		}
+		conn.Execute(last).Drain();
+		last = std::move(stmt);
+	}
+	return last;
+}
+
+bool Query(duckdb::cxx::Connection &conn, const std::string &sql, Result &res) {
+	try {
+		duckdb::cxx::SqlStatement stmt = ParseAndExecuteAllButLast(conn, sql);
+		res.Fill(conn.Execute(stmt));
+		return true;
+	} catch (std::exception &e) {
+		res.error = e.what();
+		return false;
+	}
+}
+
+bool Prepare(duckdb::cxx::Connection &conn, const std::string &sql, PreparedStatement &ps) {
+	try {
+		duckdb::cxx::SqlStatement stmt = ParseAndExecuteAllButLast(conn, sql);
+		ps.ps.reset(new duckdb::cxx::PreparedStatement(conn.Prepare(stmt)));
+		ps.factory = &conn.GetFactory();
+		return true;
+	} catch (std::exception &e) {
+		ps.error = e.what();
+		return false;
+	}
+}
+
+ValuePtr CreateInt32(ScannerConn &sc, int32_t value) {
+	return ValuePtr(new duckdb::cxx::Value(duckdb::cxx::Value::Create(sc.conn.GetFactory(), value)));
+}
+
+ValuePtr CreateVarchar(ScannerConn &sc, const std::string &value) {
+	duckdb::cxx::varchar_t str(value);
+	return ValuePtr(new duckdb::cxx::Value(duckdb::cxx::Value::Create(sc.conn.GetFactory(), str)));
+}
+
+ValuePtr CreateDate(ScannerConn &sc, DateStruct value) {
+	duckdb::cxx::date_t dt;
+	dt.days = ToDate(value);
+	return ValuePtr(new duckdb::cxx::Value(duckdb::cxx::Value::Create(sc.conn.GetFactory(), dt)));
+}
+
+ValuePtr CreateDecimal(ScannerConn &sc, int128_t value, uint8_t width, uint8_t scale) {
+	duckdb::cxx::Factory &factory = sc.conn.GetFactory();
+	// DECIMAL values are created with the width and scale known at compile time
+	if (width == 4 && scale == 3) {
+		duckdb::cxx::decimal_t<4, 3> dec {static_cast<int16_t>(value.lower)};
+		return ValuePtr(new duckdb::cxx::Value(duckdb::cxx::Value::Create(factory, dec)));
+	} else if (width == 38 && scale == 3) {
+		duckdb::cxx::decimal_t<38, 3> dec {value};
+		return ValuePtr(new duckdb::cxx::Value(duckdb::cxx::Value::Create(factory, dec)));
+	}
+	FAIL("Unsupported DECIMAL width: " + std::to_string(width) + ", scale: " + std::to_string(scale));
+	return ValuePtr();
 }
 
 bool DBMSConfigured(const std::string dbms_name) {
@@ -270,21 +360,17 @@ bool DBMSConfigured(const std::string dbms_name) {
 	return str.find(needle) != std::string::npos;
 }
 
-bool QuerySuccess(duckdb_result *res, duckdb_state st) {
-	if (st != DuckDBSuccess) {
-		const char *cerr = duckdb_result_error(res);
-		std::string err = cerr != nullptr ? std::string(cerr) : "N/A";
-		std::cerr << "Query error, message: [\n" + err + "\n]" << std::endl;
+bool QuerySuccess(Result &res, bool st) {
+	if (!st) {
+		std::cerr << "Query error, message: [\n" + res.Error() + "\n]" << std::endl;
 		return false;
 	}
 	return true;
 }
 
-bool PreparedSuccess(duckdb_prepared_statement ps, duckdb_state st) {
-	if (st != DuckDBSuccess) {
-		const char *cerr = duckdb_prepare_error(ps);
-		std::string err = cerr != nullptr ? std::string(cerr) : "N/A";
-		std::cerr << "Prepared statement error, message: [\n" + err + "\n]" << std::endl;
+bool PreparedSuccess(PreparedStatement &ps, bool st) {
+	if (!st) {
+		std::cerr << "Prepared statement error, message: [\n" + ps.error + "\n]" << std::endl;
 		return false;
 	}
 	return true;

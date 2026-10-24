@@ -57,7 +57,7 @@ struct OdbcConnection {
 	OdbcConnection &operator=(const OdbcConnection &) = delete;
 	OdbcConnection &operator=(OdbcConnection &&other) = delete;
 
-	static ExtractedConnection ExtractOrOpen(const std::string &function_name, duckdb_value conn_id_or_str_val);
+	static ExtractedConnection ExtractOrOpen(const std::string &function_name, const Value *conn_id_or_str_val);
 };
 
 struct ExtractedConnection {
