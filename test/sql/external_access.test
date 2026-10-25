@@ -1,0 +1,66 @@
+# name: test/sql/external_access.test
+# description: odbc_connect, odbc_query and odbc_copy check enable_external_access before opening a connection
+# group: [sql_external_access]
+
+require odbc_scanner
+
+require-env ODBC_CONN_STRING
+
+# connection opened while external access is still enabled
+statement ok
+SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
+
+statement ok
+SET enable_external_access=false
+
+# the connection is not even opened: the check fails at bind, before the ODBC driver is touched
+
+statement error
+SELECT odbc_connect('${ODBC_CONN_STRING}')
+----
+ODBC connections cannot be opened when external access is disabled (enable_external_access)
+
+statement error
+SELECT odbc_connect('Driver=fail', 'foo', 'bar')
+----
+ODBC connections cannot be opened when external access is disabled (enable_external_access)
+
+statement error
+SELECT * FROM odbc_query('${ODBC_CONN_STRING}', 'SELECT 1')
+----
+ODBC connections cannot be opened when external access is disabled (enable_external_access)
+
+statement error
+SELECT * FROM odbc_query('Driver=fail', 'SELECT 1')
+----
+ODBC connections cannot be opened when external access is disabled (enable_external_access)
+
+# already opened connections cannot be used for querying either
+
+statement error
+SELECT * FROM odbc_query(getvariable('conn'), 'SELECT 1')
+----
+ODBC connections cannot be opened when external access is disabled (enable_external_access)
+
+statement error
+SELECT * FROM odbc_copy(getvariable('conn'),
+  dest_table='external_access_test_copy',
+  create_table=TRUE,
+  source_query='SELECT 42::INTEGER'
+)
+----
+ODBC connections cannot be opened when external access is disabled (enable_external_access)
+
+statement error
+SELECT * FROM odbc_copy('${ODBC_CONN_STRING}',
+  dest_table='external_access_test_copy',
+  create_table=TRUE,
+  source_query='SELECT 42::INTEGER'
+)
+----
+ODBC connections cannot be opened when external access is disabled (enable_external_access)
+
+# closing a connection does not access external resources
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

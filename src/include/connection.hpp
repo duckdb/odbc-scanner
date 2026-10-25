@@ -58,6 +58,11 @@ struct OdbcConnection {
 	OdbcConnection &operator=(OdbcConnection &&other) = delete;
 
 	static ExtractedConnection ExtractOrOpen(const std::string &function_name, const Value *conn_id_or_str_val);
+
+	// Opening an ODBC connection accesses an external resource - a local file or a network host, depending on the
+	// driver - outside of the file systems of DuckDB, so it must honor enable_external_access like the other
+	// data-access paths.
+	static void VerifyExternalAccess(Context &context);
 };
 
 struct ExtractedConnection {

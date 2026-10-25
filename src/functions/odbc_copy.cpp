@@ -609,6 +609,7 @@ static GeneralOptions ExtractGeneralOptions(const Value *close_connection_val, b
 
 static void Bind(TableFunction::BindInput &input) {
 	Factory &factory = input.GetContext().GetFactory();
+	OdbcConnection::VerifyExternalAccess(input.GetContext());
 	auto conn_id_or_str_val = FunctionArgs::GetArg(input, 0);
 	auto extracted_conn = OdbcConnection::ExtractOrOpen("odbc_copy", conn_id_or_str_val.get());
 	// Return the connection to registry at the end of the block

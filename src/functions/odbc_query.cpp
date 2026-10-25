@@ -121,6 +121,7 @@ static QueryOptions ExtractQueryOptions(const Value *ignore_exec_failure_val, co
 
 static void Bind(TableFunction::BindInput &input) {
 	Factory &factory = input.GetContext().GetFactory();
+	OdbcConnection::VerifyExternalAccess(input.GetContext());
 	auto conn_id_or_str_val = FunctionArgs::GetArg(input, 0);
 	auto extracted_conn = OdbcConnection::ExtractOrOpen("odbc_query", conn_id_or_str_val.get());
 	// Return the connection to registry at the end of the block

@@ -187,6 +187,18 @@ OdbcConnection::~OdbcConnection() noexcept {
 	SQLFreeHandle(SQL_HANDLE_ENV, env);
 }
 
+void OdbcConnection::VerifyExternalAccess(Context &context) {
+	auto opt = context.GetConfig().TryGetOption("enable_external_access");
+	if (!opt.has_value() || opt->value.IsNull()) {
+		// the setting is unavailable - do not block
+		return;
+	}
+	if (!opt->value.Get<bool>()) {
+		throw ScannerException(
+		    "ODBC connections cannot be opened when external access is disabled (enable_external_access)");
+	}
+}
+
 ExtractedConnection OdbcConnection::ExtractOrOpen(const std::string &function_name, const Value *conn_id_or_str_val) {
 	if (conn_id_or_str_val->IsNull()) {
 		throw ScannerException("'" + function_name + "' error: specified ODBC connection must be not NULL");
