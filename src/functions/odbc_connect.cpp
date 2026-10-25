@@ -15,6 +15,8 @@
 #include "strings.hpp"
 #include "types.hpp"
 
+static void odbc_connect_bind(duckdb::cxx::ScalarFunction::BindInput &input);
+
 namespace odbcscanner {
 
 static void AppendUsernameAndPassword(ScalarFunction::ExecInput &input, std::string &conn_str) {
@@ -140,6 +142,10 @@ static std::pair<std::vector<OdbcConnectionAttribute>, bool> ExtractAttrs(Scalar
 	return std::make_pair(std::move(attrs), true);
 }
 
+static void Bind(ScalarFunction::BindInput &input) {
+	OdbcConnection::VerifyExternalAccess(input.GetContext());
+}
+
 static void Connect(ScalarFunction::ExecInput &input) {
 	Vector output = input.GetResult();
 
@@ -191,6 +197,7 @@ void OdbcConnectFunction::Register(Extension &extension, Factory &factory) {
 	sig.SetReturnType(bigint_type);
 
 	// callbacks
+	fun.SetBindCallback(odbc_connect_bind);
 	fun.SetExecCallback(Connect);
 
 	// options
@@ -206,3 +213,11 @@ void OdbcConnectFunction::Register(Extension &extension, Factory &factory) {
 }
 
 } // namespace odbcscanner
+
+static void odbc_connect_bind(duckdb::cxx::ScalarFunction::BindInput &input) {
+	try {
+		odbcscanner::Bind(input);
+	} catch (std::exception &e) {
+		throw odbcscanner::FunctionArgs::BinderError(e.what());
+	}
+}
