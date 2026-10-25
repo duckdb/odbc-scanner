@@ -218,10 +218,12 @@ if(NOT MSVC)
         )
     endif()
 else()
-    target_compile_options(${EXTENSION_NAME} PRIVATE
-        /W4
-        /WX
-    )
+    if(NOT DEFINED ${EXTENSION_NAME}_CMAKE_ONLY_BUILD)
+        target_compile_options(${EXTENSION_NAME} PRIVATE
+            /W4
+            /WX
+        )
+    endif()
     target_compile_definitions(${EXTENSION_NAME} PRIVATE
         -D_CRT_SECURE_NO_WARNINGS
     )
