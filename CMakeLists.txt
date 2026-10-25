@@ -10,10 +10,19 @@ if(DEFINED DUCKDB_MODULE_BASE_DIR)
     set(EXTENSION_NAME odbc_scanner)
     set(${EXTENSION_NAME}_CMAKE_ONLY_BUILD TRUE)
 
-    set(TARGET_DUCKDB_VERSION_MAJOR 2)
-    set(TARGET_DUCKDB_VERSION_MINOR 0)
-    set(TARGET_DUCKDB_VERSION_PATCH 0)
-    set(DUCKDB_EXTENSION_API_VERSION_UNSTABLE v2.0.0)
+    # Expected DUCKDB_VERSION format: "v2.1.0-alpha42"
+    if("${DUCKDB_VERSION}" MATCHES "^v([0-9]+)\\.([0-9]+)\\.([0-9]+(-[0-9A-Za-z]+)?)$")
+        message(STATUS "ODBC extension configured with C API V2 (unstable) version: ${DUCKDB_VERSION}")
+        set(TARGET_DUCKDB_VERSION_MAJOR ${CMAKE_MATCH_1})
+        set(TARGET_DUCKDB_VERSION_MINOR ${CMAKE_MATCH_2})
+        set(TARGET_DUCKDB_VERSION_PATCH ${CMAKE_MATCH_3})
+    else()
+        message(WARNING "ODBC: Unexpected DUCKDB_VERSION format: '${DUCKDB_VERSION}', using 'v2.1.0-dev' instead")
+        set(TARGET_DUCKDB_VERSION_MAJOR 2)
+        set(TARGET_DUCKDB_VERSION_MINOR 1)
+        set(TARGET_DUCKDB_VERSION_PATCH 0-dev)
+    endif()
+    set(DUCKDB_EXTENSION_API_VERSION_UNSTABLE ${DUCKDB_VERSION})
 
     find_package(Git)
     if(Git_FOUND)
@@ -84,7 +93,6 @@ endif()
 
 # Create Extension library
 set(EXTENSION_SOURCES
-    duckdb_capi_v2/cpp/duckdb_cpp.cpp
     src/binary.cpp
     src/capi_entry_point.cpp
     src/columns.cpp
@@ -128,6 +136,16 @@ set(EXTENSION_SOURCES
     src/types/varchar_type.cpp
 )
 
+if(DEFINED ${EXTENSION_NAME}_CMAKE_ONLY_BUILD)
+    LIST(APPEND EXTENSION_SOURCES
+        ${DUCKDB_MODULE_BASE_DIR}/tools/cpp/duckdb_cpp.cpp
+    )
+else()
+    LIST(APPEND EXTENSION_SOURCES
+        duckdb_capi_v2/cpp/duckdb_cpp.cpp
+    )
+endif()
+
 add_library(${EXTENSION_NAME} SHARED ${EXTENSION_SOURCES})
 
 # C++ API calls are routed through the extension API struct
@@ -161,6 +179,15 @@ if(DEFINED ${EXTENSION_NAME}_CMAKE_ONLY_BUILD)
             -DNULL_FILE=${DUCKDB_MODULE_BASE_DIR}/scripts/null.txt
             -P ${DUCKDB_MODULE_BASE_DIR}/scripts/append_metadata.cmake
     )
+    target_include_directories(${EXTENSION_NAME} PRIVATE
+        ${DUCKDB_MODULE_BASE_DIR}/src/include
+        ${DUCKDB_MODULE_BASE_DIR}/tools/cpp
+    )
+else()
+    target_include_directories(${EXTENSION_NAME} PRIVATE
+        duckdb_capi_v2
+        duckdb_capi_v2/cpp
+    )
 endif()
 
 # Hide symbols
@@ -175,8 +202,6 @@ endif()
 
 target_include_directories(${EXTENSION_NAME} PRIVATE
     third_party/utf8cpp
-    duckdb_capi_v2
-    duckdb_capi_v2/cpp
     ${ODBC_INCLUDE_DIRS}
     src/include
 )
