@@ -65,6 +65,22 @@ test: test_c_api
 
 test_release: test_c_api
 
+ifeq ($(CI_UPLOAD_ALL_EXTENSIONS),true)
+release: stage_ci_artifact
+
+.PHONY: stage_ci_artifact
+stage_ci_artifact: build_extension_with_metadata_release
+	$(PYTHON_BIN) scripts/ci_artifacts.py stage --build-directory "$(EXTENSION_BUILD_PATH)/release" --filename "$(EXTENSION_FILENAME)" --duckdb-version "$(DUCKDB_VERSION)" --platform "$(DUCKDB_PLATFORM)"
+endif
+
+ifneq ($(CI_EXTENSION_ARTIFACT_DIR),)
+test_c_api: restore_ci_artifact
+
+.PHONY: restore_ci_artifact
+restore_ci_artifact: configure
+	$(PYTHON_BIN) scripts/ci_artifacts.py restore --build-directory "$(EXTENSION_BUILD_PATH)/release" --filename "$(EXTENSION_FILENAME)" --duckdb-version "$(DUCKDB_VERSION)" --platform "$(DUCKDB_PLATFORM)" --repository "$(CI_EXTENSION_ARTIFACT_DIR)"
+endif
+
 test_debug: test_c_api_debug
 
 clean: clean_build clean_cmake
