@@ -14,7 +14,12 @@ namespace odbcscanner {
 std::string OdbcType::ToString() const {
 	return "code: " + std::to_string(desc_type) + ", concise type: " + std::to_string(desc_concise_type) +
 	       ", type name: '" + desc_type_name + "', unsigned: " + std::to_string(is_unsigned) +
-	       ", precision: " + std::to_string(decimal_precision) + ", scale: " + std::to_string(decimal_scale);
+	       ", precision: " + std::to_string(decimal_precision) + ", scale: " + std::to_string(decimal_scale) +
+	       ", source precision: " + std::to_string(decimal_source_precision);
+}
+
+bool OdbcType::DecimalExceedsNumericStruct() const {
+	return decimal_source_precision > 38;
 }
 
 bool OdbcType::Equals(const OdbcType &other) const {

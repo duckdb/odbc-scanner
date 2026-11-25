@@ -321,3 +321,57 @@ FROM odbc_query(
 	REQUIRE(res.DecimalValue<int128_t>(0, 0).lower == 4302749291975741149ULL);
 	REQUIRE(res.DecimalValue<int128_t>(0, 0).upper == -669260594276348692LL);
 }
+
+TEST_CASE("Decimal INT128 query with max and min values", group_name) {
+	if (!(DBMSConfigured("DuckDB") || DBMSConfigured("PostgreSQL"))) {
+		return;
+	}
+	ScannerConn sc;
+	Result res;
+	bool st = Query(sc.conn,
+	                (R"(
+FROM odbc_query(
+  getvariable('conn'),
+  '
+    SELECT )" + CastAsDecimalSQL("''99999999999999999999999999999999999999''", 38, 0, "AS col1") +
+	                 ", " + CastAsDecimalSQL("''-99999999999999999999999999999999999999''", 38, 0, "AS col2") +
+	                 R"(
+  ')
+)")
+	                    .c_str(),
+	                res);
+	REQUIRE(QuerySuccess(res, st));
+	REQUIRE(res.NextChunk());
+	REQUIRE(res.DecimalValue<int128_t>(0, 0).lower == 687399551400673279ULL);
+	REQUIRE(res.DecimalValue<int128_t>(0, 0).upper == 5421010862427522170LL);
+	REQUIRE(res.DecimalValue<int128_t>(1, 0).lower == 17759344522308878337ULL);
+	REQUIRE(res.DecimalValue<int128_t>(1, 0).upper == -5421010862427522171LL);
+}
+
+TEST_CASE("Decimal INT128 query with values fetched as chars", group_name) {
+	if (!(DBMSConfigured("DuckDB") || DBMSConfigured("PostgreSQL"))) {
+		return;
+	}
+	ScannerConn sc;
+	Result res;
+	// these values overflow the lower 64 bits when the last digit is appended
+	bool st = Query(sc.conn,
+	                (R"(
+FROM odbc_query(
+  getvariable('conn'),
+  '
+    SELECT )" + CastAsDecimalSQL("''36893488147419103220''", 20, 0, "AS col1") +
+	                 ", " + CastAsDecimalSQL("''-36893488147419103220''", 20, 0, "AS col2") +
+	                 R"(
+  ',
+  decimal_columns_as_chars=TRUE)
+)")
+	                    .c_str(),
+	                res);
+	REQUIRE(QuerySuccess(res, st));
+	REQUIRE(res.NextChunk());
+	REQUIRE(res.DecimalValue<int128_t>(0, 0).lower == 18446744073709551604ULL);
+	REQUIRE(res.DecimalValue<int128_t>(0, 0).upper == 1LL);
+	REQUIRE(res.DecimalValue<int128_t>(1, 0).lower == 12ULL);
+	REQUIRE(res.DecimalValue<int128_t>(1, 0).upper == -2LL);
+}

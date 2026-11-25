@@ -66,6 +66,7 @@ static OdbcType GetTypeAttributes(const std::string &query, SQLSMALLINT cols_cou
 
 	uint8_t decimal_precision = 0;
 	uint8_t decimal_scale = 0;
+	SQLLEN decimal_source_precision = 0;
 	if (desc_concise_type == SQL_DECIMAL || desc_concise_type == SQL_NUMERIC) {
 		{
 			SQLLEN precision = 0;
@@ -77,7 +78,11 @@ static OdbcType GetTypeAttributes(const std::string &query, SQLSMALLINT cols_cou
 				    ", columns count: " + std::to_string(cols_count) + ", query: '" + query +
 				    "', return: " + std::to_string(ret) + ", diagnostics: '" + diag + "'");
 			}
+			// Drivers report zero precision for unconstrained types (like NUMBER in Oracle), and the source type
+			// can be wider than DECIMAL(38), in both cases the column is mapped to the widest DECIMAL
+			// and every fetched value is checked to fit it exactly.
 			decimal_precision = static_cast<uint8_t>(precision >= 1 && precision <= 38 ? precision : 38);
+			decimal_source_precision = precision;
 		}
 
 		{
@@ -101,7 +106,7 @@ static OdbcType GetTypeAttributes(const std::string &query, SQLSMALLINT cols_cou
 	}
 
 	return OdbcType(desc_type, desc_concise_type, is_unsigned == SQL_TRUE, std::move(desc_type_name), decimal_precision,
-	                decimal_scale);
+	                decimal_scale, decimal_source_precision);
 }
 
 std::vector<ResultColumn> Columns::Collect(const QueryContext &ctx) {

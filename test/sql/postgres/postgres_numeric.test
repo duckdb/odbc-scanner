@@ -1,0 +1,202 @@
+# name: test/sql/postgres/postgres_numeric.test
+# description: test for NUMERIC type with PostgreSQL
+# group: [sql_postgres_numeric]
+
+require odbc_scanner
+
+require-env ODBC_CONN_STRING
+
+require-env POSTGRES_AVAILABLE
+
+statement ok
+SET VARIABLE conn = odbc_connect('${ODBC_CONN_STRING}')
+
+query III
+FROM odbc_query(getvariable('conn'), '
+  SELECT
+    ''1.234''::NUMERIC(4,3) AS c1,
+    ''-123456789012345.123''::NUMERIC(18,3) AS c2,
+    ''12345678901234567890123456789012345.123''::NUMERIC(38,3) AS c3
+')
+----
+1.234
+-123456789012345.123
+12345678901234567890123456789012345.123
+
+query I
+SELECT column_type from (
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT ''1.234''::NUMERIC(4,3) AS c1, ''1.234''::NUMERIC(18,3) AS c2, ''1.234''::NUMERIC(38,3) AS c3')
+)
+----
+DECIMAL(4,3)
+DECIMAL(18,3)
+DECIMAL(38,3)
+
+# values at the edges of the type
+
+query IIIIII
+FROM odbc_query(getvariable('conn'), '
+  SELECT
+    ''99999999999999999999999999999999999999''::NUMERIC(38,0) AS c1,
+    ''-99999999999999999999999999999999999999''::NUMERIC(38,0) AS c2,
+    ''0.99999999999999999999999999999999999999''::NUMERIC(38,38) AS c3,
+    ''-0.99999999999999999999999999999999999999''::NUMERIC(38,38) AS c4,
+    ''0''::NUMERIC(38,10) AS c5,
+    NULL::NUMERIC(38,10) AS c6
+')
+----
+99999999999999999999999999999999999999
+-99999999999999999999999999999999999999
+0.99999999999999999999999999999999999999
+-0.99999999999999999999999999999999999999
+0.0000000000
+NULL
+
+# these values overflow the lower 64 bits when the next digit is appended
+
+query IIII
+FROM odbc_query(getvariable('conn'), '
+  SELECT
+    ''36893488147419103220''::NUMERIC(20,0) AS c1,
+    ''-36893488147419103220''::NUMERIC(20,0) AS c2,
+    ''18446744073709551616''::NUMERIC(38,0) AS c3,
+    ''184467440737095516.15''::NUMERIC(38,2) AS c4
+')
+----
+36893488147419103220
+-36893488147419103220
+18446744073709551616
+184467440737095516.15
+
+# NUMERIC without precision is reported by the driver as NUMERIC(28,6),
+# values are returned with the scale they have
+
+query I
+SELECT column_type from (
+  DESCRIBE FROM odbc_query(getvariable('conn'), 'SELECT ''1.5''::NUMERIC')
+)
+----
+DECIMAL(28,6)
+
+query IIIII
+FROM odbc_query(getvariable('conn'), '
+  SELECT
+    ''1.5''::NUMERIC AS c1,
+    ''-0.123456''::NUMERIC AS c2,
+    ''1234567890123456789012''::NUMERIC AS c3,
+    ''1.50000000000000000000''::NUMERIC AS c4,
+    NULL::NUMERIC AS c5
+')
+----
+1.500000
+-0.123456
+1234567890123456789012.000000
+1.500000
+NULL
+
+statement error
+FROM odbc_query(getvariable('conn'), 'SELECT ''0.1234567''::NUMERIC')
+----
+value has more fractional digits than the column scale, value: '0.1234567'
+
+statement error
+FROM odbc_query(getvariable('conn'), 'SELECT ''12345678901234567890123''::NUMERIC')
+----
+value has more digits than the column precision, value: '12345678901234567890123'
+
+statement error
+FROM odbc_query(getvariable('conn'), 'SELECT ''NaN''::NUMERIC')
+----
+value is not a finite decimal number, value: 'NaN'
+
+statement error
+FROM odbc_query(getvariable('conn'), 'SELECT ''-Infinity''::NUMERIC')
+----
+value is not a finite decimal number, value: '-Infinity'
+
+# value text that is longer than the fetch buffer
+
+query I
+FROM odbc_query(getvariable('conn'), 'SELECT (''1.5'' || repeat(''0'', 600))::NUMERIC')
+----
+1.500000
+
+statement error
+FROM odbc_query(getvariable('conn'), 'SELECT (''1.5'' || repeat(''0'', 600) || ''1'')::NUMERIC')
+----
+value has more fractional digits than the column scale
+
+# NUMERIC types that are wider than DECIMAL(38) are mapped to DECIMAL(38),
+# values that do not fit it are reported, they are never truncated
+
+query I
+SELECT column_type from (
+  DESCRIBE FROM odbc_query(getvariable('conn'), '
+    SELECT ''1.5''::NUMERIC(50,10) AS c1, ''1.5''::NUMERIC(255,20) AS c2, ''1.5''::NUMERIC(300,2) AS c3, ''1.5''::NUMERIC(50,45) AS c4')
+)
+----
+DECIMAL(38,10)
+DECIMAL(38,20)
+DECIMAL(38,2)
+DECIMAL(38,38)
+
+query IIII
+FROM odbc_query(getvariable('conn'), '
+  SELECT
+    ''1234567890123456789012345678.0123456789''::NUMERIC(50,10) AS c1,
+    ''-1.5''::NUMERIC(255,20) AS c2,
+    ''999999999999999999999999999999999999.99''::NUMERIC(300,2) AS c3,
+    ''-0.5''::NUMERIC(50,45) AS c4
+')
+----
+1234567890123456789012345678.0123456789
+-1.50000000000000000000
+999999999999999999999999999999999999.99
+-0.50000000000000000000000000000000000000
+
+statement error
+FROM odbc_query(getvariable('conn'), 'SELECT ''1234567890123456789012345678901234567890.0123456789''::NUMERIC(50,10)')
+----
+cannot be represented as DECIMAL(38,10) without changing it: value has more digits than the column precision, value: '1234567890123456789012345678901234567890.0123456789'
+
+statement error
+FROM odbc_query(getvariable('conn'), 'SELECT ''-12345678901234567890123456789.0123456789''::NUMERIC(50,10)')
+----
+value has more digits than the column precision
+
+statement error
+FROM odbc_query(getvariable('conn'), 'SELECT ''1.5''::NUMERIC(50,45)')
+----
+cannot be represented as DECIMAL(38,38) without changing it: value has more digits than the column precision
+
+statement error
+FROM odbc_query(getvariable('conn'), 'SELECT ''0.000000000000000000000000000000000000001''::NUMERIC(50,45)')
+----
+value has more fractional digits than the column scale
+
+# SQL_NUMERIC_STRUCT is used only when it is requested explicitly
+
+query III
+FROM odbc_query(getvariable('conn'), '
+  SELECT
+    ''-12345678901234567890123456789012345.123''::NUMERIC(38,3) AS c1,
+    ''1.5''::NUMERIC AS c2,
+    ''1.5''::NUMERIC(50,10) AS c3
+', decimal_columns_as_chars=FALSE)
+----
+-12345678901234567890123456789012345.123
+1.500000
+1.5000000000
+
+statement error
+FROM odbc_query(getvariable('conn'), 'SELECT ''0.1234567''::NUMERIC', decimal_columns_as_chars=FALSE)
+----
+value has more fractional digits than the column scale, value: '0.1234567'
+
+statement error
+FROM odbc_query(getvariable('conn'), 'SELECT ''1234567890123456789012345678901234567890''::NUMERIC', decimal_columns_as_chars=FALSE)
+----
+was truncated by the ODBC driver
+
+statement ok
+SELECT odbc_close(getvariable('conn'))

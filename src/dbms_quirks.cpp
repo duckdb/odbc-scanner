@@ -37,6 +37,9 @@ DbmsQuirks::DbmsQuirks(OdbcConnection &conn, const std::map<std::string, std::un
 		this->decimal_columns_as_chars = true;
 		break;
 	case DbmsDriver::POSTGRESQL:
+		// NUMERIC values in PostgreSQL are not limited to 38 digits ('NaN' and 'Infinity' are also allowed),
+		// such values are truncated or zeroed by the driver when they are fetched as SQL_NUMERIC_STRUCT
+		this->decimal_columns_as_chars = true;
 		break;
 	case DbmsDriver::FIREBIRD:
 		this->decimal_params_as_chars = true;
