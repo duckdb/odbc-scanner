@@ -2,6 +2,18 @@
 
 static const std::string group_name = "[capi_decimal]";
 
+// The Arrow Flight SQL ODBC driver describes every DECIMAL column as DECIMAL(19,0), whatever its declared
+// precision and scale. A value with fractional digits or with more than 19 digits does not fit that type,
+// and is rejected instead of being returned as a different number.
+static bool RejectedByFlightSQL(Result &res, bool st) {
+	if (!DBMSConfigured("FlightSQL")) {
+		return false;
+	}
+	REQUIRE_FALSE(st);
+	REQUIRE(res.Error().find("cannot be represented as DECIMAL(19,0) without changing it") != std::string::npos);
+	return true;
+}
+
 TEST_CASE("Decimal INT16 query with a literal", group_name) {
 	ScannerConn sc;
 	Result res;
@@ -16,6 +28,9 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
+	if (RejectedByFlightSQL(res, st)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == 1234);
@@ -35,6 +50,9 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
+	if (RejectedByFlightSQL(res, st)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == -1234);
@@ -54,6 +72,9 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
+	if (RejectedByFlightSQL(res, st)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int32_t>(0, 0) == 123456789);
@@ -73,6 +94,9 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
+	if (RejectedByFlightSQL(res, st)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int32_t>(0, 0) == -123456789);
@@ -92,6 +116,9 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
+	if (RejectedByFlightSQL(res, st)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int64_t>(0, 0) == 123456789012345123LL);
@@ -111,6 +138,9 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
+	if (RejectedByFlightSQL(res, st)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int64_t>(0, 0) == -123456789012345123LL);
@@ -133,6 +163,9 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
+	if (RejectedByFlightSQL(res, st)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int128_t>(0, 0).lower == 14143994781733810467ULL);
@@ -174,6 +207,9 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
+	if (RejectedByFlightSQL(res, st)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int128_t>(0, 0).lower == 4302749291975741149ULL);
