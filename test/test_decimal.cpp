@@ -2,15 +2,23 @@
 
 static const std::string group_name = "[capi_decimal]";
 
-// The Arrow Flight SQL ODBC driver describes every DECIMAL column as DECIMAL(19,0), whatever its declared
-// precision and scale. A value with fractional digits or with more than 19 digits does not fit that type,
-// and is rejected instead of being returned as a different number.
-static bool RejectedByFlightSQL(Result &res, bool st) {
-	if (!DBMSConfigured("FlightSQL")) {
+// Some drivers do not report the precision and scale of DECIMAL columns: the Arrow Flight SQL ODBC driver
+// describes every DECIMAL column as DECIMAL(19,0), the ClickHouse ODBC driver reports zero precision and
+// scale for them (such column is mapped to DECIMAL(38,0)). A value with fractional digits or with more digits
+// than the described precision does not fit that type, and is rejected instead of being returned as a different
+// number.
+static bool RejectedAsUndescribedDecimal(Result &res, bool st) {
+	std::string described_type;
+	if (DBMSConfigured("FlightSQL")) {
+		described_type = "DECIMAL(19,0)";
+	} else if (DBMSConfigured("ClickHouse")) {
+		described_type = "DECIMAL(38,0)";
+	} else {
 		return false;
 	}
 	REQUIRE_FALSE(st);
-	REQUIRE(res.Error().find("cannot be represented as DECIMAL(19,0) without changing it") != std::string::npos);
+	REQUIRE(res.Error().find("cannot be represented as " + described_type + " without changing it") !=
+	        std::string::npos);
 	return true;
 }
 
@@ -28,7 +36,7 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
-	if (RejectedByFlightSQL(res, st)) {
+	if (RejectedAsUndescribedDecimal(res, st)) {
 		return;
 	}
 	REQUIRE(QuerySuccess(res, st));
@@ -50,7 +58,7 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
-	if (RejectedByFlightSQL(res, st)) {
+	if (RejectedAsUndescribedDecimal(res, st)) {
 		return;
 	}
 	REQUIRE(QuerySuccess(res, st));
@@ -72,7 +80,7 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
-	if (RejectedByFlightSQL(res, st)) {
+	if (RejectedAsUndescribedDecimal(res, st)) {
 		return;
 	}
 	REQUIRE(QuerySuccess(res, st));
@@ -94,7 +102,7 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
-	if (RejectedByFlightSQL(res, st)) {
+	if (RejectedAsUndescribedDecimal(res, st)) {
 		return;
 	}
 	REQUIRE(QuerySuccess(res, st));
@@ -116,7 +124,7 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
-	if (RejectedByFlightSQL(res, st)) {
+	if (RejectedAsUndescribedDecimal(res, st)) {
 		return;
 	}
 	REQUIRE(QuerySuccess(res, st));
@@ -138,7 +146,7 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
-	if (RejectedByFlightSQL(res, st)) {
+	if (RejectedAsUndescribedDecimal(res, st)) {
 		return;
 	}
 	REQUIRE(QuerySuccess(res, st));
@@ -163,7 +171,7 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
-	if (RejectedByFlightSQL(res, st)) {
+	if (RejectedAsUndescribedDecimal(res, st)) {
 		return;
 	}
 	REQUIRE(QuerySuccess(res, st));
@@ -207,7 +215,7 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
-	if (RejectedByFlightSQL(res, st)) {
+	if (RejectedAsUndescribedDecimal(res, st)) {
 		return;
 	}
 	REQUIRE(QuerySuccess(res, st));
@@ -234,6 +242,9 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
+	if (RejectedAsUndescribedDecimal(res, st)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == 1234);
@@ -257,6 +268,9 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
+	if (RejectedAsUndescribedDecimal(res, st)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == -1234);
@@ -281,6 +295,9 @@ FROM odbc_query(
 )")
 	                    .c_str(),
 	                res);
+	if (RejectedAsUndescribedDecimal(res, st)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int128_t>(0, 0).lower == 4302749291975741149ULL);
@@ -316,6 +333,9 @@ FROM odbc_query(
 	Result res;
 	bool st_exec = ps.Execute(res);
 
+	if (RejectedAsUndescribedDecimal(res, st_exec)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st_exec));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int16_t>(0, 0) == -1234);
@@ -352,6 +372,9 @@ FROM odbc_query(
 	Result res;
 	bool st_exec = ps.Execute(res);
 
+	if (RejectedAsUndescribedDecimal(res, st_exec)) {
+		return;
+	}
 	REQUIRE(QuerySuccess(res, st_exec));
 	REQUIRE(res.NextChunk());
 	REQUIRE(res.DecimalValue<int128_t>(0, 0).lower == 4302749291975741149ULL);

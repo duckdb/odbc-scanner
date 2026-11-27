@@ -2,10 +2,11 @@
 # description: test odbc_close() function
 # group: [sql_close]
 
+# extension is auto-loaded on the first call to its function
 statement error
 SELECT odbc_close()
 ----
-Catalog Error: Scalar Function
+Binder Error: No function matches the given name and argument types 'odbc_close()'
 
 require odbc_scanner
 

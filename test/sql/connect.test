@@ -2,10 +2,11 @@
 # description: test odbc_connect() function
 # group: [sql_connect]
 
+# extension is auto-loaded on the first call to its function
 statement error
 SET VARIABLE conn = odbc_connect()
 ----
-Catalog Error: Scalar Function
+invalid number of arguments specified
 
 require odbc_scanner
 
