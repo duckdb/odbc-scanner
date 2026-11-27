@@ -17,14 +17,18 @@ struct OdbcType {
 	SQLLEN desc_concise_type;
 	bool is_unsigned;
 	std::string desc_type_name;
+	// Width and scale of the DuckDB DECIMAL the column is mapped to
 	uint8_t decimal_precision;
 	uint8_t decimal_scale;
+	// Precision as reported by the driver, can be zero (unconstrained) or greater than 'decimal_precision'
+	SQLLEN decimal_source_precision;
 
 	explicit OdbcType(SQLLEN desc_type_in, SQLLEN desc_concise_type_in, bool is_unsigned_in,
-	                  std::string desc_type_name_in, uint8_t decimal_precision_in, uint8_t decimal_scale_in)
+	                  std::string desc_type_name_in, uint8_t decimal_precision_in, uint8_t decimal_scale_in,
+	                  SQLLEN decimal_source_precision_in)
 	    : desc_type(desc_type_in), desc_concise_type(desc_concise_type_in), is_unsigned(is_unsigned_in),
 	      desc_type_name(std::move(desc_type_name_in)), decimal_precision(decimal_precision_in),
-	      decimal_scale(decimal_scale_in) {
+	      decimal_scale(decimal_scale_in), decimal_source_precision(decimal_source_precision_in) {
 	}
 
 	OdbcType(OdbcType &other) = delete;
@@ -36,6 +40,9 @@ struct OdbcType {
 	std::string ToString() const;
 
 	bool Equals(const OdbcType &other) const;
+
+	// SQL_NUMERIC_STRUCT holds at most 38 digits, columns that are declared wider can only be fetched as text
+	bool DecimalExceedsNumericStruct() const;
 };
 
 struct Types {
