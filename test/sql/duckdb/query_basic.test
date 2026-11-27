@@ -2,10 +2,11 @@
 # description: basic test for odbc_query() function with DuckDB
 # group: [duckdb_query_basic]
 
+# extension is auto-loaded on the first call to its function
 statement error
 FROM odbc_query()
 ----
-Catalog Error: Table Function
+Binder Error: No function matches the given name and argument types 'odbc_query()'
 
 require odbc_scanner
 

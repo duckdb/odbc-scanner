@@ -12,7 +12,7 @@ EXTENSION_NAME := odbc_scanner
 USE_UNSTABLE_C_API := 1
 
 # The DuckDB version to target
-TARGET_DUCKDB_VERSION := v2.0.0
+TARGET_DUCKDB_VERSION := v2.0.1
 
 ENABLE_C_API_TESTS := TRUE
 
@@ -24,7 +24,7 @@ endif
 CMAKE_EXTRA_BUILD_FLAGS := -DENABLE_C_API_TESTS=$(ENABLE_C_API_TESTS)
 
 # extension-ci-tools only parses V1 versions, V2 version is passed explicitly
-CMAKE_EXTRA_BUILD_FLAGS += -DTARGET_DUCKDB_VERSION_MAJOR=2 -DTARGET_DUCKDB_VERSION_MINOR=0 -DTARGET_DUCKDB_VERSION_PATCH=0
+CMAKE_EXTRA_BUILD_FLAGS += -DTARGET_DUCKDB_VERSION_MAJOR=2 -DTARGET_DUCKDB_VERSION_MINOR=0 -DTARGET_DUCKDB_VERSION_PATCH=1
 
 CAPI_RUN_MSG := "Running C API tests using shared lib at $(DUCKDB_CAPI_LIB_PATH)"
 CAPI_ERROR_MSG := "C API test suite is disabled, to enable it specify DuckDB shared library in 'DUCKDB_CAPI_LIB_PATH' environment variable."

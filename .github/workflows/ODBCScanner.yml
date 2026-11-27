@@ -5,9 +5,9 @@ on:
   workflow_dispatch:
 
 env:
-  DUCKDB_CAPI_LIB_URL_LINUX_AMD64: https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-shared-libs-linux-amd64.tar.gz
+  DUCKDB_CAPI_LIB_URL_LINUX_AMD64: https://github.com/duckdb/duckdb/releases/download/v2.0.1/duckdb-shared-libs-linux-amd64.tar.gz
   CCACHE_DIR: ${{ github.workspace }}/ccache
-  DUCKDB_TEST_VERSION: v2.0.0
+  DUCKDB_TEST_VERSION: v2.0.1
 
 jobs:
   format-check:
@@ -28,7 +28,7 @@ jobs:
       CC: 'ccache gcc'
       CXX: 'ccache g++'
       ODBC_CONN_STRING: Driver={DuckDB Driver};
-      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v2.0.0.0/duckdb_odbc-linux-amd64.zip
+      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v2.0.1.0/duckdb_odbc-linux-amd64.zip
       DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.so
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.so
     steps:
@@ -94,9 +94,9 @@ jobs:
     env:
       GEN: ninja
       ODBC_CONN_STRING: Driver={DuckDB Driver};
-      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v2.0.0.0/duckdb_odbc-macos-arm64.zip
+      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v2.0.1.0/duckdb_odbc-macos-arm64.zip
       DUCKDB_ODBC_LIB_PATH: ${{ github.workspace }}/odbc/libduckdb_odbc.dylib
-      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-shared-libs-osx-arm64.tar.gz
+      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v2.0.1/duckdb-shared-libs-osx-arm64.tar.gz
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/libduckdb.dylib
     steps:
       - uses: actions/checkout@v6
@@ -162,8 +162,8 @@ jobs:
       CXX: 'ccache cl'
       CCACHE_DIR: ${{ github.workspace }}/ccache
       ODBC_CONN_STRING: Driver={DuckDB Driver};
-      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v2.0.0.0/duckdb_odbc-windows-amd64.zip
-      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-shared-libs-windows-amd64.tar.gz 
+      DUCKDB_ODBC_LIB_URL: https://github.com/duckdb/duckdb-odbc/releases/download/v2.0.1.0/duckdb_odbc-windows-amd64.zip
+      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v2.0.1/duckdb-shared-libs-windows-amd64.tar.gz 
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/duckdb.lib
       DUCKDB_CAPI_LIB_SHARED_PATH: ${{ github.workspace }}/libduckdb/duckdb.dll
     steps:
@@ -1028,7 +1028,7 @@ jobs:
       CXX: 'ccache cl'
       CCACHE_DIR: ${{ github.workspace }}/ccache
       ODBC_CONN_STRING: Driver={Firebird ODBC Driver};Database=localhost:C:/tmp/test.fdb;UID=SYSDBA;PWD=masterkey;CHARSET=UTF8;
-      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v2.0.0/duckdb-shared-libs-windows-amd64.tar.gz
+      DUCKDB_CAPI_LIB_URL: https://github.com/duckdb/duckdb/releases/download/v2.0.1/duckdb-shared-libs-windows-amd64.tar.gz
       DUCKDB_CAPI_LIB_PATH: ${{ github.workspace }}/libduckdb/duckdb.lib
       DUCKDB_CAPI_LIB_SHARED_PATH: ${{ github.workspace }}/libduckdb/duckdb.dll
     steps:
